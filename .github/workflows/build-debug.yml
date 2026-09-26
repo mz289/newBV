@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-debug:
-    name: Build Debug APK
+    name: Build Debug & Release APK
     runs-on: ubuntu-latest
     env:
       # job 级映射，供步骤的 if 判断（step 自身 env 在其 if 中不可见）
@@ -45,14 +45,16 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build debug & release APK
+        run: ./gradlew assembleDebug assembleRelease --stacktrace
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: newBV_debug_${{ github.sha }}
-          path: app/build/outputs/apk/debug/*.apk
+          name: newBV_apks_${{ github.sha }}
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
           retention-days: 7
           if-no-files-found: error
 
@@ -67,7 +69,7 @@ jobs:
           echo "versionCode=$(jq -r '.elements[0].versionCode' "$META")" >> "$GITHUB_OUTPUT"
           echo "versionName=$(jq -r '.elements[0].versionName' "$META")" >> "$GITHUB_OUTPUT"
 
-      - name: Publish debug prerelease
+      - name: Publish prerelease
         if: github.repository == 'mz289/newBV'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -75,12 +77,14 @@ jobs:
           VERSION_NAME: ${{ steps.version.outputs.versionName }}
         run: |
           TAG="v$VERSION_NAME"
-          APK="app/build/outputs/apk/debug/newBV_${VERSION_CODE}_${VERSION_NAME}_debug.apk"
-          test -f "$APK"
+          DEBUG_APK="app/build/outputs/apk/debug/newBV_${VERSION_CODE}_${VERSION_NAME}_debug.apk"
+          RELEASE_APK="app/build/outputs/apk/release/newBV_${VERSION_CODE}_${VERSION_NAME}_release.apk"
+          test -f "$DEBUG_APK"
+          test -f "$RELEASE_APK"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK" --clobber
+            gh release upload "$TAG" "$DEBUG_APK" "$RELEASE_APK" --clobber
           else
-            gh release create "$TAG" "$APK" \
+            gh release create "$TAG" "$DEBUG_APK" "$RELEASE_APK" \
               --title "newBV $VERSION_NAME" \
               --generate-notes \
               --prerelease
