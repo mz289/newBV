@@ -254,7 +254,8 @@ object Prefs {
     /**
      * 检查更新时是否接收预发布版本（默认关闭）。
      *
-     * 开启后更新检查会包含预发布 Release（如 mods 分支 CI 自动构建的 `debug` 预发布）。
+     * 开启后更新检查会包含预发布 Release（如 mods 分支 CI 自动构建的
+     * debug 预发布，以 `v<versionName>` 版本标签发布）。
      */
     var acceptPrerelease by pref(PrefKeys.acceptPrerelease, false)
 

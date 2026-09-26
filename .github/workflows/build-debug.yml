@@ -44,27 +44,32 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
-      # Actions 产物的 zip 下载接口需要鉴权，App 端无法匿名下载，
-      # 故将 APK 以 `debug` 标签的预发布 Release 形式发布，供 App 内更新检查匿名拉取。
-      # 每次 push 删除重建该 Release，保证其始终指向最新一次构建。
-      - name: Delete previous debug release
-        if: github.repository == 'mz289/newBV'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release delete debug --repo "${{ github.repository }}" --yes --cleanup-tag || true
+      # 参考 husi 的发布方式：每次构建发布为独立版本标签（v<versionName>）的
+      # 预发布 Release，历史版本保留可回滚；同一标签重建时 --clobber 覆盖附件。
+      # 不用 Actions 产物作 App 更新源——其 zip 下载接口需鉴权，App 无法匿名拉取；
+      # 预发布 Release 可匿名下载，App 内更新检查（接收预发布开关）直接消费。
+      - name: Read version from build output
+        id: version
+        run: |
+          META=app/build/outputs/apk/debug/output-metadata.json
+          echo "versionCode=$(jq -r '.elements[0].versionCode' "$META")" >> "$GITHUB_OUTPUT"
+          echo "versionName=$(jq -r '.elements[0].versionName' "$META")" >> "$GITHUB_OUTPUT"
 
       - name: Publish debug prerelease
         if: github.repository == 'mz289/newBV'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: debug
-          target_commitish: ${{ github.sha }}
-          name: newBV Debug 自动构建 #${{ github.run_number }}
-          body: |
-            mods 分支自动构建
-
-            commit: ${{ github.sha }}
-            ${{ github.event.head_commit.message }}
-          prerelease: true
-          make_latest: "false"
-          files: app/build/outputs/apk/debug/*.apk
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_CODE: ${{ steps.version.outputs.versionCode }}
+          VERSION_NAME: ${{ steps.version.outputs.versionName }}
+        run: |
+          TAG="v$VERSION_NAME"
+          APK="app/build/outputs/apk/debug/newBV_${VERSION_CODE}_${VERSION_NAME}_debug.apk"
+          test -f "$APK"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" \
+              --title "newBV $VERSION_NAME" \
+              --generate-notes \
+              --prerelease
+          fi

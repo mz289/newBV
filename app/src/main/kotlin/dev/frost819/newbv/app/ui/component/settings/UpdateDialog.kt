@@ -49,7 +49,7 @@ import java.io.File
  * 下载进度通过 [LinearProgressIndicator] 实时显示。
  *
  * 更新源统一为本仓库 Releases：稳定版取 `releases/latest`，
- * 开启"接收预发布版本"后包含 CI 自动构建的 `debug` 预发布；
+ * 开启"接收预发布版本"后包含 CI 自动构建的 debug 预发布（`v<versionName>` 版本标签）；
  * 并按当前构建 variant 匹配 APK 附件（debug 构建只认 debug 附件）。
  *
  * @param show 是否显示弹窗。
