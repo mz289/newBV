@@ -13,6 +13,9 @@ jobs:
   build-debug:
     name: Build Debug APK
     runs-on: ubuntu-latest
+    env:
+      # job 级映射，供步骤的 if 判断（step 自身 env 在其 if 中不可见）
+      DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
 
     steps:
       - name: Checkout
@@ -29,6 +32,15 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      # runner 的 debug keystore 是临时生成的，每次构建签名都不同，
+      # 会导致后续更新安装时签名不一致。改用仓库 secret 中的固定 keystore
+      # （与开发者本地 ~/.android/debug.keystore 相同，保证 CI 与本地构建可互相覆盖安装）。
+      - name: Restore stable debug keystore
+        if: env.DEBUG_KEYSTORE_B64 != ''
+        run: |
+          mkdir -p ~/.android
+          echo "$DEBUG_KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
