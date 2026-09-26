@@ -26,7 +26,7 @@ class SeasonEntityTest {
                 dimension =
                     dev.frost819.newbv.biliapi.http.entity.video
                         .Dimension(1920, 1080, 0),
-                duration = 1440,
+                duration = 1_440_000,
                 enableVt = false,
                 epId = 500,
                 from = "",
@@ -726,6 +726,32 @@ class SeasonEntityTest {
             seasonType = 1,
             title = "测试番剧",
         )
+
+    @Test
+    fun `PGC episode converts milliseconds to seconds for history progress`() {
+        // Given: PGC season API duration is in milliseconds; history lastTime is in seconds.
+        val source = fakeSeasonEpisode().copy(duration = 1_559_933)
+        // When
+        val episode = Episode.fromEpisode(source)
+        // Then
+        assertThat(episode.duration).isEqualTo(1559)
+    }
+
+    @Test
+    fun `PGC episode with unknown duration has no progress denominator`() {
+        // Given / When
+        val episode = Episode.fromEpisode(fakeSeasonEpisode().copy(duration = 0))
+        // Then
+        assertThat(episode.duration).isEqualTo(0)
+    }
+
+    @Test
+    fun `PGC episode clamps invalid negative duration`() {
+        // Given / When
+        val episode = Episode.fromEpisode(fakeSeasonEpisode().copy(duration = -1000))
+        // Then
+        assertThat(episode.duration).isEqualTo(0)
+    }
 
     private fun fakeSeasonEpisode(
         aid: Long = 100L,

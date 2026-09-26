@@ -26,6 +26,7 @@ data class Episode(
     val title: String,
     val longTitle: String,
     val cover: String,
+    /** 时长（秒），用于与观看历史计算进度。 */
     val duration: Int,
     val dimension: Dimension?,
 ) {
@@ -56,6 +57,7 @@ data class Episode(
                 dimension = Dimension.fromDimension(episode.page.dimension),
             )
 
+        /** 将 Web/App PGC 的毫秒时长转换为播放器和观看历史使用的秒数。 */
         fun fromEpisode(episode: dev.frost819.newbv.biliapi.http.entity.season.Episode) =
             Episode(
                 id = episode.id,
@@ -66,7 +68,7 @@ data class Episode(
                 title = episode.title,
                 longTitle = episode.longTitle,
                 epid = episode.epId,
-                duration = episode.duration,
+                duration = (episode.duration / 1000).coerceAtLeast(0),
                 dimension = episode.dimension?.let { Dimension.fromDimension(it) },
             )
     }
