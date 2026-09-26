@@ -29,8 +29,8 @@ import java.io.File
  *
  * 用于检查更新和下载 APK。更新统一走本仓库（fork）`mz289/newBV` 的 Releases：
  * - 稳定版：`releases/latest`（GitHub 天然排除预发布与草稿）。
- * - 预发布：Releases 列表（含 mods 分支 CI 自动构建的 `debug` 预发布），
- *   由"接收预发布版本"开关控制是否纳入。
+ * - 预发布：Releases 列表（含 mods 分支 CI 自动构建的 debug 预发布，
+ *   以 `v<versionName>` 版本标签发布），由"接收预发布版本"开关控制是否纳入。
  * 下载通过 `ghfast.top` 代理加速国内访问。
  */
 object GithubApi {
@@ -67,7 +67,7 @@ object GithubApi {
      *
      * @param includePrerelease 是否包含预发布版本。为 false 时仅查
      *   `releases/latest`（GitHub 排除预发布与草稿）；为 true 时按创建时间倒序
-     *   扫描 Releases 列表（含 CI 自动构建的 `debug` 预发布）。
+     *   扫描 Releases 列表（含 CI 自动构建的 debug 预发布，`v<versionName>` 版本标签）。
      * @param assetChannels 更新 APK 附件匹配关键字，需与当前构建 variant 一致
      *   （如 debug 构建传 `UpdateChannel.DEBUG.assetKeywords`）。
      * @return 最新的、包含匹配 APK 附件的非草稿 Release；
