@@ -1,34 +1,34 @@
 package dev.frost819.newbv.app.ui.screen.pgc
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -40,14 +40,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
@@ -59,13 +62,12 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.LoadingTip
-import dev.frost819.newbv.app.ui.component.dialog.EpisodeGridButton
 import dev.frost819.newbv.app.ui.component.dialog.EpisodeListDialog
+import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.navigation.PgcFeatureRoute
 import dev.frost819.newbv.app.ui.navigation.VideoPlayerRoute
@@ -77,9 +79,6 @@ import dev.frost819.newbv.biliapi.entity.video.season.Episode
 import dev.frost819.newbv.biliapi.entity.video.season.SeasonDetail
 import dev.frost819.newbv.core.focus.focusInvertedColors
 import dev.frost819.newbv.core.focus.touchClickable
-
-/** 集数超过该值时显示网格快速选集按钮。 */
-private const val SEASON_EPISODE_DIALOG_THRESHOLD = 20
 
 /** 快速选集弹窗每页集数。 */
 private const val SEASON_EPISODE_DIALOG_PAGE_SIZE = 50
@@ -106,7 +105,7 @@ fun NavGraphBuilder.pgcFeatureScreen(navController: NavController) {
 @Composable
 private fun SeasonDetailScreen(navController: NavController) {
     val viewModel: SeasonDetailViewModel = hiltViewModel()
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -150,26 +149,30 @@ private fun SeasonDetailScreen(navController: NavController) {
         }
         state.seasonDetail != null -> {
             SeasonDetailContent(
-                detail = state.seasonDetail!!,
+                detail = requireNotNull(state.seasonDetail),
                 state = state,
-                viewModel = viewModel,
-                navController = navController,
+                onPlay = viewModel::onPlay,
+                onToggleFollow = viewModel::toggleFollow,
+                onPlayEpisode = viewModel::onPlayEpisode,
+                onSwitchSeason = viewModel::onSwitchSeason,
             )
         }
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
+/** 番剧详情展示层；回调由页面 ViewModel 处理，便于独立验证遥控器与触屏交互。 */
 @Composable
-private fun SeasonDetailContent(
+internal fun SeasonDetailContent(
     detail: SeasonDetail,
     state: SeasonDetailUiState,
-    viewModel: SeasonDetailViewModel,
-    navController: NavController,
+    onPlay: () -> Unit,
+    onToggleFollow: () -> Unit,
+    onPlayEpisode: (Episode) -> Unit,
+    onSwitchSeason: (Int) -> Unit,
 ) {
     val focusSaver = rememberFocusSaver()
+    val entryFocusKey = remember(detail.seasonId) { focusSaver.savedKeyValue() }
     focusSaver.RestoreFocus()
-    val scrollState = rememberScrollState()
 
     // 快速选集弹窗状态：当前打开的是哪一行的剧集
     var showEpisodeDialog by remember { mutableStateOf(false) }
@@ -178,19 +181,23 @@ private fun SeasonDetailContent(
 
     // 切换季时用 key 强制重组，重置所有 LazyRow 滚动位置
     key(detail.seasonId) {
+        val scrollState = rememberScrollState()
         Column(
             modifier =
                 Modifier
                     .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
                     .verticalScroll(scrollState)
                     .padding(bottom = 64.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SeasonInfoHeader(
                 detail = detail,
-                isFollowing = state.isFollowing,
-                onPlay = { viewModel.onPlay() },
-                onToggleFollow = { viewModel.toggleFollow() },
+                state = state,
+                entryFocusKey = entryFocusKey,
+                onPlay = onPlay,
+                onToggleFollow = onToggleFollow,
+                onSwitchSeason = onSwitchSeason,
                 focusSaver = focusSaver,
             )
 
@@ -199,7 +206,8 @@ private fun SeasonDetailContent(
                     title = "正片",
                     episodes = detail.episodes,
                     lastPlayedCid = state.historyLastPlayedCid,
-                    onClick = { episode -> viewModel.onPlayEpisode(episode) },
+                    lastPlayedTime = state.historyLastPlayedTime,
+                    onClick = onPlayEpisode,
                     onShowListDialog = {
                         dialogTitle = "正片"
                         dialogEpisodes = detail.episodes
@@ -215,7 +223,8 @@ private fun SeasonDetailContent(
                     title = section.title,
                     episodes = section.episodes,
                     lastPlayedCid = state.historyLastPlayedCid,
-                    onClick = { episode -> viewModel.onPlayEpisode(episode) },
+                    lastPlayedTime = state.historyLastPlayedTime,
+                    onClick = onPlayEpisode,
                     onShowListDialog = {
                         dialogTitle = section.title
                         dialogEpisodes = section.episodes
@@ -223,15 +232,6 @@ private fun SeasonDetailContent(
                     },
                     focusSaver = focusSaver,
                     rowKey = "section_${section.id}",
-                )
-            }
-
-            if (detail.seasons.size > 1) {
-                SeasonSwitcherRow(
-                    seasons = detail.seasons,
-                    currentSeasonId = detail.seasonId,
-                    onClick = { seasonId -> viewModel.onSwitchSeason(seasonId) },
-                    focusSaver = focusSaver,
                 )
             }
         }
@@ -256,134 +256,187 @@ private fun SeasonDetailContent(
             onDismiss = { showEpisodeDialog = false },
             onSelect = { episode ->
                 showEpisodeDialog = false
-                viewModel.onPlayEpisode(episode)
+                onPlayEpisode(episode)
             },
         )
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
+/** 双层渐变保证文字区域和底部选集始终可读；图片缺失时自然退回主题背景。 */
 @Composable
 private fun SeasonInfoHeader(
     detail: SeasonDetail,
-    isFollowing: Boolean,
+    state: SeasonDetailUiState,
+    entryFocusKey: String,
     onPlay: () -> Unit,
     onToggleFollow: () -> Unit,
+    onSwitchSeason: (Int) -> Unit,
     focusSaver: FocusSaver,
 ) {
-    val coverFocusRequester = focusSaver.focusRequesterFor("cover")
-    val playFocusRequester = focusSaver.focusRequesterFor("play")
-    val followFocusRequester = focusSaver.focusRequesterFor("follow")
-
-    LaunchedEffect(Unit) {
-        if (focusSaver.savedKeyValue().isEmpty()) {
-            runCatching { coverFocusRequester.requestFocus() }
+    val background = MaterialTheme.colorScheme.background
+    val backdrop =
+        detail.seasons
+            .firstOrNull { it.seasonId == detail.seasonId }
+            ?.horizontalCover
+            ?.takeIf { it.isNotBlank() }
+            ?: detail.episodes.firstOrNull { it.cover.isNotBlank() }?.cover
+            ?: detail.cover
+    val lastEpisode =
+        (detail.episodes + detail.sections.flatMap { it.episodes })
+            .firstOrNull { state.historyLastPlayedCid != 0L && it.cid == state.historyLastPlayedCid }
+    val initialFocusKey =
+        remember {
+            val validKeys =
+                buildSet {
+                    addAll(listOf("play", "follow", "episodes_all"))
+                    detail.episodes.forEach { add("episodes_${it.id}") }
+                    detail.sections.forEach { section ->
+                        add("section_${section.id}_all")
+                        section.episodes.forEach { add("section_${section.id}_${it.id}") }
+                    }
+                    detail.seasons.forEach { add("season_${it.seasonId}") }
+                }
+            entryFocusKey.takeIf { it in validKeys } ?: if (detail.episodes.isEmpty()) "follow" else "play"
         }
+    LaunchedEffect(detail.seasonId) {
+        // 等待首帧自动聚焦和 LazyRow 布局完成，避免系统自动聚焦覆盖入口保存的 key。
+        kotlinx.coroutines.delay(100)
+        focusSaver.saveFocusedKey(initialFocusKey)
+        runCatching { focusSaver.focusRequesterFor(initialFocusKey).requestFocus() }
     }
-
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 50.dp, vertical = 16.dp),
-    ) {
-        Card(
-            modifier =
-                Modifier
-                    .focusRequester(coverFocusRequester)
-                    .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("cover") }
-                    .width(240.dp)
-                    .fillMaxHeight()
-                    .aspectRatio(0.7f)
-                    .touchClickable(onClick = onPlay),
-            onClick = onPlay,
-            shape = CardDefaults.shape(MaterialTheme.shapes.large),
-            border =
-                CardDefaults.border(
-                    focusedBorder =
-                        Border(
-                            border =
-                                androidx.compose.foundation.BorderStroke(
-                                    3.dp,
-                                    MaterialTheme.colorScheme.border,
-                                ),
-                            shape = MaterialTheme.shapes.large,
-                        ),
+    Box(Modifier.fillMaxWidth()) {
+        AsyncImage(
+            model = backdrop,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alignment = Alignment.CenterEnd,
+            modifier = Modifier.matchParentSize(),
+        )
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.horizontalGradient(
+                    0f to background,
+                    0.45f to background.copy(alpha = 0.94f),
+                    1f to background.copy(alpha = 0.18f),
                 ),
-        ) {
-            AsyncImage(
-                modifier = Modifier.fillMaxSize(),
-                model = detail.cover,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-            )
-        }
-
-        Spacer(modifier = Modifier.width(24.dp))
-
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = detail.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (detail.styles.isNotEmpty()) {
-                    Text(
-                        text = detail.styles.joinToString(" / "),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        )
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.verticalGradient(
+                    0f to background.copy(alpha = 0.15f),
+                    0.65f to Color.Transparent,
+                    1f to background,
+                ),
+            ),
+        )
+        Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp)) {
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 40.dp, vertical = 12.dp)) {
+                val compact = maxWidth < 700.dp
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(28.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AsyncImage(
+                        model = detail.cover,
+                        contentDescription = "番剧封面",
+                        contentScale = ContentScale.Crop,
+                        modifier =
+                            Modifier
+                                .width(if (compact) 112.dp else 132.dp)
+                                .aspectRatio(0.68f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
                     )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            detail.title,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (detail.styles.isNotEmpty()) {
+                                Text(
+                                    detail.styles.joinToString(" · "),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                            }
+                            if (detail.newEpDesc.isNotBlank()) {
+                                Text(
+                                    detail.newEpDesc,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        Text(
+                            detail.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 540.dp),
+                        )
+                        if (detail.seasons.size > 1) {
+                            SeasonSwitcherRow(detail, onSwitchSeason, focusSaver)
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            SeasonActionButton(
+                                text = lastEpisode?.let { "继续播放 ${it.title}" } ?: "立即播放",
+                                icon = Icons.Rounded.PlayArrow,
+                                highlighted = true,
+                                onClick = onPlay,
+                                enabled = detail.episodes.isNotEmpty() || lastEpisode != null,
+                                modifier =
+                                    Modifier
+                                        .weight(
+                                            1f,
+                                            fill = false,
+                                        ).focusSaverItem(focusSaver, "play")
+                                        .testTag("season_play"),
+                            )
+                            SeasonActionButton(
+                                text = if (state.isFollowing) "已追番" else "追番",
+                                icon = if (state.isFollowing) Icons.Rounded.Star else Icons.Outlined.StarBorder,
+                                highlighted = false,
+                                onClick = onToggleFollow,
+                                modifier = Modifier.focusSaverItem(focusSaver, "follow"),
+                            )
+                        }
+                        if (lastEpisode != null) {
+                            val time = state.historyLastPlayedTime
+                            Text(
+                                if (time <
+                                    0
+                                ) {
+                                    "上次已看完"
+                                } else {
+                                    "上次看到 ${time / 60}:${(time % 60).toString().padStart(2, '0')}"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
-                if (detail.newEpDesc.isNotEmpty()) {
-                    Text(
-                        text = detail.newEpDesc,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Text(
-                    text = detail.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SeasonActionButton(
-                    text = "播放",
-                    icon = Icons.Rounded.PlayArrow,
-                    highlighted = true,
-                    onClick = onPlay,
-                    modifier =
-                        Modifier
-                            .focusRequester(playFocusRequester)
-                            .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("play") },
-                )
-                SeasonActionButton(
-                    text = if (isFollowing) "已追番" else "追番",
-                    icon = if (isFollowing) Icons.Rounded.Star else Icons.Outlined.StarBorder,
-                    highlighted = isFollowing,
-                    accentColor = MaterialTheme.colorScheme.secondary,
-                    onClick = onToggleFollow,
-                    modifier =
-                        Modifier
-                            .focusRequester(followFocusRequester)
-                            .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("follow") },
-                )
             }
         }
     }
@@ -394,57 +447,51 @@ private fun SeasonActionButton(
     text: String,
     icon: ImageVector,
     highlighted: Boolean,
-    accentColor: Color = MaterialTheme.colorScheme.primary,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
+    val shape = RoundedCornerShape(8.dp)
+    val container =
+        if (highlighted) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+                .copy(
+                    alpha = 0.85f,
+                )
+        }
+    val content = if (highlighted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     Surface(
-        modifier =
-            modifier
-                .clip(MaterialTheme.shapes.small)
-                .then(
-                    if (highlighted) {
-                        Modifier.border(
-                            2.dp,
-                            MaterialTheme.colorScheme.border,
-                            MaterialTheme.shapes.small,
-                        )
-                    } else {
-                        Modifier
-                    },
-                ).touchClickable(onClick = onClick),
+        modifier = modifier.touchClickable(onClick = { if (enabled) onClick() }),
+        enabled = enabled,
         onClick = onClick,
-        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
+        shape = ClickableSurfaceDefaults.shape(shape = shape),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+        border =
+            ClickableSurfaceDefaults.border(
+                focusedBorder =
+                    Border(
+                        BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+                        inset = (-4).dp,
+                        shape = shape,
+                    ),
+            ),
         colors =
-            focusInvertedColors(
-                containerColor =
-                    if (highlighted) {
-                        accentColor.copy(alpha = 0.2f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                contentColor =
-                    if (highlighted) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+            ClickableSurfaceDefaults.colors(
+                containerColor = container,
+                contentColor = content,
+                focusedContainerColor = container,
+                focusedContentColor = content,
             ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = text,
-                modifier = Modifier.size(20.dp),
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-            )
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text(text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -454,275 +501,216 @@ private fun SeasonEpisodeRow(
     title: String,
     episodes: List<Episode>,
     lastPlayedCid: Long,
+    lastPlayedTime: Int,
     onClick: (Episode) -> Unit,
     onShowListDialog: () -> Unit,
     focusSaver: FocusSaver,
     rowKey: String,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
+            Modifier.fillMaxWidth().padding(horizontal = 40.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                "${episodes.size} 话",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.weight(1f))
+            SeasonActionButton(
+                "全部选集",
+                Icons.Rounded.ChevronRight,
+                false,
+                onShowListDialog,
+                modifier = Modifier.focusSaverItem(focusSaver, "${rowKey}_all"),
+            )
+        }
+        val initialIndex = remember(episodes) { episodes.indexOfFirst { it.cid == lastPlayedCid }.coerceAtLeast(0) }
+        val listState =
+            androidx.compose.foundation.lazy.rememberLazyListState(
+                initialFirstVisibleItemIndex = initialIndex,
+            )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val cardWidth = ((maxWidth - 80.dp - 64.dp) / 5).coerceIn(140.dp, 220.dp)
+            LazyRow(
+                state = listState,
+                modifier = Modifier.fillMaxWidth().focusRestorer(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(horizontal = 40.dp, vertical = 8.dp),
+            ) {
+                items(episodes, key = { it.id }) { episode ->
+                    EpisodeCard(
+                        episode = episode,
+                        isLastWatched = lastPlayedCid != 0L && episode.cid == lastPlayedCid,
+                        playedTime = if (episode.cid == lastPlayedCid) lastPlayedTime else 0,
+                        onClick = { onClick(episode) },
+                        modifier = Modifier.width(cardWidth).focusSaverItem(focusSaver, "${rowKey}_${episode.id}"),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeCard(
+    episode: Episode,
+    isLastWatched: Boolean,
+    playedTime: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Card(
+            onClick = onClick,
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 50.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .testTag("season_episode_${episode.id}")
+                    .aspectRatio(16f / 9f)
+                    .touchClickable(onClick = onClick),
+            shape = CardDefaults.shape(RoundedCornerShape(8.dp)),
+            scale = CardDefaults.scale(focusedScale = 1.03f),
+            border =
+                CardDefaults.border(
+                    focusedBorder =
+                        Border(
+                            BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+                            shape = RoundedCornerShape(8.dp),
+                        ),
+                ),
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (episodes.size > SEASON_EPISODE_DIALOG_THRESHOLD) {
-                EpisodeGridButton(onClick = onShowListDialog)
-            }
-            // 与 UGC 详情页一致：显示「上次播放到」按钮，一键回到断点分集
-            if (episodes.size > 1 && lastPlayedCid != 0L) {
-                val lastEpisode = episodes.find { it.cid == lastPlayedCid }
-                if (lastEpisode != null) {
-                    Surface(
-                        onClick = { onClick(lastEpisode) },
-                        modifier = Modifier.touchClickable(onClick = { onClick(lastEpisode) }),
-                        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                        // 不做聚焦放大：否则会盖住左侧的网格列表按钮
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-                        colors =
-                            focusInvertedColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
+                AsyncImage(
+                    model = episode.cover,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (isLastWatched) {
+                    Text(
+                        "上次观看",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopStart)
+                                .padding(6.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.primary)
+                                .padding(horizontal = 6.dp, vertical = 3.dp),
+                    )
+                    if (episode.duration > 0 && playedTime != 0) {
+                        val progress =
+                            if (playedTime <
+                                0
+                            ) {
+                                1f
+                            } else {
+                                (playedTime.toFloat() / episode.duration).coerceIn(0f, 1f)
+                            }
+                        Box(
+                            Modifier
+                                .align(
+                                    Alignment.BottomStart,
+                                ).fillMaxWidth()
+                                .height(3.dp)
+                                .background(Color.White.copy(alpha = 0.3f)),
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.History,
-                                contentDescription = "历史",
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Text(
-                                text = "上次播放到：${lastEpisode.title}",
-                                style = MaterialTheme.typography.labelSmall,
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(
+                                        progress,
+                                    ).height(3.dp)
+                                    .background(MaterialTheme.colorScheme.border),
                             )
                         }
                     }
                 }
             }
         }
-        val focusRequester = focusSaver.focusRequesterFor(rowKey)
-        LazyRow(
-            modifier =
-                Modifier
-                    .focusRestorer(focusRequester)
-                    .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey(rowKey) }
-                    .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(horizontal = 50.dp),
-        ) {
-            items(episodes) { episode ->
-                val epKey = "${rowKey}_${episode.id}"
-                EpisodeCard(
-                    episode = episode,
-                    isLastWatched = lastPlayedCid != 0L && episode.cid == lastPlayedCid,
-                    onClick = { onClick(episode) },
-                    modifier =
-                        if (episode == episodes.first()) {
-                            Modifier.focusRequester(focusRequester)
-                        } else {
-                            Modifier
-                        },
-                    focusSaver = focusSaver,
-                    epKey = epKey,
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun EpisodeCard(
-    episode: Episode,
-    isLastWatched: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    focusSaver: FocusSaver,
-    epKey: String,
-) {
-    Column(
-        modifier =
-            modifier
-                .width(200.dp)
-                .focusRequester(focusSaver.focusRequesterFor(epKey))
-                .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey(epKey) },
-    ) {
-        Card(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1.6f)
-                    .touchClickable(onClick = onClick),
-            onClick = onClick,
-            shape = CardDefaults.shape(MaterialTheme.shapes.large),
-            border =
-                CardDefaults.border(
-                    focusedBorder =
-                        Border(
-                            border =
-                                androidx.compose.foundation.BorderStroke(
-                                    3.dp,
-                                    if (isLastWatched) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.border
-                                    },
-                                ),
-                            shape = MaterialTheme.shapes.large,
-                        ),
-                ),
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                AsyncImage(
-                    modifier = Modifier.fillMaxSize(),
-                    model = episode.cover,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                )
-                if (isLastWatched) {
-                    Surface(
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(4.dp),
-                        shape = RoundedCornerShape(4.dp),
-                        colors =
-                            SurfaceDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = Color.White,
-                            ),
-                    ) {
-                        Text(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            text = "上次看到",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = episode.title,
-            style = MaterialTheme.typography.labelSmall,
+            episode.title,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (episode.longTitle.isNotBlank() && episode.longTitle != episode.title) {
+            Text(
+                episode.longTitle,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
 @Composable
 private fun SeasonSwitcherRow(
-    seasons: List<dev.frost819.newbv.biliapi.entity.video.season.PgcSeason>,
-    currentSeasonId: Int,
+    detail: SeasonDetail,
     onClick: (Int) -> Unit,
     focusSaver: FocusSaver,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    LazyRow(
+        modifier = Modifier.fillMaxWidth().focusRestorer(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
     ) {
-        Text(
-            text = "系列",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 50.dp),
-        )
-        val focusRequester = focusSaver.focusRequesterFor("seasons")
-        LazyRow(
-            modifier =
-                Modifier
-                    .focusRestorer(focusRequester)
-                    .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("seasons") }
-                    .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(horizontal = 50.dp),
-        ) {
-            items(seasons) { season ->
-                val seasonKey = "season_${season.seasonId}"
-                SeasonChip(
-                    title = season.shortTitle,
-                    isCurrent = season.seasonId == currentSeasonId,
-                    onClick = { onClick(season.seasonId) },
-                    modifier =
-                        if (season == seasons.first()) {
-                            Modifier.focusRequester(focusRequester)
-                        } else {
-                            Modifier
-                        },
-                    focusSaver = focusSaver,
-                    chipKey = seasonKey,
+        items(detail.seasons, key = { it.seasonId }) { season ->
+            val current = season.seasonId == detail.seasonId
+            Surface(
+                onClick = { onClick(season.seasonId) },
+                modifier =
+                    Modifier
+                        .focusSaverItem(focusSaver, "season_${season.seasonId}")
+                        .touchClickable(onClick = { onClick(season.seasonId) }),
+                shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(6.dp)),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                border =
+                    ClickableSurfaceDefaults.border(
+                        focusedBorder =
+                            Border(
+                                BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+                                inset = (-3).dp,
+                                shape = RoundedCornerShape(6.dp),
+                            ),
+                    ),
+                colors =
+                    focusInvertedColors(
+                        containerColor =
+                            if (current) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            },
+                        contentColor =
+                            if (current) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    ),
+            ) {
+                Text(
+                    season.shortTitle.ifBlank { season.title.orEmpty() },
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 200.dp).padding(horizontal = 14.dp, vertical = 6.dp),
                 )
             }
         }
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun SeasonChip(
-    title: String,
-    isCurrent: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    focusSaver: FocusSaver,
-    chipKey: String,
-) {
-    Surface(
-        modifier =
-            modifier
-                .focusRequester(focusSaver.focusRequesterFor(chipKey))
-                .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey(chipKey) }
-                .clip(MaterialTheme.shapes.small)
-                .then(
-                    if (isCurrent) {
-                        Modifier.border(
-                            2.dp,
-                            MaterialTheme.colorScheme.border,
-                            MaterialTheme.shapes.small,
-                        )
-                    } else {
-                        Modifier
-                    },
-                ).touchClickable(onClick = onClick),
-        onClick = onClick,
-        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-        colors =
-            focusInvertedColors(
-                containerColor =
-                    if (isCurrent) {
-                        MaterialTheme.colorScheme.secondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                contentColor =
-                    if (isCurrent) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            ),
-    ) {
-        Text(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-        )
     }
 }
 
