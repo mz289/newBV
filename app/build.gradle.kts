@@ -68,6 +68,10 @@ android {
             )
             if (signingPropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                // 无正式签名配置（本地/CI 自动构建）时回退 debug keystore，
+                // 保证 release 包可直接安装；正式发版仍走 signing.properties
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
         debug {
