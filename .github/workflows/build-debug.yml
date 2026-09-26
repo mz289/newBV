@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-debug:
@@ -43,3 +43,28 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
           if-no-files-found: error
+
+      # Actions 产物的 zip 下载接口需要鉴权，App 端无法匿名下载，
+      # 故将 APK 以 `debug` 标签的预发布 Release 形式发布，供 App 内更新检查匿名拉取。
+      # 每次 push 删除重建该 Release，保证其始终指向最新一次构建。
+      - name: Delete previous debug release
+        if: github.repository == 'mz289/newBV'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete debug --repo "${{ github.repository }}" --yes --cleanup-tag || true
+
+      - name: Publish debug prerelease
+        if: github.repository == 'mz289/newBV'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug
+          target_commitish: ${{ github.sha }}
+          name: newBV Debug 自动构建 #${{ github.run_number }}
+          body: |
+            mods 分支自动构建
+
+            commit: ${{ github.sha }}
+            ${{ github.event.head_commit.message }}
+          prerelease: true
+          make_latest: "false"
+          files: app/build/outputs/apk/debug/*.apk

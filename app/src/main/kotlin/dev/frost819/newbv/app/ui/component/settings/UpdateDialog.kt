@@ -29,10 +29,14 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import dev.frost819.newbv.BuildConfig
 import dev.frost819.newbv.app.network.GithubApi
+import dev.frost819.newbv.app.network.UpdateChannel
 import dev.frost819.newbv.app.network.entity.GithubRelease
+import dev.frost819.newbv.app.network.entity.findApkAsset
+import dev.frost819.newbv.app.network.entity.parseVersionCode
 import dev.frost819.newbv.app.util.CacheManager
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.log.Loggers
+import dev.frost819.newbv.data.datastore.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -43,6 +47,10 @@ import java.io.File
  *
  * 打开后自动检查最新版本，支持下载 APK 并调起安装。
  * 下载进度通过 [LinearProgressIndicator] 实时显示。
+ *
+ * 更新源统一为本仓库 Releases：稳定版取 `releases/latest`，
+ * 开启"接收预发布版本"后包含 CI 自动构建的 `debug` 预发布；
+ * 并按当前构建 variant 匹配 APK 附件（debug 构建只认 debug 附件）。
  *
  * @param show 是否显示弹窗。
  * @param onHideDialog 关闭弹窗回调。
@@ -57,6 +65,9 @@ fun UpdateDialog(
     val scope = rememberCoroutineScope()
     val logger = Loggers.get("UpdateDialog")
 
+    // 与当前构建 variant 一致的更新渠道：debug 包只能被 debug 附件覆盖安装
+    val updateChannel = if (BuildConfig.DEBUG) UpdateChannel.DEBUG else UpdateChannel.RELEASE
+
     var updateStatus by remember { mutableStateOf(UpdateStatus.UpdatingInfo) }
     var bytesSentTotal by remember { mutableLongStateOf(0L) }
     var contentLength by remember { mutableLongStateOf(0L) }
@@ -64,6 +75,7 @@ fun UpdateDialog(
     val progress by animateFloatAsState(targetValue = targetProgress, label = "update progress")
     var downloadJob by remember { mutableStateOf<Job?>(null) }
     var latestRelease by remember { mutableStateOf<GithubRelease?>(null) }
+    var latestAsset by remember { mutableStateOf<GithubRelease.Asset?>(null) }
 
     DisposableEffect(show) {
         if (!show) {
@@ -76,16 +88,25 @@ fun UpdateDialog(
 
     val checkUpdate: () -> Unit = {
         updateStatus = UpdateStatus.UpdatingInfo
+        latestAsset = null
         scope.launch(Dispatchers.IO) {
             runCatching {
-                latestRelease = GithubApi.getLatestBuild()
+                val release =
+                    GithubApi.getLatestBuild(
+                        includePrerelease = Prefs.acceptPrerelease,
+                        assetChannels = updateChannel.assetKeywords,
+                    )
+                latestRelease = release
+                // 仓库无 Release 或无匹配当前 variant 的附件：视为无可用更新
+                if (release == null) {
+                    updateStatus = UpdateStatus.NoAvailableUpdate
+                    return@launch
+                }
+                val asset = release.findApkAsset(updateChannel.assetKeywords)
+                latestAsset = asset
                 val revision =
-                    latestRelease!!
-                        .assets
-                        .first { it.name.startsWith("newBV") && it.name.contains("release") }
-                        .name
-                        .split("_")[1]
-                        .toInt()
+                    asset?.parseVersionCode()
+                        ?: error("Update asset not found in release ${release.name}")
                 if (revision <= BuildConfig.VERSION_CODE) {
                     updateStatus = UpdateStatus.NoAvailableUpdate
                     return@launch
@@ -94,7 +115,7 @@ fun UpdateDialog(
                 logger.error(it) { "Failed to get latest version" }
                 updateStatus = UpdateStatus.CheckError
             }.onSuccess {
-                logger.info { "Find latest version ${latestRelease!!.name}" }
+                logger.info { "Find latest version ${latestRelease?.name}" }
                 updateStatus = UpdateStatus.Ready
             }
         }
@@ -123,37 +144,38 @@ fun UpdateDialog(
     }
 
     val startUpdate: () -> Unit = {
-        updateStatus = UpdateStatus.Downloading
-        downloadJob =
-            scope.launch(Dispatchers.IO) {
-                val tempFilename =
-                    latestRelease!!
-                        .assets
-                        .first { it.name.startsWith("newBV") && it.name.contains("release") }
-                        .name
-                val tempDir = File(context.cacheDir, "update_downloader")
-                if (!tempDir.exists()) tempDir.mkdirs()
-                val tempFile = File(tempDir, tempFilename)
-                tempFile.createNewFile()
-                runCatching {
-                    GithubApi.downloadUpdate(latestRelease!!, tempFile) { downloaded, total ->
-                        bytesSentTotal = downloaded
-                        contentLength = total
-                        targetProgress =
-                            if (total > 0) {
-                                downloaded.toFloat() / total
-                            } else {
-                                0f
-                            }
+        val release = latestRelease
+        val asset = latestAsset
+        if (release == null || asset == null) {
+            updateStatus = UpdateStatus.DownloadError
+        } else {
+            updateStatus = UpdateStatus.Downloading
+            downloadJob =
+                scope.launch(Dispatchers.IO) {
+                    val tempDir = File(context.cacheDir, "update_downloader")
+                    if (!tempDir.exists()) tempDir.mkdirs()
+                    val tempFile = File(tempDir, asset.name)
+                    tempFile.createNewFile()
+                    runCatching {
+                        GithubApi.downloadUpdate(release, tempFile, channel = updateChannel) { downloaded, total ->
+                            bytesSentTotal = downloaded
+                            contentLength = total
+                            targetProgress =
+                                if (total > 0) {
+                                    downloaded.toFloat() / total
+                                } else {
+                                    0f
+                                }
+                        }
+                        // 缓存写入后检查阈值，保留刚下载的 APK 待安装
+                        CacheManager(context).checkCache(preserve = tempFile)
+                        if (show) installUpdate(tempFile)
+                    }.onFailure {
+                        logger.error(it) { "Failed to download update" }
+                        updateStatus = UpdateStatus.DownloadError
                     }
-                    // 缓存写入后检查阈值，保留刚下载的 APK 待安装
-                    CacheManager(context).checkCache(preserve = tempFile)
-                    if (show) installUpdate(tempFile)
-                }.onFailure {
-                    logger.error(it) { "Failed to download update" }
-                    updateStatus = UpdateStatus.DownloadError
                 }
-            }
+        }
     }
 
     LaunchedEffect(show) {

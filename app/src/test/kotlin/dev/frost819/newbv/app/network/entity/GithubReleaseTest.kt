@@ -1,6 +1,7 @@
 package dev.frost819.newbv.app.network.entity
 
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.app.network.UpdateChannel
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 
@@ -381,5 +382,96 @@ class GithubReleaseTest {
         assertThat(asset.size).isEqualTo(1024)
         assertThat(asset.state).isEqualTo("uploaded")
         assertThat(asset.url).isEqualTo("https://api.github.com/assets/555")
+    }
+
+    // ── 更新包选取与版本解析 ──────────────────────────────────────────
+
+    private fun asset(name: String) =
+        GithubRelease.Asset(
+            browserDownloadUrl = "https://example.com/$name",
+            contentType = "application/vnd.android.package-archive",
+            downloadCount = 0,
+            id = 1,
+            name = name,
+            size = 1024,
+            state = "uploaded",
+            url = "https://api.github.com/assets/1",
+        )
+
+    private fun releaseWithAssets(assets: List<GithubRelease.Asset>) =
+        GithubRelease(
+            assets = assets,
+            assetsUrl = "",
+            body = "",
+            createdAt = "",
+            draft = false,
+            htmlUrl = "",
+            id = 1,
+            name = "release",
+            prerelease = false,
+            publishedAt = "",
+            tagName = "v1.0",
+            tarballUrl = "",
+            targetCommitish = "",
+            uploadUrl = "",
+            url = "",
+            zipballUrl = "",
+        )
+
+    @Test
+    fun `findApkAsset matches channel keyword`() {
+        val release =
+            releaseWithAssets(
+                listOf(
+                    asset("newBV_646_0.1.0.r646.abc1234_release.apk"),
+                    asset("newBV_647_0.1.0.r647.def5678_debug.apk"),
+                ),
+            )
+
+        assertThat(release.findApkAsset(UpdateChannel.RELEASE.assetKeywords)?.name)
+            .isEqualTo("newBV_646_0.1.0.r646.abc1234_release.apk")
+        assertThat(release.findApkAsset(UpdateChannel.DEBUG.assetKeywords)?.name)
+            .isEqualTo("newBV_647_0.1.0.r647.def5678_debug.apk")
+    }
+
+    @Test
+    fun `findApkAsset ignores assets without newBV prefix`() {
+        val release =
+            releaseWithAssets(
+                listOf(asset("app-release.apk"), asset("something_debug.apk")),
+            )
+
+        assertThat(release.findApkAsset(UpdateChannel.RELEASE.assetKeywords)).isNull()
+        assertThat(release.findApkAsset(UpdateChannel.DEBUG.assetKeywords)).isNull()
+    }
+
+    @Test
+    fun `findApkAsset returns null when no asset matches channel`() {
+        val release = releaseWithAssets(listOf(asset("newBV_1_0.0.1_debug.apk")))
+
+        assertThat(release.findApkAsset(UpdateChannel.RELEASE.assetKeywords)).isNull()
+    }
+
+    @Test
+    fun `findApkAsset returns null for empty assets`() {
+        val release = releaseWithAssets(emptyList())
+
+        assertThat(release.findApkAsset(UpdateChannel.RELEASE.assetKeywords)).isNull()
+        assertThat(release.findApkAsset(UpdateChannel.DEBUG.assetKeywords)).isNull()
+    }
+
+    @Test
+    fun `parseVersionCode parses code from asset name`() {
+        val release = releaseWithAssets(listOf(asset("newBV_647_0.1.0.r647.abc1234_debug.apk")))
+
+        assertThat(release.findApkAsset(UpdateChannel.DEBUG.assetKeywords)?.parseVersionCode())
+            .isEqualTo(647)
+    }
+
+    @Test
+    fun `parseVersionCode returns null for malformed asset name`() {
+        assertThat(asset("newBV_debug_abc.apk").parseVersionCode()).isNull()
+        assertThat(asset("random.apk").parseVersionCode()).isNull()
+        assertThat(asset("newBV_.apk").parseVersionCode()).isNull()
     }
 }
