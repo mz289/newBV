@@ -67,3 +67,25 @@ data class GithubRelease(
         val url: String,
     )
 }
+
+/**
+ * 从 APK 附件名解析 versionCode。
+ *
+ * 附件名约定为 `newBV_<versionCode>_<versionName>_<variant>.apk`
+ * （由 app 模块构建脚本的 outputFileName 保证）。
+ *
+ * @return 附件名中的 versionCode；命名不符合约定时返回 null。
+ */
+fun GithubRelease.Asset.parseVersionCode(): Int? = name.split("_").getOrNull(1)?.toIntOrNull()
+
+/**
+ * 按更新渠道关键字选取更新用 APK 附件。
+ *
+ * @param assetChannels 匹配附件名的渠道关键字（如 `release`/`alpha`/`debug`），
+ *   需与渠道对应的 APK variant 名一致。
+ * @return 首个名称以 `newBV` 开头且命中任一关键字的附件；无匹配时返回 null。
+ */
+fun GithubRelease.findApkAsset(assetChannels: List<String>): GithubRelease.Asset? =
+    assets.firstOrNull { asset ->
+        asset.name.startsWith("newBV") && assetChannels.any { it in asset.name }
+    }

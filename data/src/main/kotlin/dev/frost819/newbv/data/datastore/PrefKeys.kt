@@ -40,6 +40,9 @@ internal object PrefKeys {
     val crashReportEnabled = booleanPreferencesKey("crash_report_enabled")
     val autoSelectCdn = booleanPreferencesKey("auto_select_cdn")
 
+    // ===== 更新 =====
+    val acceptPrerelease = booleanPreferencesKey("accept_prerelease")
+
     // ===== 播放器 - 视频 =====
     val defaultQuality = intPreferencesKey("dq")
     val defaultVideoCodec = intPreferencesKey("dvc")

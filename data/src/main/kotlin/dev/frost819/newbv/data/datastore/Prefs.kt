@@ -249,6 +249,15 @@ object Prefs {
      */
     var autoSelectCdn by pref(PrefKeys.autoSelectCdn, false)
 
+    // --- 更新 ---
+
+    /**
+     * 检查更新时是否接收预发布版本（默认关闭）。
+     *
+     * 开启后更新检查会包含预发布 Release（如 mods 分支 CI 自动构建的 `debug` 预发布）。
+     */
+    var acceptPrerelease by pref(PrefKeys.acceptPrerelease, false)
+
     // --- 播放器 - 视频（PRD 7.1） ---
 
     /** 默认画质。 */
