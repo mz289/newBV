@@ -42,10 +42,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * 圆角 TV 控件的外侧焦点描边：2dp 线宽，与控件边缘保持 4dp 空隙。
+ * 圆角 TV 控件的外侧焦点描边：2dp 线宽，内缘紧贴控件边缘。
  *
- * TV Border 的正 inset 向外扩展；描边中心外移 5dp 后，其内缘距控件 4dp。
- * 调用方需预留至少 6dp 绘制空间，避免 Lazy 容器裁切。
+ * TV Border 的正 inset 向外扩展；描边中心外移 1dp 后，其内缘与控件边缘重合，外沿最多伸出 2dp。
+ * 调用方需预留至少 2dp 绘制空间，避免 Lazy 容器裁切。
  *
  * @param cornerRadius 控件自身的圆角半径，描边圆角同步向外扩展。
  */
@@ -54,13 +54,14 @@ import kotlinx.coroutines.launch
 fun outerFocusBorder(cornerRadius: Dp = 8.dp): Border =
     Border(
         border = BorderStroke(2.dp, MaterialTheme.colorScheme.border),
-        inset = 5.dp,
-        shape = RoundedCornerShape(cornerRadius + 5.dp),
+        inset = 1.dp,
+        shape = RoundedCornerShape(cornerRadius + 1.dp),
     )
 
 /**
- * 为不提供 TV Border 参数的导航控件显示统一外框，并预留 6dp 防裁切空间。
- * 应放在背景裁切修饰符之前；不会添加点击或焦点节点，沿用原控件的语义和导航。
+ * 为不提供 TV Border 参数的导航控件显示统一外框：2dp 描边内缘紧贴控件边缘。
+ * modifier 自带 6dp padding 作绘制余量兼布局间距；应放在背景裁切修饰符之前；
+ * 不会添加点击或焦点节点，沿用原控件的语义和导航。
  */
 fun Modifier.controlFocusOutline(): Modifier =
     composed {
@@ -69,8 +70,8 @@ fun Modifier.controlFocusOutline(): Modifier =
         padding(6.dp).onFocusChanged { focused = it.hasFocus }.drawWithContent {
             drawContent()
             if (focused) {
-                inset(-5.dp.toPx()) {
-                    drawRoundRect(color, cornerRadius = CornerRadius(13.dp.toPx()), style = Stroke(2.dp.toPx()))
+                inset(-1.dp.toPx()) {
+                    drawRoundRect(color, cornerRadius = CornerRadius(9.dp.toPx()), style = Stroke(2.dp.toPx()))
                 }
             }
         }

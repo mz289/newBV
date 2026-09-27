@@ -751,9 +751,10 @@ private fun VideoInfoHeader(
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    // 水平不留内边距，让首个标签与点赞按钮左对齐。
                     contentPadding =
                         androidx.compose.foundation.layout
-                            .PaddingValues(8.dp),
+                            .PaddingValues(vertical = 8.dp),
                 ) {
                     items(detail.tags) { tag ->
                         val tagKey = "tag_${tag.id}"

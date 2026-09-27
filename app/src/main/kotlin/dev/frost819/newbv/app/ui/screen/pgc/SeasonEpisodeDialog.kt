@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.testTag
@@ -60,6 +61,9 @@ private const val EPISODES_PER_GROUP = 50
 
 /**
  * 番剧全部选集：分段侧栏与自适应网格，进入时定位最近观看的分集。
+ *
+ * 分段侧栏获得焦点（D-Pad 移动）即自动切换右侧对应分段内容，无需按确认键；
+ * 点击仍可切换（触屏路径）。
  *
  * @param seasonTitle 番剧名称。
  * @param sectionTitle 当前分区名称，如正片或 SP。
@@ -184,7 +188,14 @@ internal fun SeasonEpisodeDialog(
                                             .fillMaxWidth()
                                             .testTag("episode_group_$index")
                                             .focusSaverItem(focusSaver, "group_$index")
-                                            .focusProperties {
+                                            .onFocusChanged {
+                                                // 焦点落到某一分段即切换右侧内容，免去再按确认键；
+                                                // 同时丢弃待定位请求，避免切段后焦点被抢回网格。
+                                                if (it.isFocused && group != index) {
+                                                    group = index
+                                                    pendingIndex = null
+                                                }
+                                            }.focusProperties {
                                                 if (index == group && slice.isNotEmpty()) {
                                                     right =
                                                         focusSaver.focusRequesterFor(
