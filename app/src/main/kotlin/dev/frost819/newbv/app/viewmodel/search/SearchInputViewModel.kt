@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.state.search.SearchInputUiState
-import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.repositories.SearchRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
@@ -99,16 +98,7 @@ class SearchInputViewModel
             }
         }
 
-        /** 刷新热搜词。 */
-        fun refreshHotwords() {
-            _uiState.update { it.copy(hotwordsError = false) }
-            loadHotwords()
-        }
-
         private fun loadHotwords() {
-            if (_uiState.value.isLoadingHotwords) return
-            _uiState.update { it.copy(isLoadingHotwords = true, hotwordsError = false) }
-
             viewModelScope.launch {
                 runCatching {
                     withTimeout(LOAD_TIMEOUT_MS) {
@@ -118,23 +108,18 @@ class SearchInputViewModel
                         )
                     }
                 }.onSuccess { hotwords ->
-                    _uiState.update {
-                        it.copy(hotwords = hotwords, isLoadingHotwords = false, hotwordsError = false)
-                    }
+                    _uiState.update { it.copy(hotwords = hotwords) }
                     logger.info { "Loaded hotwords: ${hotwords.size}" }
                 }.onFailure { e ->
                     if (e is CancellationException && e !is TimeoutCancellationException) {
                         throw e
                     }
                     logger.warn { "Failed to load hotwords: $e" }
-                    _uiState.update { it.copy(isLoadingHotwords = false, hotwordsError = true) }
                 }
             }
         }
 
         private fun loadSuggests(keyword: String) {
-            _uiState.update { it.copy(isLoadingSuggests = true) }
-
             viewModelScope.launch {
                 runCatching {
                     withTimeout(LOAD_TIMEOUT_MS) {
@@ -144,13 +129,13 @@ class SearchInputViewModel
                         )
                     }
                 }.onSuccess { suggests ->
-                    _uiState.update { it.copy(suggests = suggests, isLoadingSuggests = false) }
+                    _uiState.update { it.copy(suggests = suggests) }
                 }.onFailure { e ->
                     if (e is CancellationException && e !is TimeoutCancellationException) {
                         throw e
                     }
                     logger.warn { "Failed to load suggests: $e" }
-                    _uiState.update { it.copy(suggests = emptyList(), isLoadingSuggests = false) }
+                    _uiState.update { it.copy(suggests = emptyList()) }
                 }
             }
         }

@@ -3,6 +3,7 @@ package dev.frost819.newbv.app.viewmodel.player
 import com.google.common.truth.Truth.assertThat
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
+import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMeta
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
@@ -27,7 +28,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
 import dev.frost819.newbv.data.datastore.DanmakuType as DataDanmakuType
-import dev.frost819.newbv.biliapi.entity.ApiType
 
 /**
  * [DanmakuViewModel] 的单元测试。

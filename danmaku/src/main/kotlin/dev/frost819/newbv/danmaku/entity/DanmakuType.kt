@@ -29,15 +29,4 @@ enum class DanmakuType(
      * 底部居中弹幕
      */
     Bottom(4),
-    ;
-
-    companion object {
-        /**
-         * 将 akdanmaku 的 mode 值转换为对应的 [DanmakuType]。
-         *
-         * @param mode akdanmaku [com.kuaishou.akdanmaku.data.DanmakuItemData] 中的 mode 字段
-         * @return 对应的 [DanmakuType]，如果 mode 不在已知范围内则返回 [All]
-         */
-        fun fromAkDanmakuMode(mode: Int): DanmakuType = entries.find { it.modeValue == mode && it != All } ?: All
-    }
 }

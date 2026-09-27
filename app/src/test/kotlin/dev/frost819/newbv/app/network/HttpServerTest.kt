@@ -63,19 +63,9 @@ class HttpServerTest {
 
     @Test
     fun `server starts and port is resolved`() {
-        assertThat(server.isRunning()).isTrue()
         assertThat(server.getPort()).isNotNull()
         assertThat(server.getPort()!!).isGreaterThan(0)
     }
-
-    @Test
-    fun `stop sets isRunning to false`() {
-        server.stop()
-        assertThat(server.isRunning()).isFalse()
-        assertThat(server.getPort()).isNull()
-    }
-
-    // ── 首页路由 ──────────────────────────────────────────────────────
 
     @Test
     fun `GET root returns index html`() {

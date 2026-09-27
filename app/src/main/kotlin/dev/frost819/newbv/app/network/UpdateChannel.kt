@@ -13,9 +13,9 @@ enum class UpdateChannel(
     val assetKeywords: List<String>,
 ) {
     /**
-     * 正式版渠道：匹配 release/alpha 附件（正式构建与 alpha 构建）。
+     * 正式版渠道：匹配 release 附件。
      */
-    RELEASE(listOf("release", "alpha")),
+    RELEASE(listOf("release")),
 
     /**
      * Debug 渠道：匹配 debug 附件（mods 分支 CI 自动构建）。

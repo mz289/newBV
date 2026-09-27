@@ -1,6 +1,7 @@
 package dev.frost819.newbv.app.viewmodel.user
 
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideo
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoData
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
@@ -25,7 +26,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
 import dev.frost819.newbv.biliapi.entity.ApiType as BiliApiType
-import dev.frost819.newbv.biliapi.entity.ApiType
 
 /**
  * [UserSpaceViewModel] 的单元测试。

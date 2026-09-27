@@ -76,39 +76,9 @@ class LoginViewModel
                             qrUrl = qrData.url,
                         )
                     }
-                    startPolling(qrData.key, isAppQr = true)
+                    startPolling(qrData.key)
                 }.onFailure { error ->
                     logger.error(error) { "Failed to request app QR code" }
-                    _uiState.update {
-                        it.copy(
-                            state = QrLoginState.Error,
-                            errorMessage = error.message ?: "请求二维码失败",
-                        )
-                    }
-                }
-            }
-        }
-
-        /**
-         * 请求 Web QR 二维码。
-         *
-         * 调用 Web 接口获取二维码 URL 和 qrcodeKey，启动轮询。
-         */
-        fun requestWebQrCode() {
-            cancelPolling()
-            _uiState.update { it.copy(state = QrLoginState.RequestingQRCode, errorMessage = "") }
-            viewModelScope.launch {
-                runCatching {
-                    val qrData = loginRepository.requestWebQrLogin()
-                    _uiState.update {
-                        it.copy(
-                            state = QrLoginState.WaitingForScan,
-                            qrUrl = qrData.url,
-                        )
-                    }
-                    startPolling(qrData.key, isAppQr = false)
-                }.onFailure { error ->
-                    logger.error(error) { "Failed to request web QR code" }
                     _uiState.update {
                         it.copy(
                             state = QrLoginState.Error,
@@ -125,23 +95,15 @@ class LoginViewModel
          * 每 1 秒轮询一次，根据返回状态更新 UI。
          * Success 时自动取消轮询并保存登录凭证。
          *
-         * @param key 二维码 key（WebQR 为 qrcodeKey，AppQR 为 authCode）。
-         * @param isAppQr 是否为 TV QR（App 接口）。
+         * @param key TV 扫码登录的 authCode。
          */
-        private fun startPolling(
-            key: String,
-            isAppQr: Boolean,
-        ) {
+        private fun startPolling(key: String) {
             pollingJob =
                 viewModelScope.launch {
                     while (true) {
                         delay(1000)
                         runCatching {
-                            if (isAppQr) {
-                                loginRepository.checkAppQrLoginState(key)
-                            } else {
-                                loginRepository.checkWebQrLoginState(key)
-                            }
+                            loginRepository.checkAppQrLoginState(key)
                         }.onSuccess { result ->
                             when (result.state) {
                                 QrLoginState.WaitingForScan,

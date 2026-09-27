@@ -29,6 +29,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import dev.frost819.newbv.app.data.toDanmakuEntities
 import dev.frost819.newbv.app.entity.player.VideoAspectRatio
 import dev.frost819.newbv.app.entity.player.VideoListItem
 import dev.frost819.newbv.app.entity.player.shortcut.PlayerCustomShortcutAction
@@ -43,6 +44,7 @@ import dev.frost819.newbv.app.ui.component.player.menu.MenuController
 import dev.frost819.newbv.app.ui.state.player.PlayerState
 import dev.frost819.newbv.app.ui.state.player.PlayerUiState
 import dev.frost819.newbv.app.ui.state.player.SeekerState
+import dev.frost819.newbv.app.util.PlayerConstants
 import dev.frost819.newbv.app.util.VideoShotImageCache
 import dev.frost819.newbv.biliapi.entity.video.Subtitle
 import dev.frost819.newbv.core.theme.BVTheme
@@ -136,7 +138,7 @@ fun VideoPlayerController(
     var currentBrightness by remember { mutableFloatStateOf(-1f) }
 
     fun calCoefficient(): Long =
-        if (System.currentTimeMillis() - lastSeekChangeTime < 200) {
+        if (System.currentTimeMillis() - lastSeekChangeTime < PlayerConstants.SEEK_ACCELERATION_WINDOW_MS) {
             seekChangeCount++
             seekChangeCount / 5
         } else {
@@ -147,7 +149,7 @@ fun VideoPlayerController(
     fun onTimeForward() {
         isSeeking = true
         val coefficient = calCoefficient()
-        val step = 10_000L + coefficient * 5_000L
+        val step = PlayerConstants.SEEK_BASE_INCREMENT_MS + coefficient * PlayerConstants.SEEK_STEP_INCREMENT_MS
         goTime = (goTime + step).coerceAtMost(seekerState.value.totalDuration)
         lastSeekChangeTime = System.currentTimeMillis()
     }
@@ -155,7 +157,7 @@ fun VideoPlayerController(
     fun onTimeBack() {
         isSeeking = true
         val coefficient = calCoefficient()
-        val step = 10_000L + coefficient * 5_000L
+        val step = PlayerConstants.SEEK_BASE_INCREMENT_MS + coefficient * PlayerConstants.SEEK_STEP_INCREMENT_MS
         goTime = (goTime - step).coerceAtLeast(0L)
         lastSeekChangeTime = System.currentTimeMillis()
     }
@@ -164,7 +166,7 @@ fun VideoPlayerController(
         seekCountdown?.cancel()
         seekCountdown =
             scope.launch {
-                delay(1000)
+                delay(PlayerConstants.SEEK_EXECUTE_DELAY_MS)
                 onGoTime(goTime)
                 if (uiState.playerState != PlayerState.Playing) onPlay()
                 isSeeking = false
@@ -200,7 +202,7 @@ fun VideoPlayerController(
         hideInfoSeekCountdown?.cancel()
         hideInfoSeekCountdown =
             scope.launch {
-                delay(5000)
+                delay(PlayerConstants.CONTROLLER_AUTO_HIDE_MS)
                 showInfoSeekController = false
             }
     }
@@ -599,13 +601,7 @@ fun VideoPlayerController(
                 onPlaySpeedChange = onPlaySpeedChange,
                 onAudioChange = { onMediaProfileSettingChange(MediaProfileSettingAction.SetAudio(it)) },
                 onDanmakuSwitchChange = { types ->
-                    // data DanmakuType → danmaku entity DanmakuType
-                    val entityTypes =
-                        types.mapNotNull {
-                            runCatching { dev.frost819.newbv.danmaku.entity.DanmakuType.entries[it.ordinal] }
-                                .getOrNull()
-                        }
-                    onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(entityTypes))
+                    onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(types.toDanmakuEntities()))
                 },
                 onDanmakuSizeChange = { onDanmakuSettingChange(DanmakuSettingAction.SetScale(it)) },
                 onDanmakuOpacityChange = { onDanmakuSettingChange(DanmakuSettingAction.SetOpacity(it)) },

@@ -31,14 +31,15 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
+import dev.frost819.newbv.app.data.toDanmakuEntities
+import dev.frost819.newbv.app.data.toDataDanmakuTypes
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
 import dev.frost819.newbv.app.ui.component.player.menu.component.PlayerTwoLevelMenu
-import dev.frost819.newbv.app.viewmodel.player.LocalMenuFocusStateData
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusState
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusStateData
+import dev.frost819.newbv.app.ui.state.player.LocalMenuFocusStateData
+import dev.frost819.newbv.app.ui.state.player.MenuFocusState
+import dev.frost819.newbv.app.ui.state.player.MenuFocusStateData
 import dev.frost819.newbv.biliapi.repositories.LivePlayLine
 import dev.frost819.newbv.danmaku.config.DanmakuState
-import dev.frost819.newbv.data.datastore.DanmakuType
 
 /**
  * 直播播放器设置菜单导航 Tab。
@@ -233,10 +234,7 @@ private fun LiveMenuList(
                 )
 
             LivePlayerMenuNavItem.Danmaku -> {
-                val dataTypes =
-                    danmakuState.enabledTypes.mapNotNull { entity ->
-                        runCatching { DanmakuType.entries[entity.ordinal] }.getOrNull()
-                    }
+                val dataTypes = danmakuState.enabledTypes.toDataDanmakuTypes()
                 DanmakuMenuList(
                     currentEnabledTypes = dataTypes,
                     currentScale = danmakuState.scale,
@@ -245,12 +243,7 @@ private fun LiveMenuList(
                     currentArea = danmakuState.area,
                     currentMaskEnabled = danmakuState.maskEnabled,
                     onDanmakuSwitchChange = { types ->
-                        val entityTypes =
-                            types.mapNotNull {
-                                runCatching { dev.frost819.newbv.danmaku.entity.DanmakuType.entries[it.ordinal] }
-                                    .getOrNull()
-                            }
-                        onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(entityTypes))
+                        onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(types.toDanmakuEntities()))
                     },
                     onDanmakuSizeChange = { onDanmakuSettingChange(DanmakuSettingAction.SetScale(it)) },
                     onDanmakuOpacityChange = { onDanmakuSettingChange(DanmakuSettingAction.SetOpacity(it)) },

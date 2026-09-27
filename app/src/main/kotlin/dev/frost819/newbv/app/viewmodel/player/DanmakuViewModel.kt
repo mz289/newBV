@@ -13,8 +13,9 @@ import com.kuaishou.akdanmaku.ecs.component.filter.TypeFilter
 import com.kuaishou.akdanmaku.render.SimpleRenderer
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.data.toDanmakuEntity
+import dev.frost819.newbv.app.data.toDataDanmakuType
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
-import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMask
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMeta
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
@@ -38,7 +39,6 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import kotlin.math.abs
 import dev.frost819.newbv.danmaku.entity.DanmakuType as DanmakuEntityDanmakuType
-import dev.frost819.newbv.data.datastore.DanmakuType as DataDanmakuType
 
 /**
  * 弹幕 ViewModel。
@@ -565,14 +565,6 @@ class DanmakuViewModel
             danmakuConfig = danmakuConfig.copy(textSizeScale = scale)
             danmakuPlayer?.updateConfig(danmakuConfig)
         }
-
-        /** 将 data 层 DanmakuType 映射为 danmaku 模块的 DanmakuType。 */
-        private fun DataDanmakuType.toDanmakuEntity(): DanmakuEntityDanmakuType =
-            DanmakuEntityDanmakuType.entries.getOrElse(this.ordinal) { DanmakuEntityDanmakuType.All }
-
-        /** 将 danmaku 模块的 DanmakuType 映射为 data 层 DanmakuType。 */
-        private fun DanmakuEntityDanmakuType.toDataDanmakuType(): DataDanmakuType =
-            DataDanmakuType.entries.getOrElse(this.ordinal) { DataDanmakuType.All }
 
         companion object {
             private const val LOAD_TIMEOUT_MS = 10_000L

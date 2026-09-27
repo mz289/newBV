@@ -15,7 +15,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import java.io.File
-import java.util.Date
 
 /**
  * [AuthData] 的单元测试。
@@ -132,48 +131,5 @@ class AuthDataTest {
         assertThat(Prefs.accessToken).isEqualTo("mytoken")
         assertThat(Prefs.refreshToken).isEqualTo("myrefresh")
         assertThat(Prefs.tokenExpiredDate.time).isEqualTo(1700000000000L)
-    }
-
-    @Test
-    fun `fromPrefs reads all fields from Prefs`() {
-        Prefs.uid = 555L
-        Prefs.uidCkMd5 = "md5hash"
-        Prefs.sid = "psid"
-        Prefs.biliJct = "pjct"
-        Prefs.sessData = "psess"
-        Prefs.tokenExpiredDate = Date(1800000000000L)
-        Prefs.accessToken = "ptoken"
-        Prefs.refreshToken = "prefresh"
-
-        val authData = AuthData.fromPrefs()
-
-        assertThat(authData.uid).isEqualTo(555L)
-        assertThat(authData.uidCkMd5).isEqualTo("md5hash")
-        assertThat(authData.sid).isEqualTo("psid")
-        assertThat(authData.biliJct).isEqualTo("pjct")
-        assertThat(authData.sessData).isEqualTo("psess")
-        assertThat(authData.tokenExpiredDate).isEqualTo(1800000000000L)
-        assertThat(authData.accessToken).isEqualTo("ptoken")
-        assertThat(authData.refreshToken).isEqualTo("prefresh")
-    }
-
-    @Test
-    fun `saveToPrefs and fromPrefs roundtrip`() {
-        val original =
-            AuthData(
-                uid = 777L,
-                uidCkMd5 = "roundtrip",
-                sid = "rsid",
-                biliJct = "rjct",
-                sessData = "rsess",
-                tokenExpiredDate = 1900000000000L,
-                accessToken = "rtoken",
-                refreshToken = "rrefresh",
-            )
-
-        original.saveToPrefs()
-        val restored = AuthData.fromPrefs()
-
-        assertThat(restored).isEqualTo(original)
     }
 }

@@ -3,7 +3,6 @@ package dev.frost819.newbv.app.viewmodel.user
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.user.FollowedUser
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.core.log.Loggers

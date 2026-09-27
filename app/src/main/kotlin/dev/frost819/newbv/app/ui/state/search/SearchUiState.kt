@@ -15,18 +15,12 @@ import dev.frost819.newbv.data.db.entity.SearchHistoryEntity
  * @param hotwords 热搜词列表
  * @param suggests 搜索建议列表（keyword 非空时显示）
  * @param histories 搜索历史列表
- * @param isLoadingHotwords 是否正在加载热搜
- * @param isLoadingSuggests 是否正在加载建议
- * @param hotwordsError 热搜加载是否失败
  */
 data class SearchInputUiState(
     val keyword: String = "",
     val hotwords: List<Hotword> = emptyList(),
     val suggests: List<String> = emptyList(),
     val histories: List<SearchHistoryEntity> = emptyList(),
-    val isLoadingHotwords: Boolean = false,
-    val isLoadingSuggests: Boolean = false,
-    val hotwordsError: Boolean = false,
 )
 
 /**

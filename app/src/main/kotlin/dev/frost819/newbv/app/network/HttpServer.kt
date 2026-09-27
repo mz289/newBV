@@ -92,9 +92,6 @@ class HttpServer(
         logger.info { "HttpServer stopped" }
     }
 
-    /** 服务器是否正在运行。 */
-    fun isRunning(): Boolean = server != null
-
     /**
      * 获取实际监听端口。
      *

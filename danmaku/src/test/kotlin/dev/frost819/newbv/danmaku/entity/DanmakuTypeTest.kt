@@ -3,32 +3,13 @@ package dev.frost819.newbv.danmaku.entity
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.Test
 
+/**
+ * [DanmakuType] 的单元测试。
+ *
+ * modeValue 是传给 akdanmaku 的显示区域过滤值，必须与
+ * [com.kuaishou.akdanmaku.data.DanmakuItemData] 的 mode 常量保持一致。
+ */
 class DanmakuTypeTest {
-    @Test
-    fun `fromAkDanmakuMode with rolling mode returns Rolling`() {
-        assertThat(DanmakuType.fromAkDanmakuMode(1)).isEqualTo(DanmakuType.Rolling)
-    }
-
-    @Test
-    fun `fromAkDanmakuMode with top mode returns Top`() {
-        assertThat(DanmakuType.fromAkDanmakuMode(5)).isEqualTo(DanmakuType.Top)
-    }
-
-    @Test
-    fun `fromAkDanmakuMode with bottom mode returns Bottom`() {
-        assertThat(DanmakuType.fromAkDanmakuMode(4)).isEqualTo(DanmakuType.Bottom)
-    }
-
-    @Test
-    fun `fromAkDanmakuMode with unknown mode returns All`() {
-        assertThat(DanmakuType.fromAkDanmakuMode(999)).isEqualTo(DanmakuType.All)
-    }
-
-    @Test
-    fun `fromAkDanmakuMode with All mode returns All`() {
-        assertThat(DanmakuType.fromAkDanmakuMode(-1)).isEqualTo(DanmakuType.All)
-    }
-
     @Test
     fun `modeValue Rolling returns correct value`() {
         assertThat(DanmakuType.Rolling.modeValue).isEqualTo(1)

@@ -2,6 +2,7 @@ package dev.frost819.newbv.app.viewmodel.common
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.repositories.ToViewRepository
 import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
@@ -21,7 +22,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
 import dev.frost819.newbv.biliapi.entity.ApiType as BiliApiType
-import dev.frost819.newbv.biliapi.entity.ApiType
 
 /**
  * [WatchLaterViewModel] 的单元测试。

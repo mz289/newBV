@@ -40,25 +40,6 @@ data class AuthData(
         fun fromJson(json: String): AuthData =
             kotlinx.serialization.json.Json
                 .decodeFromString(serializer(), json)
-
-        /**
-         * 从当前 [Prefs] 构造 [AuthData]。
-         *
-         * 读取 Prefs 中已保存的登录凭证，组装为 [AuthData]。
-         *
-         * @return 当前 Prefs 中的凭证。
-         */
-        fun fromPrefs(): AuthData =
-            AuthData(
-                uid = Prefs.uid,
-                uidCkMd5 = Prefs.uidCkMd5,
-                sid = Prefs.sid,
-                biliJct = Prefs.biliJct,
-                sessData = Prefs.sessData,
-                tokenExpiredDate = Prefs.tokenExpiredDate.time,
-                accessToken = Prefs.accessToken,
-                refreshToken = Prefs.refreshToken,
-            )
     }
 
     /**

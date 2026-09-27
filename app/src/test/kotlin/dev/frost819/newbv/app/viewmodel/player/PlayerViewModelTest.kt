@@ -13,6 +13,7 @@ import dev.frost819.newbv.app.ui.state.player.PlayerState
 import dev.frost819.newbv.app.ui.state.player.PlayerUiEffect
 import dev.frost819.newbv.app.ui.state.player.PlayerUiState
 import dev.frost819.newbv.app.util.VideoCapabilityProvider
+import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.DashVideo
 import dev.frost819.newbv.biliapi.entity.PlayData
 import dev.frost819.newbv.biliapi.entity.user.Author
@@ -55,7 +56,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import dev.frost819.newbv.biliapi.entity.ApiType
 
 /**
  * [PlayerViewModel] 的单元测试。

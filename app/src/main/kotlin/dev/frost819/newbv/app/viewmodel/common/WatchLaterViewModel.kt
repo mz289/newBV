@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.util.ToastUtils
-import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.repositories.ToViewRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
