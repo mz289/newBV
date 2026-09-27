@@ -35,15 +35,4 @@ enum class DanmakuSpeedFactor(
      * 0.5x 速度（弹幕滚动减慢）
      */
     S5(0.5f),
-    ;
-
-    companion object {
-        /**
-         * 根据速度因子查找对应的枚举值。
-         *
-         * @param targetFactor 目标速度因子
-         * @return 匹配的枚举值，找不到则返回 [S3]（1.0x）
-         */
-        fun fromFactor(targetFactor: Float): DanmakuSpeedFactor = entries.find { it.factor == targetFactor } ?: S3
-    }
 }

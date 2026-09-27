@@ -6,8 +6,8 @@ import androidx.compose.ui.Modifier
 import dev.frost819.newbv.app.entity.player.VideoAspectRatio
 import dev.frost819.newbv.app.ui.component.player.menu.component.PlayerThreeLevelMenu
 import dev.frost819.newbv.app.ui.component.player.menu.component.RadioMenuList
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusState
-import dev.frost819.newbv.app.viewmodel.player.VideoPlayerPictureMenuItem
+import dev.frost819.newbv.app.ui.state.player.MenuFocusState
+import dev.frost819.newbv.app.ui.state.player.VideoPlayerPictureMenuItem
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.Resolution
 import dev.frost819.newbv.data.datastore.VideoCodec

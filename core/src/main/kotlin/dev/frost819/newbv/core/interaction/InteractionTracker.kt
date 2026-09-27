@@ -20,11 +20,6 @@ enum class InputMethod {
 
     /** 触屏点击/手势。 */
     Touch,
-
-    ;
-
-    val isTouch: Boolean get() = this == Touch
-    val isDPad: Boolean get() = this == DPad
 }
 
 /**

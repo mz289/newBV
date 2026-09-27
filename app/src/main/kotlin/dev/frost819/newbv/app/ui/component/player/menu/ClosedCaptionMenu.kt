@@ -5,8 +5,8 @@ import androidx.compose.ui.Modifier
 import dev.frost819.newbv.app.ui.component.player.menu.component.PlayerThreeLevelMenu
 import dev.frost819.newbv.app.ui.component.player.menu.component.RadioMenuList
 import dev.frost819.newbv.app.ui.component.player.menu.component.StepLessMenuItem
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusState
-import dev.frost819.newbv.app.viewmodel.player.VideoPlayerClosedCaptionMenuItem
+import dev.frost819.newbv.app.ui.state.player.MenuFocusState
+import dev.frost819.newbv.app.ui.state.player.VideoPlayerClosedCaptionMenuItem
 import dev.frost819.newbv.biliapi.entity.video.Subtitle
 
 /**

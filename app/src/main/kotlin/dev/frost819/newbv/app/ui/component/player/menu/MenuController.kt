@@ -28,12 +28,13 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
+import dev.frost819.newbv.app.data.toDataDanmakuTypes
 import dev.frost819.newbv.app.entity.player.VideoAspectRatio
+import dev.frost819.newbv.app.ui.state.player.LocalMenuFocusStateData
+import dev.frost819.newbv.app.ui.state.player.MenuFocusState
+import dev.frost819.newbv.app.ui.state.player.MenuFocusStateData
 import dev.frost819.newbv.app.ui.state.player.PlayerUiState
-import dev.frost819.newbv.app.viewmodel.player.LocalMenuFocusStateData
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusState
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusStateData
-import dev.frost819.newbv.app.viewmodel.player.VideoPlayerMenuNavItem
+import dev.frost819.newbv.app.ui.state.player.VideoPlayerMenuNavItem
 import dev.frost819.newbv.biliapi.entity.video.Subtitle
 import dev.frost819.newbv.biliapi.entity.video.SubtitleAiStatus
 import dev.frost819.newbv.biliapi.entity.video.SubtitleAiType
@@ -267,12 +268,7 @@ private fun MenuList(
                 )
 
             VideoPlayerMenuNavItem.Danmaku -> {
-                // 将 danmaku 模块 DanmakuType 映射为 data 模块 DanmakuType
-                val dataTypes =
-                    uiState.danmakuState.enabledTypes.mapNotNull { entity ->
-                        runCatching { dev.frost819.newbv.data.datastore.DanmakuType.entries[entity.ordinal] }
-                            .getOrNull()
-                    }
+                val dataTypes = uiState.danmakuState.enabledTypes.toDataDanmakuTypes()
                 DanmakuMenuList(
                     currentEnabledTypes = dataTypes,
                     currentScale = uiState.danmakuState.scale,

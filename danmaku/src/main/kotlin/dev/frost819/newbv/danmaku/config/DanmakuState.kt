@@ -27,12 +27,6 @@ data class DanmakuState(
         ),
 ) {
     /**
-     * 是否显示所有类型的弹幕。
-     */
-    val isShowAll: Boolean
-        get() = enabledTypes.contains(DanmakuType.All) || enabledTypes.size == 3
-
-    /**
      * 返回要传给 akdanmaku 的屏幕显示区域比例。
      * akdanmaku 的 screenPart: 1.0 = 全屏，0.5 = 下半屏，0.25 = 下四分之一。
      */

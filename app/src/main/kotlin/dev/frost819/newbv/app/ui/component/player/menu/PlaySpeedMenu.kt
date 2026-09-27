@@ -22,7 +22,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import dev.frost819.newbv.app.ui.component.player.ifElse
 import dev.frost819.newbv.app.ui.component.player.menu.component.MenuListItem
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusState
+import dev.frost819.newbv.app.ui.state.player.MenuFocusState
 
 /**
  * 倍速设置面板。

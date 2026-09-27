@@ -6,7 +6,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.state.search.SearchResultItem
 import dev.frost819.newbv.app.ui.state.search.SearchResultUiState
 import dev.frost819.newbv.app.ui.state.search.TypedSearchResult
-import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.repositories.SearchFilterDuration
 import dev.frost819.newbv.biliapi.repositories.SearchFilterOrderType
 import dev.frost819.newbv.biliapi.repositories.SearchRepository

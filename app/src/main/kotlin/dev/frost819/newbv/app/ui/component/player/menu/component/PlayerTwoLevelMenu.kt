@@ -10,8 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
-import dev.frost819.newbv.app.viewmodel.player.LocalMenuFocusStateData
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusState
+import dev.frost819.newbv.app.ui.state.player.LocalMenuFocusStateData
+import dev.frost819.newbv.app.ui.state.player.MenuFocusState
 
 /**
  * 视频/直播播放器二级设置菜单（MenuNav ↔ Items）。

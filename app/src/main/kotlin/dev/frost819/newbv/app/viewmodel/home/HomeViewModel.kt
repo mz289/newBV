@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-import dev.frost819.newbv.biliapi.entity.ApiType
 
 /** 网络请求超时时间（毫秒）。 */
 private const val LOAD_TIMEOUT_MS = 10_000L

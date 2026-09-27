@@ -69,13 +69,6 @@ class CrashHandler(
     }
 
     /**
-     * 卸载崩溃处理器，恢复原始 handler。
-     */
-    fun uninstall() {
-        Thread.setDefaultUncaughtExceptionHandler(originalHandler)
-    }
-
-    /**
      * 手动生成日志文件（含 logcat 输出）。
      *
      * @return 生成的日志文件，失败返回 null。

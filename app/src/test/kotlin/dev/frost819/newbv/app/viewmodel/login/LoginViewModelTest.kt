@@ -159,25 +159,6 @@ class LoginViewModelTest {
         }
 
     @Test
-    fun `requestWebQrCode uses web API`() =
-        runTest(testDispatcher) {
-            coEvery { loginRepository.requestWebQrLogin() } returns fakeQrData
-            coEvery { loginRepository.checkWebQrLoginState(any()) } returns
-                QrLoginResult(
-                    state = QrLoginState.WaitingForScan,
-                )
-
-            try {
-                viewModel.requestWebQrCode()
-
-                assertThat(viewModel.uiState.value.state).isEqualTo(QrLoginState.WaitingForScan)
-                assertThat(viewModel.uiState.value.qrUrl).isEqualTo(fakeQrData.url)
-            } finally {
-                viewModel.cancelPolling()
-            }
-        }
-
-    @Test
     fun `cancelPolling stops ongoing polling`() =
         runTest(testDispatcher) {
             coEvery { loginRepository.requestAppQrLogin() } returns fakeQrData
@@ -208,17 +189,6 @@ class LoginViewModelTest {
 
             assertThat(viewModel.uiState.value.state).isEqualTo(QrLoginState.Ready)
             assertThat(viewModel.uiState.value.qrUrl).isEmpty()
-        }
-
-    @Test
-    fun `requestWebQrCode on error sets Error state`() =
-        runTest(testDispatcher) {
-            coEvery { loginRepository.requestWebQrLogin() } throws RuntimeException("web error")
-
-            viewModel.requestWebQrCode()
-
-            assertThat(viewModel.uiState.value.state).isEqualTo(QrLoginState.Error)
-            assertThat(viewModel.uiState.value.errorMessage).contains("web error")
         }
 
     @Test
@@ -304,26 +274,6 @@ class LoginViewModelTest {
 
             coVerify(atLeast = 2) { loginRepository.checkAppQrLoginState(any()) }
             viewModel.cancelPolling()
-        }
-
-    @Test
-    fun `web QR polling success calls addUser`() =
-        runTest(testDispatcher) {
-            coEvery { loginRepository.requestWebQrLogin() } returns fakeQrData
-            coEvery { loginRepository.checkWebQrLoginState(any()) } returns
-                QrLoginResult(
-                    state = QrLoginState.Success,
-                    cookies = fakeCookies,
-                    accessToken = null,
-                    refreshToken = null,
-                )
-            coEvery { accountRepository.addUser(any()) } just Runs
-
-            viewModel.requestWebQrCode()
-            advanceTimeBy(1500)
-
-            coVerify { accountRepository.addUser(any()) }
-            assertThat(viewModel.uiState.value.state).isEqualTo(QrLoginState.Success)
         }
 
     @Test

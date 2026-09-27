@@ -237,4 +237,3 @@ enum class PersonalTopNavItem {
         fun fromOrdinal(ordinal: Int): PersonalTopNavItem = entries.getOrElse(ordinal) { ToView }
     }
 }
-

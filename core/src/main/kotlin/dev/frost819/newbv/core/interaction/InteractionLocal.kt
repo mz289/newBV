@@ -32,12 +32,3 @@ fun currentInputMethod(): InputMethod {
     val state by tracker.inputMethod.collectAsState()
     return state
 }
-
-/**
- * 判断当前是否应显示焦点视觉反馈（边框/缩放）。
- *
- * 仅在 [InputMethod.DPad] 模式下返回 `true`，
- * 触屏模式下隐藏焦点边框。
- */
-@Composable
-fun shouldShowFocusVisual(): Boolean = currentInputMethod() == InputMethod.DPad

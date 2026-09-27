@@ -216,37 +216,6 @@ class SearchInputViewModelTest {
         }
 
     @Test
-    fun `loadHotwords failure sets hotwordsError`() =
-        runTest(testDispatcher) {
-            coEvery { searchRepo.getSearchHotwords(any(), any()) } throws RuntimeException("network error")
-
-            viewModel.refreshHotwords()
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertThat(state.hotwordsError).isTrue()
-            assertThat(state.isLoadingHotwords).isFalse()
-        }
-
-    @Test
-    fun `refreshHotwords clears error and retries`() =
-        runTest(testDispatcher) {
-            // First: fail
-            coEvery { searchRepo.getSearchHotwords(any(), any()) } throws RuntimeException("error")
-            viewModel.refreshHotwords()
-            advanceUntilIdle()
-            assertThat(viewModel.uiState.value.hotwordsError).isTrue()
-
-            // Then: recover
-            coEvery { searchRepo.getSearchHotwords(any(), any()) } returns listOf(fakeHotword("恢复"))
-            viewModel.refreshHotwords()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.hotwordsError).isFalse()
-            assertThat(viewModel.uiState.value.hotwords).hasSize(1)
-        }
-
-    @Test
     fun `hotwords state emits updates`() =
         runTest(testDispatcher) {
             advanceUntilIdle()
@@ -255,5 +224,15 @@ class SearchInputViewModelTest {
                 assertThat(awaitItem().hotwords).isNotEmpty()
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `init with hotwords failure leaves hotwords empty`() =
+        runTest(testDispatcher) {
+            coEvery { searchRepo.getSearchHotwords(any(), any()) } throws RuntimeException("network error")
+            val failingVm = SearchInputViewModel(searchRepo, historyRepo)
+            advanceUntilIdle()
+
+            assertThat(failingVm.uiState.value.hotwords).isEmpty()
         }
 }

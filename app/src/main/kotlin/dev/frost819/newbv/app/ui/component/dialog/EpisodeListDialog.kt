@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,7 +31,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Tab
@@ -108,36 +105,6 @@ fun EpisodeListButton(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-    }
-}
-
-/**
- * 网格选集触发器。
- *
- * 分 P / 分集数量较多时显示，点击打开分页网格弹窗。
- *
- * @param onClick 点击回调。
- */
-@Composable
-fun EpisodeGridButton(onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.touchClickable(onClick = onClick),
-        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-        colors =
-            focusInvertedColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Apps,
-            contentDescription = "网格列表",
-            modifier =
-                Modifier
-                    .padding(4.dp)
-                    .size(20.dp),
-        )
     }
 }
 

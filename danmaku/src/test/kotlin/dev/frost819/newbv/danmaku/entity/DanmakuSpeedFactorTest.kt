@@ -14,22 +14,6 @@ class DanmakuSpeedFactorTest {
     }
 
     @Test
-    fun `fromFactor with valid factor returns correct enum`() {
-        assertThat(DanmakuSpeedFactor.fromFactor(1.5f)).isEqualTo(DanmakuSpeedFactor.S1)
-        assertThat(DanmakuSpeedFactor.fromFactor(1.25f)).isEqualTo(DanmakuSpeedFactor.S2)
-        assertThat(DanmakuSpeedFactor.fromFactor(1.0f)).isEqualTo(DanmakuSpeedFactor.S3)
-        assertThat(DanmakuSpeedFactor.fromFactor(0.75f)).isEqualTo(DanmakuSpeedFactor.S4)
-        assertThat(DanmakuSpeedFactor.fromFactor(0.5f)).isEqualTo(DanmakuSpeedFactor.S5)
-    }
-
-    @Test
-    fun `fromFactor with unknown factor returns default`() {
-        assertThat(DanmakuSpeedFactor.fromFactor(0.3f)).isEqualTo(DanmakuSpeedFactor.S3)
-        assertThat(DanmakuSpeedFactor.fromFactor(2.0f)).isEqualTo(DanmakuSpeedFactor.S3)
-        assertThat(DanmakuSpeedFactor.fromFactor(0f)).isEqualTo(DanmakuSpeedFactor.S3)
-    }
-
-    @Test
     fun `entries has correct count`() {
         assertThat(DanmakuSpeedFactor.entries).hasSize(5)
     }

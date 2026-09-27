@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import dev.frost819.newbv.app.util.PlayerConstants
 import dev.frost819.newbv.app.util.ToastUtils
 
 /**
@@ -38,7 +39,7 @@ import dev.frost819.newbv.app.util.ToastUtils
 fun rememberDoublePressExit(
     onExit: () -> Unit,
     message: String,
-    intervalMs: Long = 3000L,
+    intervalMs: Long = PlayerConstants.BACK_EXIT_WINDOW_MS,
 ): () -> Unit {
     val context = LocalContext.current
     var lastBackPressTime by remember { mutableLongStateOf(0L) }

@@ -72,12 +72,4 @@ class InteractionTrackerTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
-
-    @Test
-    fun `InputMethod isTouch and isDPad are mutually exclusive`() {
-        assertThat(InputMethod.Touch.isTouch).isTrue()
-        assertThat(InputMethod.Touch.isDPad).isFalse()
-        assertThat(InputMethod.DPad.isTouch).isFalse()
-        assertThat(InputMethod.DPad.isDPad).isTrue()
-    }
 }

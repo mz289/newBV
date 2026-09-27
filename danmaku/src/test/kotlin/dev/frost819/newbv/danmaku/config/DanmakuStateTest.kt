@@ -22,32 +22,6 @@ class DanmakuStateTest {
     }
 
     @Test
-    fun `isShowAll is true when All type is in list`() {
-        val state = DanmakuState(enabledTypes = listOf(DanmakuType.All))
-        assertThat(state.isShowAll).isTrue()
-    }
-
-    @Test
-    fun `isShowAll is true when all three types present`() {
-        val state =
-            DanmakuState(
-                enabledTypes =
-                    listOf(
-                        DanmakuType.Rolling,
-                        DanmakuType.Top,
-                        DanmakuType.Bottom,
-                    ),
-            )
-        assertThat(state.isShowAll).isTrue()
-    }
-
-    @Test
-    fun `isShowAll is false when subset of types`() {
-        val state = DanmakuState(enabledTypes = listOf(DanmakuType.Rolling))
-        assertThat(state.isShowAll).isFalse()
-    }
-
-    @Test
     fun `screenPart returns area value`() {
         assertThat(DanmakuState(area = 0.5f).screenPart).isEqualTo(0.5f)
         assertThat(DanmakuState(area = 1.0f).screenPart).isEqualTo(1.0f)

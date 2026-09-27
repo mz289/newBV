@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test
  * 验证显示名称与深浅色判定（data 层直接持久化本枚举，行为必须稳定）。
  */
 class ThemeModeTest {
-
     @Test
     fun `displayNames are stable`() {
         assertThat(ThemeMode.FollowSystem.displayName).isEqualTo("跟随系统")

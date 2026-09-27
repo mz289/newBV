@@ -34,6 +34,7 @@ import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
 import dev.frost819.newbv.app.ui.navigation.navigateFromVideoCard
 import dev.frost819.newbv.app.ui.navigation.navigateToVideoDetailFromPlayer
 import dev.frost819.newbv.app.ui.state.player.PlayerState
+import dev.frost819.newbv.app.util.PlayerConstants
 import dev.frost819.newbv.app.util.ToastUtils
 import dev.frost819.newbv.app.util.VideoShotImageCache
 import dev.frost819.newbv.app.viewmodel.comment.CommentViewModel
@@ -172,12 +173,12 @@ fun VideoPlayerScreen(
 
     // 心跳循环（5s 延迟后，每 15s 发送）
     LaunchedEffect(Unit) {
-        delay(5000)
+        delay(PlayerConstants.HEARTBEAT_INITIAL_DELAY_MS)
         while (isActive) {
             if (uiState.playerState == PlayerState.Playing) {
                 playerViewModel.trySendHeartbeat()
             }
-            delay(15000)
+            delay(PlayerConstants.HEARTBEAT_INTERVAL_MS)
         }
     }
 

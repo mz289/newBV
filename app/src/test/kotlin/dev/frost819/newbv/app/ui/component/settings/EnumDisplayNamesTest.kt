@@ -1,7 +1,7 @@
-import dev.frost819.newbv.biliapi.entity.ApiType
 package dev.frost819.newbv.app.ui.component.settings
 
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.data.datastore.ActionAfterPlay
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.HomeTopNavItem
