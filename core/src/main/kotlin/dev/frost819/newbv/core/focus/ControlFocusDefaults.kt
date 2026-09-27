@@ -12,7 +12,7 @@ import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.SuggestionChipDefaults
 
-/** 全应用操作控件的焦点样式：2dp 外描边、4dp 留白，聚焦时保留普通与选中底色。 */
+/** 全应用操作控件的焦点样式：2dp 外描边、内缘紧贴控件边缘，聚焦时保留普通与选中底色。 */
 @OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class)
 object ControlFocusDefaults {
     /** 标准按钮、图标按钮和标签共用的圆角。 */

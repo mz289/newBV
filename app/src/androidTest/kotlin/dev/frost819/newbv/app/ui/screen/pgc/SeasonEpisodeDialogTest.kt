@@ -104,6 +104,18 @@ class SeasonEpisodeDialogTest {
     }
 
     @Test
+    fun group_focus_switches_content_without_confirm() {
+        show()
+        composeRule.onNodeWithTag("episode_choice_21").performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("episode_group_0").assertIsFocused()
+        // 焦点移到 51–100 分段时内容立即切换，无需按确认键，且焦点不被抢回网格。
+        composeRule.onNodeWithTag("episode_group_1").performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("episode_group_1").assertIsFocused()
+        composeRule.onNodeWithText("51–100 话").assertIsDisplayed()
+        composeRule.onNodeWithTag("episode_choice_51").assertIsDisplayed()
+    }
+
+    @Test
     fun partial_final_group_is_bounded_and_playable() {
         show(history = 1274)
         composeRule.onNodeWithTag("episode_choice_1274").assertIsFocused().performClick()
