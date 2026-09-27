@@ -941,7 +941,7 @@ LazyColumn
 │   └─ 追番/取消追番
 ├─ SeasonEpisodeRow (正片列表，横向滚动)
 │   └─ 每集显示封面缩略 + 进度条叠加
-│   └─ 集数多时打开分 Tab 网格弹窗
+│   └─ 全部选集弹窗：左侧每 50 集分段、右侧自适应网格，默认定位上次观看；单段隐藏侧栏
 ├─ SectionEpisodes (PV/SP 等附加分集)
 └─ CommentsPreview [新增]
 ```

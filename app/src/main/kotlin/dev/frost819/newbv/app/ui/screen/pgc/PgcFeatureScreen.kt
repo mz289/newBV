@@ -66,7 +66,6 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.LoadingTip
-import dev.frost819.newbv.app.ui.component.dialog.EpisodeListDialog
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.navigation.PgcFeatureRoute
@@ -79,9 +78,6 @@ import dev.frost819.newbv.biliapi.entity.video.season.Episode
 import dev.frost819.newbv.biliapi.entity.video.season.SeasonDetail
 import dev.frost819.newbv.core.focus.focusInvertedColors
 import dev.frost819.newbv.core.focus.touchClickable
-
-/** 快速选集弹窗每页集数。 */
-private const val SEASON_EPISODE_DIALOG_PAGE_SIZE = 50
 
 /**
  * 番剧详情页路由注册。
@@ -240,19 +236,12 @@ internal fun SeasonDetailContent(
     if (showEpisodeDialog) {
         val lastPlayedCid = state.historyLastPlayedCid
         val lastPlayedTime = state.historyLastPlayedTime
-        EpisodeListDialog(
-            title = dialogTitle,
-            entries = dialogEpisodes,
-            pageSize = SEASON_EPISODE_DIALOG_PAGE_SIZE,
-            keyOf = { it.id },
-            titleOf = { it.title },
-            durationOf = { it.duration },
-            playedOf = { episode ->
-                // 仅记录最近一次观看的分集进度，其余分集无单集进度
-                if (lastPlayedCid != 0L && episode.cid == lastPlayedCid) lastPlayedTime else 0
-            },
-            isCurrentOf = { episode -> lastPlayedCid != 0L && episode.cid == lastPlayedCid },
-            tabLabelOf = { start, end -> "$start-$end" },
+        SeasonEpisodeDialog(
+            seasonTitle = detail.title,
+            sectionTitle = dialogTitle,
+            episodes = dialogEpisodes,
+            lastPlayedCid = lastPlayedCid,
+            lastPlayedTime = lastPlayedTime,
             onDismiss = { showEpisodeDialog = false },
             onSelect = { episode ->
                 showEpisodeDialog = false
