@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -18,6 +19,8 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 private val keyboardKeys =
@@ -54,12 +57,12 @@ fun SoftKeyboard(
     onSearch: () -> Unit,
 ) {
     Column(
-        modifier = modifier.width(258.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier.width(284.dp).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         keyboardKeys.forEachIndexed { rowIndex, rowKeys ->
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 rowKeys.forEachIndexed { index, key ->
                     val keyModifier =
@@ -77,7 +80,7 @@ fun SoftKeyboard(
             }
         }
         Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             SoftKeyboardButton(
                 modifier = Modifier.weight(1f),
@@ -111,10 +114,9 @@ private fun SoftKeyboardKey(
         modifier = modifier.touchClickable(onClick = onClick),
         onClick = onClick,
         colors =
-            ClickableSurfaceDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
-                pressedContainerColor = MaterialTheme.colorScheme.inverseSurface,
-            ),
+            ControlFocusDefaults.surfaceColors(),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Box(
             modifier = Modifier.size(38.dp),
@@ -138,10 +140,9 @@ private fun SoftKeyboardButton(
         modifier = modifier.height(38.dp).touchClickable(onClick = onClick),
         onClick = onClick,
         colors =
-            ClickableSurfaceDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
-                pressedContainerColor = MaterialTheme.colorScheme.inverseSurface,
-            ),
+            ControlFocusDefaults.surfaceColors(),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),

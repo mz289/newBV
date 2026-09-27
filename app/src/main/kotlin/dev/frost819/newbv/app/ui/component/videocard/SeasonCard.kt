@@ -1,6 +1,5 @@
 package dev.frost819.newbv.app.ui.component.videocard
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,12 +20,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -51,20 +51,12 @@ fun SeasonCard(
         modifier = modifier.touchClickable(onClick = onClick),
         onClick = onClick,
         colors =
-            ClickableSurfaceDefaults.colors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor = MaterialTheme.colorScheme.surface,
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                pressedContainerColor = MaterialTheme.colorScheme.surface,
             ),
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.large),
-        border =
-            ClickableSurfaceDefaults.border(
-                focusedBorder =
-                    Border(
-                        border = BorderStroke(width = 3.dp, color = MaterialTheme.colorScheme.border),
-                        shape = MaterialTheme.shapes.large,
-                    ),
-            ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(16.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Column {
             Box(

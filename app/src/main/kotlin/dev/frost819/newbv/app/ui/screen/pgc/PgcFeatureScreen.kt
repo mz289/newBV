@@ -66,7 +66,6 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.LoadingTip
-import dev.frost819.newbv.app.ui.component.dialog.EpisodeListDialog
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.navigation.PgcFeatureRoute
@@ -77,11 +76,9 @@ import dev.frost819.newbv.app.viewmodel.pgc.SeasonDetailUiState
 import dev.frost819.newbv.app.viewmodel.pgc.SeasonDetailViewModel
 import dev.frost819.newbv.biliapi.entity.video.season.Episode
 import dev.frost819.newbv.biliapi.entity.video.season.SeasonDetail
-import dev.frost819.newbv.core.focus.focusInvertedColors
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
-
-/** 快速选集弹窗每页集数。 */
-private const val SEASON_EPISODE_DIALOG_PAGE_SIZE = 50
 
 /**
  * 番剧详情页路由注册。
@@ -240,19 +237,12 @@ internal fun SeasonDetailContent(
     if (showEpisodeDialog) {
         val lastPlayedCid = state.historyLastPlayedCid
         val lastPlayedTime = state.historyLastPlayedTime
-        EpisodeListDialog(
-            title = dialogTitle,
-            entries = dialogEpisodes,
-            pageSize = SEASON_EPISODE_DIALOG_PAGE_SIZE,
-            keyOf = { it.id },
-            titleOf = { it.title },
-            durationOf = { it.duration },
-            playedOf = { episode ->
-                // 仅记录最近一次观看的分集进度，其余分集无单集进度
-                if (lastPlayedCid != 0L && episode.cid == lastPlayedCid) lastPlayedTime else 0
-            },
-            isCurrentOf = { episode -> lastPlayedCid != 0L && episode.cid == lastPlayedCid },
-            tabLabelOf = { start, end -> "$start-$end" },
+        SeasonEpisodeDialog(
+            seasonTitle = detail.title,
+            sectionTitle = dialogTitle,
+            episodes = dialogEpisodes,
+            lastPlayedCid = lastPlayedCid,
+            lastPlayedTime = lastPlayedTime,
             onDismiss = { showEpisodeDialog = false },
             onSelect = { episode ->
                 showEpisodeDialog = false
@@ -467,23 +457,13 @@ private fun SeasonActionButton(
         enabled = enabled,
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = shape),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-        border =
-            ClickableSurfaceDefaults.border(
-                focusedBorder =
-                    Border(
-                        BorderStroke(2.dp, MaterialTheme.colorScheme.border),
-                        inset = (-4).dp,
-                        shape = shape,
-                    ),
-            ),
         colors =
-            ClickableSurfaceDefaults.colors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor = container,
                 contentColor = content,
-                focusedContainerColor = container,
-                focusedContentColor = content,
             ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -665,10 +645,22 @@ private fun SeasonSwitcherRow(
     LazyRow(
         modifier = Modifier.fillMaxWidth().focusRestorer(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
     ) {
         items(detail.seasons, key = { it.seasonId }) { season ->
             val current = season.seasonId == detail.seasonId
+            val container =
+                if (current) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                }
+            val content =
+                if (current) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
             Surface(
                 onClick = { onClick(season.seasonId) },
                 modifier =
@@ -676,31 +668,13 @@ private fun SeasonSwitcherRow(
                         .focusSaverItem(focusSaver, "season_${season.seasonId}")
                         .touchClickable(onClick = { onClick(season.seasonId) }),
                 shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(6.dp)),
-                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-                border =
-                    ClickableSurfaceDefaults.border(
-                        focusedBorder =
-                            Border(
-                                BorderStroke(2.dp, MaterialTheme.colorScheme.border),
-                                inset = (-3).dp,
-                                shape = RoundedCornerShape(6.dp),
-                            ),
-                    ),
                 colors =
-                    focusInvertedColors(
-                        containerColor =
-                            if (current) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            },
-                        contentColor =
-                            if (current) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                    ControlFocusDefaults.surfaceColors(
+                        containerColor = container,
+                        contentColor = content,
                     ),
+                border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(6.dp)),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
             ) {
                 Text(
                     season.shortTitle.ifBlank { season.title.orEmpty() },
@@ -743,23 +717,13 @@ private fun SeasonErrorScreen(
                         .touchClickable(onClick = onRetry),
                 onClick = onRetry,
                 shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
-                border =
-                    ClickableSurfaceDefaults.border(
-                        focusedBorder =
-                            Border(
-                                border =
-                                    androidx.compose.foundation.BorderStroke(
-                                        2.dp,
-                                        MaterialTheme.colorScheme.border,
-                                    ),
-                                shape = MaterialTheme.shapes.medium,
-                            ),
-                    ),
                 colors =
-                    focusInvertedColors(
+                    ControlFocusDefaults.surfaceColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
+                border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(12.dp)),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
             ) {
                 Text(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),

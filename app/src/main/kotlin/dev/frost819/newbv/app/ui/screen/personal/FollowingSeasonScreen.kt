@@ -33,8 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
+import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.FocusSaver
@@ -47,7 +50,7 @@ import dev.frost819.newbv.app.ui.navigation.PgcFeatureRoute
 import dev.frost819.newbv.app.viewmodel.personal.PersonalViewModel
 import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonStatus
 import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonType
-import dev.frost819.newbv.core.focus.focusInvertedColors
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -130,6 +133,14 @@ fun FollowingSeasonScreen(
                     IconButton(
                         onClick = { showFilter = true },
                         modifier = Modifier.touchClickable(onClick = { showFilter = true }),
+                        shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = IconButtonDefaults.scale(focusedScale = 1f),
+                        colors =
+                            ControlFocusDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.FilterList,
@@ -271,6 +282,10 @@ private fun FollowingSeasonFilterDialog(
                         androidx.tv.material3.Button(
                             onClick = { onApply(selectedType, selectedStatus) },
                             modifier = Modifier.touchClickable(onClick = { onApply(selectedType, selectedStatus) }),
+                            shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = ButtonDefaults.scale(focusedScale = 1f),
+                            colors = ControlFocusDefaults.buttonColors(),
+                            border = ControlFocusDefaults.buttonBorder(),
                         ) {
                             androidx.tv.material3.Text("确定")
                         }
@@ -300,7 +315,7 @@ private fun FilterChip(
                         .RoundedCornerShape(50),
             ),
         colors =
-            focusInvertedColors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor =
                     if (selected) {
                         androidx.tv.material3.MaterialTheme.colorScheme.primary

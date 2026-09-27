@@ -18,8 +18,11 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -85,6 +88,9 @@ fun StepLessMenuItem(
             Surface(
                 modifier = Modifier.touchClickable(onClick = increment),
                 onClick = increment,
+                border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                colors = ControlFocusDefaults.surfaceColors(),
             ) {
                 Icon(imageVector = Icons.Rounded.ArrowDropUp, contentDescription = "增加")
             }
@@ -116,6 +122,9 @@ fun StepLessMenuItem(
             Surface(
                 modifier = Modifier.touchClickable(onClick = decrement),
                 onClick = decrement,
+                border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                colors = ControlFocusDefaults.surfaceColors(),
             ) {
                 Icon(imageVector = Icons.Rounded.ArrowDropDown, contentDescription = "减少")
             }

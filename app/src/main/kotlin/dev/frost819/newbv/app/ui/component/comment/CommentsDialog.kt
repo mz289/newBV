@@ -55,7 +55,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -72,10 +71,12 @@ import dev.frost819.newbv.app.viewmodel.comment.CommentUiState
 import dev.frost819.newbv.app.viewmodel.comment.CommentViewModel
 import dev.frost819.newbv.app.viewmodel.comment.ReplyListState
 import dev.frost819.newbv.biliapi.entity.comment.Comment
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.isDpadDown
 import dev.frost819.newbv.core.focus.isDpadLeft
 import dev.frost819.newbv.core.focus.isDpadRight
 import dev.frost819.newbv.core.focus.isDpadUp
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.theme.BVTheme
 import kotlinx.coroutines.delay
@@ -364,6 +365,9 @@ private fun CommentsContent(
                     modifier = Modifier.fillMaxSize(),
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding =
+                        androidx.compose.foundation.layout
+                            .PaddingValues(8.dp),
                 ) {
                     items(rows, key = { it.key }) { row ->
                         when (row) {
@@ -522,18 +526,9 @@ internal fun CommentCard(
                                         .touchClickable(onClick = { onImageClick(comment.pictures, index) }),
                                 onClick = { onImageClick(comment.pictures, index) },
                                 shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                                border =
-                                    ClickableSurfaceDefaults.border(
-                                        focusedBorder =
-                                            Border(
-                                                border =
-                                                    androidx.compose.foundation.BorderStroke(
-                                                        2.dp,
-                                                        MaterialTheme.colorScheme.border,
-                                                    ),
-                                                shape = MaterialTheme.shapes.small,
-                                            ),
-                                    ),
+                                border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+                                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                                colors = ControlFocusDefaults.surfaceColors(),
                             ) {
                                 AsyncImage(
                                     model = url,
@@ -627,7 +622,7 @@ private fun SortButton(
         onClick = { onClick(sort) },
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
         colors =
-            ClickableSurfaceDefaults.colors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor =
                     if (sort ==
                         selected
@@ -645,14 +640,8 @@ private fun SortButton(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
             ),
-        border =
-            ClickableSurfaceDefaults.border(
-                focusedBorder =
-                    Border(
-                        border = androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.border),
-                        shape = MaterialTheme.shapes.small,
-                    ),
-            ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Text(sort.displayName, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
     }
@@ -675,10 +664,12 @@ private fun DialogActionButton(
         enabled = enabled,
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
         colors =
-            ClickableSurfaceDefaults.colors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),

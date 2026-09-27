@@ -30,6 +30,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -44,6 +46,7 @@ import dev.frost819.newbv.core.focus.touchClickable
  * @param expanded 是否展开
  * @param selected 是否选中
  * @param textAlign 文本对齐方式
+ * @param selectionFollowsFocus 选中底色是否随焦点移动；为 true 时不叠加外框。
  * @param onFocus 获得焦点回调
  * @param onClick 点击回调
  */
@@ -55,6 +58,7 @@ fun MenuListItem(
     expanded: Boolean = true,
     selected: Boolean,
     textAlign: TextAlign = TextAlign.Center,
+    selectionFollowsFocus: Boolean = false,
     onFocus: () -> Unit = {},
     onClick: () -> Unit,
 ) {
@@ -77,7 +81,7 @@ fun MenuListItem(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
         colors =
-            ClickableSurfaceDefaults.colors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor =
                     if (selected) {
                         MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.4f)
@@ -85,6 +89,18 @@ fun MenuListItem(
                         Color.Transparent
                     },
             ),
+        border =
+            ClickableSurfaceDefaults.border(
+                focusedBorder =
+                    if (selectionFollowsFocus) {
+                        androidx.tv.material3.Border.None
+                    } else {
+                        outerFocusBorder(
+                            4.dp,
+                        )
+                    },
+            ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Box {
             Row(

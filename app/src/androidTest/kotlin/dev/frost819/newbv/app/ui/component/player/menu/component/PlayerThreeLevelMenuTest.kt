@@ -12,9 +12,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.tv.material3.Text
 import com.google.common.truth.Truth.assertThat
-import dev.frost819.newbv.app.viewmodel.player.LocalMenuFocusStateData
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusState
-import dev.frost819.newbv.app.viewmodel.player.MenuFocusStateData
+import dev.frost819.newbv.app.ui.state.player.LocalMenuFocusStateData
+import dev.frost819.newbv.app.ui.state.player.MenuFocusState
+import dev.frost819.newbv.app.ui.state.player.MenuFocusStateData
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

@@ -4,8 +4,12 @@ import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -18,6 +22,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -45,6 +50,7 @@ class SeasonDetailContentTest {
     private var followCount = 0
     private var selectedEpisode: Episode? = null
     private var selectedSeason = 0
+    private var focusColor = Color.Transparent
 
     private fun show(
         detail: SeasonDetail = fixture(),
@@ -54,6 +60,7 @@ class SeasonDetailContentTest {
     ) {
         composeRule.setContent {
             BVTheme(themeMode = theme, density = 2f) {
+                focusColor = androidx.tv.material3.MaterialTheme.colorScheme.border
                 SeasonDetailContent(
                     detail = detail,
                     state =
@@ -71,6 +78,38 @@ class SeasonDetailContentTest {
         }
         composeRule.mainClock.advanceTimeBy(250)
         composeRule.waitForIdle()
+    }
+
+    @Test
+    fun focus_outline_is_outside_play_follow_and_season_chips() {
+        show()
+        assertOuterOutline(composeRule.onNodeWithTag("season_play"))
+        saveScreenshot("focus-play.png")
+        composeRule.onNodeWithTag("season_play").performKeyInput { pressKey(Key.DirectionRight) }
+        assertOuterOutline(composeRule.onNodeWithText("追番"))
+        composeRule.onNodeWithText("第一季").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        assertOuterOutline(composeRule.onNodeWithText("第一季"))
+        saveScreenshot("focus-season.png")
+        composeRule.onNodeWithText("第二季").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        assertOuterOutline(composeRule.onNodeWithText("第二季"))
+    }
+
+    private fun assertOuterOutline(node: SemanticsNodeInteraction) {
+        composeRule.waitForIdle()
+        node.assertIsFocused()
+        val bounds = node.fetchSemanticsNode().boundsInRoot
+        val pixels = composeRule.onRoot().captureToImage().toPixelMap()
+        // 测试密度为 2：描边中心应在按钮上方 10px，内部及 4px 间隙处均不应是描边色。
+        val x = bounds.center.x.toInt()
+
+        fun distance(y: Int): Float {
+            val color = pixels[x, y]
+            return kotlin.math.abs(color.red - focusColor.red) +
+                kotlin.math.abs(color.green - focusColor.green) + kotlin.math.abs(color.blue - focusColor.blue)
+        }
+        assertThat(distance(bounds.top.toInt() - 10)).isLessThan(0.04f)
+        assertThat(distance(bounds.top.toInt() - 4)).isGreaterThan(0.1f)
+        assertThat(distance(bounds.top.toInt() + 4)).isGreaterThan(0.1f)
     }
 
     @Test
@@ -146,6 +185,19 @@ class SeasonDetailContentTest {
         // Then
         composeRule.runOnIdle { assertThat(selectedEpisode?.cid).isEqualTo(108) }
         composeRule.onNodeWithText("全部选集").assertIsDisplayed()
+    }
+
+    @Test
+    fun closing_all_episodes_restores_trigger_focus() {
+        show()
+        composeRule.onNodeWithText("全部选集").performTouchInput { click() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeBy(250)
+        composeRule.onNodeWithTag("episode_choice_1").assertIsFocused()
+        androidx.test.espresso.Espresso
+            .pressBack()
+        composeRule.mainClock.advanceTimeBy(250)
+        composeRule.onNodeWithText("全部选集").assertIsFocused()
     }
 
     @Test

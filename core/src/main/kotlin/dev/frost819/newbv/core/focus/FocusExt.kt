@@ -7,7 +7,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ShapeDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -18,15 +21,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.ClickableSurfaceColors
-import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Border
 import androidx.tv.material3.MaterialTheme
 import dev.frost819.newbv.core.interaction.InputMethod
 import dev.frost819.newbv.core.interaction.LocalInteractionTracker
@@ -34,6 +40,41 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * 圆角 TV 控件的外侧焦点描边：2dp 线宽，与控件边缘保持 4dp 空隙。
+ *
+ * TV Border 的正 inset 向外扩展；描边中心外移 5dp 后，其内缘距控件 4dp。
+ * 调用方需预留至少 6dp 绘制空间，避免 Lazy 容器裁切。
+ *
+ * @param cornerRadius 控件自身的圆角半径，描边圆角同步向外扩展。
+ */
+@Composable
+@ReadOnlyComposable
+fun outerFocusBorder(cornerRadius: Dp = 8.dp): Border =
+    Border(
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+        inset = 5.dp,
+        shape = RoundedCornerShape(cornerRadius + 5.dp),
+    )
+
+/**
+ * 为不提供 TV Border 参数的导航控件显示统一外框，并预留 6dp 防裁切空间。
+ * 应放在背景裁切修饰符之前；不会添加点击或焦点节点，沿用原控件的语义和导航。
+ */
+fun Modifier.controlFocusOutline(): Modifier =
+    composed {
+        var focused by remember { mutableStateOf(false) }
+        val color = MaterialTheme.colorScheme.border
+        padding(6.dp).onFocusChanged { focused = it.hasFocus }.drawWithContent {
+            drawContent()
+            if (focused) {
+                inset(-5.dp.toPx()) {
+                    drawRoundRect(color, cornerRadius = CornerRadius(13.dp.toPx()), style = Stroke(2.dp.toPx()))
+                }
+            }
+        }
+    }
 
 /**
  * 获取焦点时显示边框。
@@ -126,32 +167,3 @@ fun FocusRequester.requestFocus(scope: CoroutineScope) {
         }
     }
 }
-
-/**
- * 构建「聚焦反色」的可点击 Surface 配色。
- *
- * TV 遥控器场景焦点必须足够醒目：聚焦时容器切换为
- * [androidx.tv.material3.ColorScheme.inverseSurface]，
- * 内容切换为 [androidx.tv.material3.ColorScheme.inverseOnSurface]，
- * 实现整体明暗反色。未聚焦时使用调用方传入的容器/内容色，
- * 以便表达「已选中 / 已激活」等常态。
- *
- * 注意：Surface 的内容色通过 [androidx.tv.material3.LocalContentColor] 下传，
- * 子组件（[androidx.tv.material3.Text] / [androidx.tv.material3.Icon]）**不要**再硬编码颜色，
- * 否则聚焦时不会随容器一起反色。
- *
- * @param containerColor 未聚焦时的容器色。
- * @param contentColor 未聚焦时的内容色。
- */
-@Composable
-@ReadOnlyComposable
-fun focusInvertedColors(
-    containerColor: Color,
-    contentColor: Color,
-): ClickableSurfaceColors =
-    ClickableSurfaceDefaults.colors(
-        containerColor = containerColor,
-        contentColor = contentColor,
-        focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
-        focusedContentColor = MaterialTheme.colorScheme.inverseOnSurface,
-    )

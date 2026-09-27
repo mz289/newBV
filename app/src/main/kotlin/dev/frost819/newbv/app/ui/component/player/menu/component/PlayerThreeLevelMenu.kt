@@ -113,6 +113,7 @@ fun <T> PlayerThreeLevelMenu(
                         selectedCategory = item
                         onFocusStateChange(MenuFocusState.Items)
                     },
+                    selectionFollowsFocus = true,
                     onFocus = { selectedCategory = item },
                 )
             }
