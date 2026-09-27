@@ -9,10 +9,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.RadioButton
 import androidx.tv.material3.RadioButtonDefaults
 import androidx.tv.material3.Text
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -63,5 +65,9 @@ fun SettingsMenuSelectItem(
         },
         onClick = onClick,
         selected = selected,
+        shape = ListItemDefaults.shape(shape = ControlFocusDefaults.shape),
+        scale = ListItemDefaults.scale(focusedScale = 1f),
+        colors = ControlFocusDefaults.listColors(),
+        border = ControlFocusDefaults.listBorder(),
     )
 }

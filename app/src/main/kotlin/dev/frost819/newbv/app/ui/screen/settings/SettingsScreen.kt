@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -32,6 +30,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.FocusSaver
@@ -43,6 +42,7 @@ import dev.frost819.newbv.app.ui.screen.settings.content.InfoSetting
 import dev.frost819.newbv.app.ui.screen.settings.content.OtherSetting
 import dev.frost819.newbv.app.ui.screen.settings.content.StorageSetting
 import dev.frost819.newbv.app.ui.screen.settings.content.UISetting
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -253,7 +253,6 @@ private fun SettingsMenuButton(
     ListItem(
         modifier =
             modifier
-                .clip(RoundedCornerShape(12.dp))
                 .onFocusChanged { if (it.hasFocus) onFocus() }
                 .touchClickable(onClick = { onFocus() }),
         selected = selected,
@@ -265,6 +264,15 @@ private fun SettingsMenuButton(
                 style = MaterialTheme.typography.titleLarge,
             )
         },
+        shape = ListItemDefaults.shape(shape = ControlFocusDefaults.shape),
+        scale = ListItemDefaults.scale(focusedScale = 1f),
+        colors = ControlFocusDefaults.listColors(),
+        border =
+            ListItemDefaults.border(
+                focusedBorder = androidx.tv.material3.Border.None,
+                focusedSelectedBorder = androidx.tv.material3.Border.None,
+                pressedSelectedBorder = androidx.tv.material3.Border.None,
+            ),
     )
 }
 

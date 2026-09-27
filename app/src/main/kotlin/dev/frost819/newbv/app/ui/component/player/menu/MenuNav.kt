@@ -66,6 +66,7 @@ fun <T> MenuNavList(
                 expanded = isFocusing,
                 selected = selected == item,
                 onClick = { onSelectedChanged(item) },
+                selectionFollowsFocus = true,
                 onFocus = { onSelectedChanged(item) },
             )
         }

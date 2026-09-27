@@ -37,7 +37,8 @@ import androidx.tv.material3.Tab
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
-import dev.frost819.newbv.core.focus.focusInvertedColors
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -63,7 +64,7 @@ fun EpisodeListButton(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        // 不要在外层用 .clip()：它会裁剪掉 Surface 内部的聚焦放大，导致没有漂浮效果
+// 不要在外层用 .clip()：它会裁剪掉 Surface 内部的聚焦放大，导致没有漂浮效果
         modifier =
             modifier
                 .width(200.dp)
@@ -72,7 +73,7 @@ fun EpisodeListButton(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
         colors =
-            focusInvertedColors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor =
                     if (isCurrent) {
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
@@ -81,6 +82,8 @@ fun EpisodeListButton(
                     },
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (played != 0 && duration > 0) {
@@ -184,6 +187,7 @@ fun <T> EpisodeListDialog(
                                 .focusRestorer(tabFocusRequester)
                                 .fillMaxWidth(),
                         selectedTabIndex = selectedTab,
+                        indicator = { _, _ -> },
                     ) {
                         repeat(pageCount) { index ->
                             val start = index * pageSize + 1
@@ -199,7 +203,20 @@ fun <T> EpisodeListDialog(
                                         } else {
                                             Modifier
                                         }
-                                    ).touchClickable(onClick = { selectedTab = index }),
+                                    ).touchClickable(
+                                        onClick = { selectedTab = index },
+                                    ).padding(6.dp)
+                                        .background(
+                                            if (selectedTab ==
+                                                index
+                                            ) {
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceVariant
+                                            },
+                                            androidx.compose.foundation.shape
+                                                .RoundedCornerShape(8.dp),
+                                        ),
                             ) {
                                 Text(
                                     modifier = Modifier.padding(vertical = 8.dp),
@@ -225,8 +242,11 @@ fun <T> EpisodeListDialog(
                             .fillMaxSize()
                             .padding(8.dp),
                     columns = GridCells.Fixed(2),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding =
+                        androidx.compose.foundation.layout
+                            .PaddingValues(8.dp),
                 ) {
                     items(slice, key = { keyOf(it) }) { entry ->
                         EpisodeListButton(

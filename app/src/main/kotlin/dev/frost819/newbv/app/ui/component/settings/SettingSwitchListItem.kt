@@ -11,13 +11,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Switch
 import androidx.tv.material3.SwitchDefaults
 import androidx.tv.material3.Text
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -38,14 +39,12 @@ fun SettingSwitchListItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    var hasFocus by remember { mutableStateOf(false) }
     var switchChecked by remember(checked) { mutableStateOf(checked) }
 
     ListItem(
         modifier =
             modifier
                 .padding(horizontal = 12.dp)
-                .onFocusChanged { hasFocus = it.hasFocus }
                 .touchClickable(onClick = {
                     switchChecked = !switchChecked
                     onCheckedChange(switchChecked)
@@ -79,6 +78,10 @@ fun SettingSwitchListItem(
             switchChecked = !switchChecked
             onCheckedChange(switchChecked)
         },
-        selected = hasFocus,
+        selected = false,
+        shape = ListItemDefaults.shape(shape = ControlFocusDefaults.shape),
+        scale = ListItemDefaults.scale(focusedScale = 1f),
+        colors = ControlFocusDefaults.listColors(),
+        border = ControlFocusDefaults.listBorder(),
     )
 }

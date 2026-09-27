@@ -69,6 +69,9 @@ fun <T : Enum<T>> OptionDialog(
                         .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding =
+                    androidx.compose.foundation.layout
+                        .PaddingValues(8.dp),
             ) {
                 items(options.toList()) { option ->
                     SettingsMenuSelectItem(

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.util.CodecInfoData
@@ -47,6 +48,7 @@ import dev.frost819.newbv.app.util.CodecMedia
 import dev.frost819.newbv.app.util.CodecMode
 import dev.frost819.newbv.app.util.CodecType
 import dev.frost819.newbv.app.util.CodecUtil
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -187,6 +189,15 @@ private fun MediaCodecListItems(
                         )
                     }
                 },
+                shape = ListItemDefaults.shape(shape = ControlFocusDefaults.shape),
+                scale = ListItemDefaults.scale(focusedScale = 1f),
+                colors = ControlFocusDefaults.listColors(),
+                border =
+                    ListItemDefaults.border(
+                        focusedBorder = androidx.tv.material3.Border.None,
+                        focusedSelectedBorder = androidx.tv.material3.Border.None,
+                        pressedSelectedBorder = androidx.tv.material3.Border.None,
+                    ),
             )
         }
     }
@@ -318,6 +329,10 @@ private fun MediaCodecDetailItem(
         supportingContent = { Text(text = text) },
         selected = false,
         onClick = {},
+        shape = ListItemDefaults.shape(shape = ControlFocusDefaults.shape),
+        scale = ListItemDefaults.scale(focusedScale = 1f),
+        colors = ControlFocusDefaults.listColors(),
+        border = ControlFocusDefaults.listBorder(),
     )
 }
 
