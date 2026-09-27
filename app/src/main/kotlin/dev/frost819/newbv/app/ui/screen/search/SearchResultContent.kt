@@ -44,6 +44,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
+import androidx.tv.material3.IconButtonDefaults
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TopNav
@@ -71,6 +73,7 @@ import dev.frost819.newbv.app.viewmodel.common.CollectWatchLaterEffects
 import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
 import dev.frost819.newbv.app.viewmodel.search.SearchResultViewModel
 import dev.frost819.newbv.biliapi.repositories.SearchType
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -354,6 +357,14 @@ fun SearchResultContent(
                         .padding(top = 16.dp, end = 40.dp)
                         .touchClickable(onClick = { viewModel.toggleFilter(true) }),
                 onClick = { viewModel.toggleFilter(true) },
+                shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                scale = IconButtonDefaults.scale(focusedScale = 1f),
+                colors =
+                    ControlFocusDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                border = ControlFocusDefaults.buttonBorder(),
             ) {
                 Icon(
                     imageVector = Icons.Rounded.FilterList,

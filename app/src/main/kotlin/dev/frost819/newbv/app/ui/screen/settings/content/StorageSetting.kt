@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Switch
@@ -37,6 +38,7 @@ import dev.frost819.newbv.app.ui.component.settings.SettingListItem
 import dev.frost819.newbv.app.ui.component.settings.SettingsMenuSelectItem
 import dev.frost819.newbv.app.ui.screen.settings.SettingsMenuNavItem
 import dev.frost819.newbv.app.util.CacheManager
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.log.CrashHandler
 import dev.frost819.newbv.data.datastore.Prefs
@@ -102,6 +104,9 @@ fun StorageSetting(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(12.dp))
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding =
+                    androidx.compose.foundation.layout
+                        .PaddingValues(8.dp),
             ) {
                 item {
                     SettingListItem(
@@ -240,6 +245,9 @@ private fun ThresholdOptionDialog(
                         .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding =
+                    androidx.compose.foundation.layout
+                        .PaddingValues(8.dp),
             ) {
                 item {
                     Text(
@@ -287,6 +295,10 @@ private fun ConfirmClearDialog(
             Button(
                 onClick = onConfirm,
                 modifier = Modifier.touchClickable(onClick = onConfirm),
+                shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                scale = ButtonDefaults.scale(focusedScale = 1f),
+                colors = ControlFocusDefaults.buttonColors(),
+                border = ControlFocusDefaults.buttonBorder(),
             ) {
                 Text(text = "确定")
             }
@@ -295,6 +307,14 @@ private fun ConfirmClearDialog(
             OutlinedButton(
                 onClick = onDismiss,
                 modifier = Modifier.touchClickable(onClick = onDismiss),
+                shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                scale = ButtonDefaults.scale(focusedScale = 1f),
+                colors =
+                    ControlFocusDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                border = ControlFocusDefaults.buttonBorder(),
             ) {
                 Text(text = "取消")
             }

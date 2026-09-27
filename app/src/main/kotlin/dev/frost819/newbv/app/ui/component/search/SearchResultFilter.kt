@@ -13,11 +13,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.FilterChip
 import androidx.tv.material3.FilterChipDefaults
 import androidx.tv.material3.MaterialTheme
@@ -26,6 +28,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dev.frost819.newbv.biliapi.repositories.SearchFilterDuration
 import dev.frost819.newbv.biliapi.repositories.SearchFilterOrderType
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 
 private val orderLabels =
@@ -99,10 +102,10 @@ fun SearchResultFilter(
                                 selected = currentOrder == order,
                                 onClick = { currentOrder = order },
                                 modifier = Modifier.touchClickable(onClick = { currentOrder = order }),
-                                colors =
-                                    FilterChipDefaults.colors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    ),
+                                shape = FilterChipDefaults.shape(shape = ControlFocusDefaults.shape),
+                                scale = FilterChipDefaults.scale(focusedScale = 1f),
+                                colors = ControlFocusDefaults.filterColors(),
+                                border = ControlFocusDefaults.filterBorder(),
                             ) {
                                 Text(
                                     text = label,
@@ -134,10 +137,10 @@ fun SearchResultFilter(
                                 selected = currentDuration == duration,
                                 onClick = { currentDuration = duration },
                                 modifier = Modifier.touchClickable(onClick = { currentDuration = duration }),
-                                colors =
-                                    FilterChipDefaults.colors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    ),
+                                shape = FilterChipDefaults.shape(shape = ControlFocusDefaults.shape),
+                                scale = FilterChipDefaults.scale(focusedScale = 1f),
+                                colors = ControlFocusDefaults.filterColors(),
+                                border = ControlFocusDefaults.filterBorder(),
                             ) {
                                 Text(
                                     text = label,
@@ -155,11 +158,19 @@ fun SearchResultFilter(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier.touchClickable(onClick = onDismiss),
+                        shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = ButtonDefaults.scale(focusedScale = 1f),
+                        colors =
+                            ControlFocusDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) {
                         Text("取消")
                     }
@@ -169,6 +180,10 @@ fun SearchResultFilter(
                                 .padding(start = 8.dp)
                                 .touchClickable(onClick = { onConfirm(currentOrder, currentDuration) }),
                         onClick = { onConfirm(currentOrder, currentDuration) },
+                        shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = ButtonDefaults.scale(focusedScale = 1f),
+                        colors = ControlFocusDefaults.buttonColors(),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) {
                         Text("确定")
                     }

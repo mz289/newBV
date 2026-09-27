@@ -16,12 +16,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.BuildConfig
 import dev.frost819.newbv.app.network.GithubApi
 import dev.frost819.newbv.app.ui.component.settings.UpdateDialog
 import dev.frost819.newbv.app.ui.screen.settings.SettingsMenuNavItem
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.log.Loggers
 import kotlinx.coroutines.Dispatchers
@@ -71,6 +73,10 @@ fun AboutSetting(modifier: Modifier = Modifier) {
             Button(
                 onClick = { showUpdateDialog = true },
                 modifier = Modifier.touchClickable(onClick = { showUpdateDialog = true }),
+                shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                scale = ButtonDefaults.scale(focusedScale = 1f),
+                colors = ControlFocusDefaults.buttonColors(),
+                border = ControlFocusDefaults.buttonBorder(),
             ) {
                 Text(text = "检查更新")
             }

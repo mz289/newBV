@@ -34,6 +34,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -46,6 +47,8 @@ import dev.frost819.newbv.app.ui.navigation.FollowRoute
 import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
 import dev.frost819.newbv.app.viewmodel.user.FollowViewModel
 import dev.frost819.newbv.biliapi.entity.user.FollowedUser
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -143,6 +146,9 @@ private fun FollowedUserCard(
     Surface(
         modifier = modifier.touchClickable(onClick = onClick),
         onClick = onClick,
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+        colors = ControlFocusDefaults.surfaceColors(),
     ) {
         Row(
             modifier =

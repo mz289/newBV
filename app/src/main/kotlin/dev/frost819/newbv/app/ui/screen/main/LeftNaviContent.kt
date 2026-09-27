@@ -43,6 +43,7 @@ import androidx.tv.material3.SurfaceDefaults
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.focusSaverItem
+import dev.frost819.newbv.core.focus.controlFocusOutline
 import dev.frost819.newbv.core.focus.isDpadRight
 import dev.frost819.newbv.core.focus.isKeyDown
 import dev.frost819.newbv.data.datastore.LeftNaviItem
@@ -99,12 +100,6 @@ fun LeftNaviContent(
     ) {
         var userIsFocused by remember { mutableStateOf(false) }
         NavigationRailItem(
-            modifier =
-                Modifier
-                    .focusSaverItem(focusSaver, "user")
-                    .onFocusChanged {
-                        userIsFocused = it.hasFocus
-                    },
             onClick = {
                 if (isLogin) {
                     onShowUserPanel()
@@ -142,6 +137,18 @@ fun LeftNaviContent(
                     )
                 }
             },
+            modifier =
+                Modifier
+                    .focusSaverItem(focusSaver, "user")
+                    .onFocusChanged {
+                        userIsFocused = it.hasFocus
+                    }.controlFocusOutline(),
+            colors =
+                androidx.compose.material3.NavigationRailItemDefaults.colors(
+                    indicatorColor = Color.Transparent,
+                    selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
         )
 
         Column(
@@ -160,10 +167,6 @@ fun LeftNaviContent(
                     label = "selection-indicator",
                 )
                 NavigationRailItem(
-                    modifier =
-                        Modifier
-                            .onFocusChanged { isFocused = it.hasFocus }
-                            .selectionIndicator(indicatorColor),
                     onClick = { onLeftNaviItemChanged(item) },
                     selected = isFocused,
                     icon = {
@@ -172,18 +175,23 @@ fun LeftNaviContent(
                             contentDescription = null,
                         )
                     },
+                    modifier =
+                        Modifier
+                            .onFocusChanged { isFocused = it.hasFocus }
+                            .selectionIndicator(indicatorColor)
+                            .controlFocusOutline(),
+                    colors =
+                        androidx.compose.material3.NavigationRailItemDefaults.colors(
+                            indicatorColor = Color.Transparent,
+                            selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
                 )
             }
         }
 
         var settingsIsFocused by remember { mutableStateOf(false) }
         NavigationRailItem(
-            modifier =
-                Modifier
-                    .focusSaverItem(focusSaver, "settings")
-                    .onFocusChanged {
-                        settingsIsFocused = it.hasFocus
-                    },
             onClick = onOpenSettings,
             selected = settingsIsFocused,
             icon = {
@@ -192,6 +200,18 @@ fun LeftNaviContent(
                     contentDescription = null,
                 )
             },
+            modifier =
+                Modifier
+                    .focusSaverItem(focusSaver, "settings")
+                    .onFocusChanged {
+                        settingsIsFocused = it.hasFocus
+                    }.controlFocusOutline(),
+            colors =
+                androidx.compose.material3.NavigationRailItemDefaults.colors(
+                    indicatorColor = Color.Transparent,
+                    selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
         )
     }
 }

@@ -38,10 +38,12 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
+import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.R
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.interaction.InputMethod
 import dev.frost819.newbv.core.interaction.currentInputMethod
@@ -152,6 +154,14 @@ fun SmallVideoCard(
                                             action()
                                         }
                                     }),
+                            shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = IconButtonDefaults.scale(focusedScale = 1f),
+                            colors =
+                                ControlFocusDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                            border = ControlFocusDefaults.buttonBorder(),
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.remove_from_list),
@@ -190,6 +200,14 @@ fun SmallVideoCard(
                                         }
                                     })
                                 },
+                            shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = IconButtonDefaults.scale(focusedScale = 1f),
+                            colors =
+                                ControlFocusDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                            border = ControlFocusDefaults.buttonBorder(),
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.add_to_list),
@@ -228,6 +246,14 @@ fun SmallVideoCard(
                                         }
                                     })
                                 },
+                            shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = IconButtonDefaults.scale(focusedScale = 1f),
+                            colors =
+                                ControlFocusDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                            border = ControlFocusDefaults.buttonBorder(),
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.info_24px),
@@ -269,6 +295,14 @@ fun SmallVideoCard(
                                         }
                                     })
                                 },
+                            shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = IconButtonDefaults.scale(focusedScale = 1f),
+                            colors =
+                                ControlFocusDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                            border = ControlFocusDefaults.buttonBorder(),
                         ) {
                             Icon(
                                 painter = painterResource(id = R.drawable.contact_page_24px),

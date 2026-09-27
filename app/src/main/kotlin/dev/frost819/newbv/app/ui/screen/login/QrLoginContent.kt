@@ -26,7 +26,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -34,7 +33,8 @@ import androidx.tv.material3.Text
 import dev.frost819.newbv.R
 import dev.frost819.newbv.app.viewmodel.login.LoginViewModel
 import dev.frost819.newbv.biliapi.entity.login.QrLoginState
-import dev.frost819.newbv.core.focus.focusInvertedColors
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import io.github.g0dkar.qrcode.QRCode
 
@@ -134,23 +134,13 @@ fun QrLoginContent(
                                     .touchClickable(onClick = { viewModel.requestAppQrCode() }),
                             onClick = { viewModel.requestAppQrCode() },
                             shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
-                            border =
-                                ClickableSurfaceDefaults.border(
-                                    focusedBorder =
-                                        Border(
-                                            border =
-                                                androidx.compose.foundation.BorderStroke(
-                                                    2.dp,
-                                                    MaterialTheme.colorScheme.border,
-                                                ),
-                                            shape = MaterialTheme.shapes.medium,
-                                        ),
-                                ),
                             colors =
-                                focusInvertedColors(
+                                ControlFocusDefaults.surfaceColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 ),
+                            border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(12.dp)),
+                            scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                         ) {
                             Text(
                                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),

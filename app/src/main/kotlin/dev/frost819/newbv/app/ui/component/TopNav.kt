@@ -2,7 +2,6 @@ package dev.frost819.newbv.app.ui.component
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -16,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -25,7 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -34,6 +31,7 @@ import androidx.tv.material3.Tab
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.TabRowScope
 import androidx.tv.material3.Text
+import dev.frost819.newbv.core.focus.controlFocusOutline
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -82,6 +80,7 @@ fun TopNav(
                     .focusRestorer(focusRequester),
             selectedTabIndex = selectedTabIndex,
             separator = { Spacer(modifier = Modifier.width(12.dp)) },
+            indicator = { _, _ -> },
         ) {
             items.forEachIndexed { index, tab ->
                 NavItemTab(
@@ -109,21 +108,19 @@ private fun TabRowScope.NavItemTab(
 ) {
     // 统一使用品牌青绿作为 TopNav 强调色，避免各页面颜色不一致
     val accentColor = MaterialTheme.colorScheme.secondary
-    var hasFocus by remember { mutableStateOf(false) }
     val containerColor =
         if (selected) {
-            accentColor.copy(alpha = if (hasFocus) 0.24f else 0.14f)
+            accentColor.copy(alpha = 0.14f)
         } else {
             Color.Transparent
         }
-    val borderColor = if (hasFocus) accentColor else Color.Transparent
+
     Tab(
         modifier =
             modifier
-                .onFocusChanged { hasFocus = it.hasFocus }
-                .clip(RoundedCornerShape(50))
+                .controlFocusOutline()
+                .clip(RoundedCornerShape(8.dp))
                 .background(containerColor)
-                .border(2.dp, borderColor, RoundedCornerShape(50))
                 .touchClickable(onClick = onClick),
         selected = selected,
         onFocus = onFocus,

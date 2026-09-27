@@ -50,6 +50,7 @@ import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.biliapi.entity.video.season.Episode
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.delay
@@ -357,9 +358,8 @@ private fun EpisodeDialogAction(
         onClick = onClick,
         modifier = modifier.touchClickable(onClick = onClick),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         colors =
-            ClickableSurfaceDefaults.colors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor =
                     if (selected) {
                         MaterialTheme.colorScheme.primary.copy(
@@ -369,13 +369,9 @@ private fun EpisodeDialogAction(
                         MaterialTheme.colorScheme.surfaceVariant
                     },
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ),
-        border =
-            ClickableSurfaceDefaults.border(
-                focusedBorder = outerFocusBorder(),
-            ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Box(
             Modifier.padding(horizontal = 10.dp, vertical = 10.dp),

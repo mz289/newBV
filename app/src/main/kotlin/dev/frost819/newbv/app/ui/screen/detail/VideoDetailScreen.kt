@@ -64,6 +64,7 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.FilterChipDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.SuggestionChip
@@ -100,7 +101,8 @@ import dev.frost819.newbv.biliapi.entity.video.Tag
 import dev.frost819.newbv.biliapi.entity.video.VideoDetail
 import dev.frost819.newbv.biliapi.entity.video.VideoPage
 import dev.frost819.newbv.biliapi.entity.video.season.Episode
-import dev.frost819.newbv.core.focus.focusInvertedColors
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -216,23 +218,13 @@ private fun ErrorScreen(
                         .touchClickable(onClick = onRetry),
                 onClick = onRetry,
                 shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
-                border =
-                    ClickableSurfaceDefaults.border(
-                        focusedBorder =
-                            Border(
-                                border =
-                                    androidx.compose.foundation.BorderStroke(
-                                        2.dp,
-                                        MaterialTheme.colorScheme.border,
-                                    ),
-                                shape = MaterialTheme.shapes.medium,
-                            ),
-                    ),
                 colors =
-                    focusInvertedColors(
+                    ControlFocusDefaults.surfaceColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
+                border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(12.dp)),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
             ) {
                 Text(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
@@ -531,6 +523,10 @@ private fun FavoriteFolderDialog(
                                         onUpdate(selectedIds.toList())
                                     },
                                 ),
+                            shape = FilterChipDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = FilterChipDefaults.scale(focusedScale = 1f),
+                            colors = ControlFocusDefaults.filterColors(),
+                            border = ControlFocusDefaults.filterBorder(),
                         ) {
                             Text(
                                 text = folder.title,
@@ -661,23 +657,13 @@ private fun VideoInfoHeader(
                             .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("up") }
                             .touchClickable(onClick = onClickUp),
                     shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                    border =
-                        ClickableSurfaceDefaults.border(
-                            focusedBorder =
-                                Border(
-                                    border =
-                                        androidx.compose.foundation.BorderStroke(
-                                            2.dp,
-                                            MaterialTheme.colorScheme.border,
-                                        ),
-                                    shape = MaterialTheme.shapes.small,
-                                ),
-                        ),
                     colors =
-                        focusInvertedColors(
+                        ControlFocusDefaults.surfaceColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         ),
+                    border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                 ) {
                     Row(
                         modifier =
@@ -765,6 +751,9 @@ private fun VideoInfoHeader(
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding =
+                        androidx.compose.foundation.layout
+                            .PaddingValues(8.dp),
                 ) {
                     items(detail.tags) { tag ->
                         val tagKey = "tag_${tag.id}"
@@ -775,8 +764,11 @@ private fun VideoInfoHeader(
                                     .focusRequester(focusSaver.focusRequesterFor(tagKey))
                                     .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey(tagKey) }
                                     .touchClickable(onClick = { onClickTag(tag) }),
-                            // tag 不做聚焦放大：否则首尾 tag 会被 LazyRow 视口裁切
+                            // 标签不放大，避免挤占相邻标签的焦点留白。
                             scale = SuggestionChipDefaults.scale(focusedScale = 1f),
+                            shape = SuggestionChipDefaults.shape(shape = ControlFocusDefaults.shape),
+                            colors = ControlFocusDefaults.suggestionColors(),
+                            border = ControlFocusDefaults.suggestionBorder(),
                         ) {
                             Text(
                                 text = tag.name,
@@ -818,13 +810,13 @@ private fun ActionButton(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        // 不要在外层用 .clip()：它会裁剪掉 Surface 内部的聚焦放大，导致漂浮被裁切
+        // 外层不裁切，保留焦点外描边的绘制空间。
         modifier = modifier.touchClickable(onClick = onClick, onLongClick = onLongClick),
         onClick = onClick,
         onLongClick = onLongClick,
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
         colors =
-            focusInvertedColors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor =
                     if (highlighted) {
                         MaterialTheme.colorScheme.primaryContainer
@@ -838,22 +830,8 @@ private fun ActionButton(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
             ),
-        border =
-            ClickableSurfaceDefaults.border(
-                border =
-                    if (highlighted) {
-                        Border(
-                            border =
-                                androidx.compose.foundation.BorderStroke(
-                                    2.dp,
-                                    MaterialTheme.colorScheme.border,
-                                ),
-                            shape = MaterialTheme.shapes.small,
-                        )
-                    } else {
-                        Border.None
-                    },
-            ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -890,25 +868,14 @@ private fun VideoDescription(
                 .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("description") }
                 .touchClickable(onClick = { expanded = !expanded }),
         colors =
-            focusInvertedColors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ),
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
-        border =
-            ClickableSurfaceDefaults.border(
-                focusedBorder =
-                    Border(
-                        border =
-                            androidx.compose.foundation.BorderStroke(
-                                2.dp,
-                                MaterialTheme.colorScheme.border,
-                            ),
-                        shape = MaterialTheme.shapes.medium,
-                    ),
-            ),
         onClick = { expanded = !expanded },
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(12.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Text(
             modifier =
@@ -970,10 +937,12 @@ private fun VideoPartRow(
                     modifier = Modifier.touchClickable(onClick = onShowPartListDialog),
                     shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
                     colors =
-                        focusInvertedColors(
+                        ControlFocusDefaults.surfaceColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         ),
+                    border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Apps,
@@ -992,13 +961,14 @@ private fun VideoPartRow(
                         onClick = { onClick(lastPage) },
                         modifier = Modifier.touchClickable(onClick = { onClick(lastPage) }),
                         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                        // 不做聚焦放大：否则会盖住左侧的网格列表按钮
+                        // 不放大，避免盖住相邻的选集按钮。
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                         colors =
-                            focusInvertedColors(
+                            ControlFocusDefaults.surfaceColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
+                        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -1097,10 +1067,12 @@ private fun VideoUgcSeasonRow(
                     modifier = Modifier.touchClickable(onClick = onShowListDialog),
                     shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
                     colors =
-                        focusInvertedColors(
+                        ControlFocusDefaults.surfaceColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         ),
+                    border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Apps,
@@ -1119,13 +1091,14 @@ private fun VideoUgcSeasonRow(
                         onClick = { onClick(lastEpisode) },
                         modifier = Modifier.touchClickable(onClick = { onClick(lastEpisode) }),
                         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                        // 不做聚焦放大：否则会盖住左侧的网格列表按钮
+                        // 不放大，避免盖住相邻的选集按钮。
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
                         colors =
-                            focusInvertedColors(
+                            ControlFocusDefaults.surfaceColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
+                        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),

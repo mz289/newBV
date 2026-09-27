@@ -33,7 +33,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
@@ -43,6 +45,7 @@ import dev.frost819.newbv.app.entity.player.shortcut.PlayerCustomShortcutCatalog
 import dev.frost819.newbv.app.entity.player.shortcut.PlayerCustomShortcutKeys
 import dev.frost819.newbv.app.entity.player.shortcut.PlayerCustomShortcutsStore
 import dev.frost819.newbv.app.ui.component.settings.SettingsMenuSelectItem
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -196,6 +199,9 @@ private fun MainStage(
                             .heightIn(max = maxHeightDp)
                             .padding(vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding =
+                        androidx.compose.foundation.layout
+                            .PaddingValues(8.dp),
                 ) {
                     if (shortcuts.isEmpty()) {
                         item {
@@ -219,6 +225,10 @@ private fun MainStage(
                                 modifier = Modifier.touchClickable(onClick = { onEdit(shortcut) }),
                                 onClick = { onEdit(shortcut) },
                                 selected = false,
+                                shape = ListItemDefaults.shape(shape = ControlFocusDefaults.shape),
+                                scale = ListItemDefaults.scale(focusedScale = 1f),
+                                colors = ControlFocusDefaults.listColors(),
+                                border = ControlFocusDefaults.listBorder(),
                             )
                         }
                     }
@@ -230,15 +240,35 @@ private fun MainStage(
                     Button(
                         onClick = onAdd,
                         modifier = Modifier.touchClickable(onClick = onAdd),
+                        shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = ButtonDefaults.scale(focusedScale = 1f),
+                        colors = ControlFocusDefaults.buttonColors(),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) { Text("添加") }
                     OutlinedButton(
                         onClick = onClear,
                         enabled = shortcuts.isNotEmpty(),
                         modifier = Modifier.touchClickable(onClick = { if (shortcuts.isNotEmpty()) onClear() }),
+                        shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = ButtonDefaults.scale(focusedScale = 1f),
+                        colors =
+                            ControlFocusDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) { Text("清空") }
                     OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier.touchClickable(onClick = onDismiss),
+                        shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = ButtonDefaults.scale(focusedScale = 1f),
+                        colors =
+                            ControlFocusDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) { Text("关闭") }
                 }
             }
@@ -330,6 +360,9 @@ private fun PickActionStage(
                             .heightIn(max = maxHeightDp)
                             .padding(vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding =
+                        androidx.compose.foundation.layout
+                            .PaddingValues(8.dp),
                 ) {
                     val groups = PlayerCustomShortcutCatalog.groups()
                     items(groups) { group ->
@@ -351,6 +384,14 @@ private fun PickActionStage(
                         OutlinedButton(
                             onClick = onRemove,
                             modifier = Modifier.touchClickable(onClick = onRemove),
+                            shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = ButtonDefaults.scale(focusedScale = 1f),
+                            colors =
+                                ControlFocusDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                            border = ControlFocusDefaults.buttonBorder(),
                         ) { Text("移除绑定") }
                     }
                 }
@@ -392,6 +433,9 @@ private fun PickActionValueStage(
                             .heightIn(max = maxHeightDp)
                             .padding(vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding =
+                        androidx.compose.foundation.layout
+                            .PaddingValues(8.dp),
                 ) {
                     items(values) { entry ->
                         SettingsMenuSelectItem(
@@ -434,10 +478,22 @@ private fun ConfirmClearStage(
                     Button(
                         onClick = onConfirm,
                         modifier = Modifier.touchClickable(onClick = onConfirm),
+                        shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = ButtonDefaults.scale(focusedScale = 1f),
+                        colors = ControlFocusDefaults.buttonColors(),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) { Text("确定") }
                     OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier.touchClickable(onClick = onDismiss),
+                        shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = ButtonDefaults.scale(focusedScale = 1f),
+                        colors =
+                            ControlFocusDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) { Text("取消") }
                 }
             }

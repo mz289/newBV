@@ -25,12 +25,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import dev.frost819.newbv.BuildConfig
 import dev.frost819.newbv.app.network.GithubApi
 import dev.frost819.newbv.app.network.entity.GithubRelease
 import dev.frost819.newbv.app.util.CacheManager
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.log.Loggers
 import kotlinx.coroutines.Dispatchers
@@ -241,6 +244,10 @@ fun UpdateDialog(
                         Button(
                             onClick = startUpdate,
                             modifier = Modifier.touchClickable(onClick = startUpdate),
+                            shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = ButtonDefaults.scale(focusedScale = 1f),
+                            colors = ControlFocusDefaults.buttonColors(),
+                            border = ControlFocusDefaults.buttonBorder(),
                         ) {
                             Text(text = "立即更新")
                         }
@@ -250,6 +257,10 @@ fun UpdateDialog(
                         Button(
                             onClick = checkUpdate,
                             modifier = Modifier.touchClickable(onClick = checkUpdate),
+                            shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = ButtonDefaults.scale(focusedScale = 1f),
+                            colors = ControlFocusDefaults.buttonColors(),
+                            border = ControlFocusDefaults.buttonBorder(),
                         ) {
                             Text(text = "再试一次")
                         }
@@ -276,6 +287,14 @@ fun UpdateDialog(
                                 onHideDialog()
                             }
                         }),
+                    shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                    scale = ButtonDefaults.scale(focusedScale = 1f),
+                    colors =
+                        ControlFocusDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    border = ControlFocusDefaults.buttonBorder(),
                 ) {
                     Text(
                         text =
