@@ -45,9 +45,6 @@ class FollowViewModel
     ) : ViewModel() {
         private val logger = Loggers.get("FollowViewModel")
 
-        private fun prefApiType(): ApiType =
-            if (Prefs.apiType == dev.frost819.newbv.data.datastore.ApiType.App) ApiType.App else ApiType.Web
-
         private val _uiState = MutableStateFlow(FollowUiState())
         val uiState: StateFlow<FollowUiState> = _uiState.asStateFlow()
 
@@ -66,7 +63,7 @@ class FollowViewModel
             viewModelScope.launch {
                 runCatching {
                     withTimeout(LOAD_TIMEOUT_MS) {
-                        userRepository.getFollowedUsers(mid, preferApiType = prefApiType())
+                        userRepository.getFollowedUsers(mid, preferApiType = Prefs.apiType)
                     }
                 }.onSuccess { users ->
                     _uiState.update {

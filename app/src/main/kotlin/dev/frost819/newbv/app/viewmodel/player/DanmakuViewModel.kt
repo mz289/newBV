@@ -38,7 +38,6 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import kotlin.math.abs
 import dev.frost819.newbv.danmaku.entity.DanmakuType as DanmakuEntityDanmakuType
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
 import dev.frost819.newbv.data.datastore.DanmakuType as DataDanmakuType
 
 /**
@@ -347,7 +346,7 @@ class DanmakuViewModel
                                     aid = currentAid,
                                     cid = currentCid,
                                     segmentIndex = segmentIndex,
-                                    preferApiType = if (Prefs.apiType == DataApiType.App) ApiType.App else ApiType.Web,
+                                    preferApiType = Prefs.apiType,
                                 )
                             }
                         val items = dataList.map { it.toDanmakuItemData() }
@@ -419,7 +418,7 @@ class DanmakuViewModel
                                 videoPlayRepository.getDanmakuMask(
                                     aid = aid,
                                     cid = cid,
-                                    preferApiType = if (Prefs.apiType == DataApiType.App) ApiType.App else ApiType.Web,
+                                    preferApiType = Prefs.apiType,
                                 )
                             }
                         _danmakuMask.update { mask }

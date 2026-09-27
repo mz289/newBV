@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
 
 sealed interface WatchLaterEffect {
     data class ShowToast(
@@ -40,8 +39,6 @@ class WatchLaterViewModel
     ) : ViewModel() {
         private val logger = Loggers.get("WatchLaterViewModel")
 
-        private fun prefApiType(): ApiType = if (Prefs.apiType == DataApiType.App) ApiType.App else ApiType.Web
-
         private val _effect = MutableSharedFlow<WatchLaterEffect>()
         val effect = _effect.asSharedFlow()
 
@@ -60,7 +57,7 @@ class WatchLaterViewModel
                     toViewRepository.addToView(
                         aid = aid,
                         bvid = bvid,
-                        preferApiType = prefApiType(),
+                        preferApiType = Prefs.apiType,
                     )
                 }.onSuccess {
                     _effect.emit(WatchLaterEffect.ShowToast("已添加到稍后再看"))
@@ -83,7 +80,7 @@ class WatchLaterViewModel
                     toViewRepository.delToView(
                         aid = aid,
                         viewed = false,
-                        preferApiType = prefApiType(),
+                        preferApiType = Prefs.apiType,
                     )
                 }.onSuccess {
                     _effect.emit(WatchLaterEffect.ShowToast("已移除稍后再看"))

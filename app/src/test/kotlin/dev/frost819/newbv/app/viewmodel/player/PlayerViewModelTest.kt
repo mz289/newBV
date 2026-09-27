@@ -55,7 +55,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
+import dev.frost819.newbv.biliapi.entity.ApiType
 
 /**
  * [PlayerViewModel] 的单元测试。
@@ -101,7 +101,7 @@ class PlayerViewModelTest {
         cdnSelector = mockk(relaxed = true)
 
         mockkObject(Prefs)
-        every { Prefs.apiType } returns DataApiType.Web
+        every { Prefs.apiType } returns ApiType.Web
         every { Prefs.defaultQuality } returns Resolution.R1080P
         every { Prefs.defaultVideoCodec } returns VideoCodec.AVC
         every { Prefs.defaultAudio } returns Audio.A192K

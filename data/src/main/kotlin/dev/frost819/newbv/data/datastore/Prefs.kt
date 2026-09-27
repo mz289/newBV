@@ -5,6 +5,7 @@ package dev.frost819.newbv.data.datastore
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import dev.frost819.newbv.biliapi.entity.ApiType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -236,7 +237,7 @@ object Prefs {
         PrefKeys.apiType,
         ApiType.Web,
         save = { it.ordinal },
-        restore = { ApiType.fromOrdinal(it) },
+        restore = { ApiType.entries.getOrElse(it) { ApiType.Web } },
     )
 
     /** 是否启用崩溃日志上传（默认关闭）。 */

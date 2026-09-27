@@ -19,7 +19,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
 
 /**
  * 搜索输入页 ViewModel。
@@ -115,7 +114,7 @@ class SearchInputViewModel
                     withTimeout(LOAD_TIMEOUT_MS) {
                         searchRepository.getSearchHotwords(
                             limit = 50,
-                            preferApiType = if (Prefs.apiType == DataApiType.App) ApiType.App else ApiType.Web,
+                            preferApiType = Prefs.apiType,
                         )
                     }
                 }.onSuccess { hotwords ->
@@ -141,7 +140,7 @@ class SearchInputViewModel
                     withTimeout(LOAD_TIMEOUT_MS) {
                         searchRepository.getSearchSuggest(
                             keyword = keyword,
-                            preferApiType = if (Prefs.apiType == DataApiType.App) ApiType.App else ApiType.Web,
+                            preferApiType = Prefs.apiType,
                         )
                     }
                 }.onSuccess { suggests ->

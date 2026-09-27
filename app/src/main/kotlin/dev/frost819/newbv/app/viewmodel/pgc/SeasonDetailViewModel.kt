@@ -95,9 +95,6 @@ class SeasonDetailViewModel
         private val _uiState = MutableStateFlow(SeasonDetailUiState())
         val uiState: StateFlow<SeasonDetailUiState> = _uiState.asStateFlow()
 
-        private fun prefApiType(): ApiType =
-            if (Prefs.apiType == dev.frost819.newbv.data.datastore.ApiType.App) ApiType.App else ApiType.Web
-
         private val _uiEffect = MutableSharedFlow<SeasonDetailUiEffect>()
         val uiEffect: SharedFlow<SeasonDetailUiEffect> = _uiEffect.asSharedFlow()
 
@@ -138,7 +135,7 @@ class SeasonDetailViewModel
                             videoDetailRepository.getPgcVideoDetail(
                                 epid = epid,
                                 seasonId = seasonId.takeIf { it != 0 },
-                                preferApiType = prefApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         _uiState.update {
                             it.copy(
@@ -172,7 +169,7 @@ class SeasonDetailViewModel
         fun toggleFollow() {
             val currentDetail = _uiState.value.seasonDetail ?: return
             val isFollowing = _uiState.value.isFollowing
-            val preferApiType = prefApiType()
+            val preferApiType = Prefs.apiType
             viewModelScope.launch {
                 runCatching {
                     if (isFollowing) {
@@ -255,7 +252,7 @@ class SeasonDetailViewModel
                         val detail =
                             videoDetailRepository.getPgcVideoDetail(
                                 seasonId = targetSeasonId,
-                                preferApiType = prefApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         _uiState.update {
                             it.copy(

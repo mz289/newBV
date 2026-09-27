@@ -6,30 +6,9 @@ package dev.frost819.newbv.data.datastore
  * 这些枚举用于 DataStore 持久化，仅保留持久化所需的 code/ordinal 与反序列化方法。
  * 显示名称（getDisplayName）由 app 层扩展，避免 data 模块依赖 Android 资源。
  *
- * 当 bili-api / player / danmaku 模块迁移完成后，部分枚举（ApiType / Resolution /
- * VideoCodec / Audio）可迁移至对应模块，data 层改为引用。
+ * 接口类型不在此定义：data 模块直接引用 bili-api 的
+ * [dev.frost819.newbv.biliapi.entity.ApiType]，避免两套同义枚举互转。
  */
-
-/**
- * 接口类型。
- *
- * 控制使用 Web HTTP API 还是 App gRPC API。
- * 通过 ordinal 持久化，反序列化时越界回退到 [Web]。
- */
-enum class ApiType {
-    /** Web HTTP API（需 WBI 签名）。 */
-    Web,
-
-    /** App gRPC API（需 App 签名）。 */
-    App,
-
-    ;
-
-    companion object {
-        /** 从序号安全解析，越界返回 [Web]。 */
-        fun fromOrdinal(ordinal: Int): ApiType = entries.getOrElse(ordinal) { Web }
-    }
-}
 
 // ===== 播放器 - 视频 =====
 

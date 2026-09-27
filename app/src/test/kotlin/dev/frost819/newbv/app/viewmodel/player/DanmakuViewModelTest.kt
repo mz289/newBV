@@ -26,8 +26,8 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
 import dev.frost819.newbv.data.datastore.DanmakuType as DataDanmakuType
+import dev.frost819.newbv.biliapi.entity.ApiType
 
 /**
  * [DanmakuViewModel] 的单元测试。
@@ -68,7 +68,7 @@ class DanmakuViewModelTest {
         every { Prefs.defaultDanmakuSpeedFactor = any() } answers {}
         every { Prefs.defaultDanmakuMask = any() } answers {}
         every { Prefs.defaultDanmakuTypes = any() } answers {}
-        every { Prefs.apiType } returns DataApiType.Web
+        every { Prefs.apiType } returns ApiType.Web
 
         videoPlayRepository = mockk()
         viewModel = DanmakuViewModel(videoPlayRepository)

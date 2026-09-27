@@ -29,8 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-import dev.frost819.newbv.biliapi.entity.ApiType as BiliApiType
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
+import dev.frost819.newbv.biliapi.entity.ApiType
 
 /** 网络请求超时时间（毫秒）。 */
 private const val LOAD_TIMEOUT_MS = 10_000L
@@ -114,12 +113,6 @@ class PersonalViewModel
         private val _effect = MutableSharedFlow<PersonalUiEffect>()
         val effect = _effect.asSharedFlow()
 
-        private fun prefApiType(): BiliApiType =
-            when (Prefs.apiType) {
-                DataApiType.Web -> BiliApiType.Web
-                DataApiType.App -> BiliApiType.App
-            }
-
         private val _uiState = MutableStateFlow(PersonalUiState())
         val uiState: StateFlow<PersonalUiState> = _uiState.asStateFlow()
 
@@ -158,7 +151,7 @@ class PersonalViewModel
                         val data =
                             toViewRepository.getToView(
                                 cursor = 0,
-                                preferApiType = prefApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         toViewItems.clear()
                         toViewItems.addAll(data.data)
@@ -189,7 +182,7 @@ class PersonalViewModel
                     toViewRepository.delToView(
                         aid = aid,
                         viewed = viewed,
-                        preferApiType = prefApiType(),
+                        preferApiType = Prefs.apiType,
                     )
                     toViewItems.removeAll { it.oid == aid }
                     _effect.emit(PersonalUiEffect.ShowToast("已移除稍后再看"))
@@ -234,7 +227,7 @@ class PersonalViewModel
                         val data =
                             historyRepository.getHistories(
                                 cursor = historyCursor,
-                                preferApiType = prefApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         historyCursor = data.cursor
                         _uiState.update {
@@ -288,7 +281,7 @@ class PersonalViewModel
                         val folders =
                             favoriteRepository.getAllFavoriteFolderMetadataList(
                                 mid = mid,
-                                preferApiType = prefApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         _uiState.update { it.copy(favoriteFolders = folders) }
                         if (folders.isNotEmpty()) {
@@ -345,7 +338,7 @@ class PersonalViewModel
                             favoriteRepository.getFavoriteFolderData(
                                 mediaId = folderId,
                                 pageNumber = favoritePageNumber,
-                                preferApiType = prefApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         favoritePageNumber++
                         val videoItems =
@@ -411,7 +404,7 @@ class PersonalViewModel
                                 type = current.followingType,
                                 status = current.followingStatus,
                                 pageNumber = followingPageNumber,
-                                preferApiType = prefApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         followingPageNumber++
                         followingTotal = data.total

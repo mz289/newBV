@@ -26,7 +26,7 @@ import dev.frost819.newbv.app.ui.component.settings.OptionDialog
 import dev.frost819.newbv.app.ui.component.settings.SettingListItem
 import dev.frost819.newbv.app.ui.component.settings.displayName
 import dev.frost819.newbv.app.ui.screen.settings.SettingsMenuNavItem
-import dev.frost819.newbv.data.datastore.ApiType
+import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.data.datastore.Prefs
 
 /**
