@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +45,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -51,6 +56,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -61,8 +67,6 @@ import dev.frost819.newbv.app.ui.state.player.SeekerState
 import dev.frost819.newbv.app.util.VideoShotImageCache
 import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.biliapi.entity.video.VideoShot
-import dev.frost819.newbv.core.focus.ControlFocusDefaults
-import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.theme.BVTheme
 import kotlinx.coroutines.delay
@@ -86,6 +90,7 @@ import kotlinx.coroutines.delay
  * @param isPgc 是否来自番剧（为 true 时隐藏详情/UP/相关视频按钮）
  * @param danmakuEnabled 弹幕是否开启
  * @param isLooping 是否循环播放
+ * @param isPlaying 是否正在播放，用于切换播放/暂停图标
  * @param onDirectionLeft seek 左移回调
  * @param onDirectionRight seek 右移回调
  * @param onSeekGoTime 确认 seek 回调
@@ -115,6 +120,7 @@ fun ControllerVideoInfo(
     isPgc: Boolean,
     danmakuEnabled: Boolean,
     isLooping: Boolean,
+    isPlaying: Boolean,
     onDirectionLeft: () -> Unit,
     onDirectionRight: () -> Unit,
     onSeekGoTime: () -> Unit,
@@ -161,6 +167,7 @@ fun ControllerVideoInfo(
                 isPgc = isPgc,
                 danmakuEnabled = danmakuEnabled,
                 isLooping = isLooping,
+                isPlaying = isPlaying,
                 onDirectionLeft = onDirectionLeft,
                 onDirectionRight = onDirectionRight,
                 onSeekGoTime = onSeekGoTime,
@@ -272,6 +279,7 @@ fun ControllerVideoInfoBottom(
     isPgc: Boolean,
     danmakuEnabled: Boolean,
     isLooping: Boolean,
+    isPlaying: Boolean,
     onDirectionLeft: () -> Unit,
     onDirectionRight: () -> Unit,
     onSeekGoTime: () -> Unit,
@@ -423,37 +431,50 @@ fun ControllerVideoInfoBottom(
         // 操作按钮行
         val icons =
             buildList {
-                add(ControllerIcon(R.drawable.play_pause_24px, "播放/暂停", onPlayPause))
                 add(
                     ControllerIcon(
-                        if (danmakuEnabled) R.drawable.danmaku_on_24px else R.drawable.danmaku_off_24px,
-                        "弹幕开关",
-                        onDanmakuSwitchChange,
+                        if (isPlaying) R.drawable.ic_player_action_pause else R.drawable.ic_player_action_play,
+                        "播放/暂停",
+                        onPlayPause,
+                        if (isPlaying) "正在播放" else "已暂停",
                     ),
                 )
-                add(ControllerIcon(R.drawable.settings_24px, "打开设置", onShowSettings))
+                add(
+                    ControllerIcon(
+                        if (danmakuEnabled) {
+                            R.drawable.ic_player_action_danmaku
+                        } else {
+                            R.drawable.ic_player_action_danmaku_off
+                        },
+                        "弹幕开关",
+                        onDanmakuSwitchChange,
+                        if (danmakuEnabled) "已开启" else "已关闭",
+                    ),
+                )
+                add(ControllerIcon(R.drawable.ic_player_action_settings, "打开设置", onShowSettings))
                 if (!isPgc) {
-                    add(ControllerIcon(R.drawable.info_24px, "视频信息", onGoToVideoInfo))
-                    add(ControllerIcon(R.drawable.contact_page_24px, "up主页", onGoToUpPage))
-                    add(ControllerIcon(R.drawable.related_videos_24px, "相关视频", onShowRelatedVideos))
+                    add(ControllerIcon(R.drawable.ic_player_action_info, "视频信息", onGoToVideoInfo))
+                    add(ControllerIcon(R.drawable.ic_player_action_person, "up主页", onGoToUpPage))
+                    add(ControllerIcon(R.drawable.ic_player_action_related, "相关视频", onShowRelatedVideos))
                 }
                 add(
                     ControllerIcon(
-                        if (isLooping) R.drawable.repeat_one_on_24px else R.drawable.repeat_one_24px,
+                        if (isLooping) R.drawable.ic_player_action_repeat_one else R.drawable.ic_player_action_repeat,
                         "循环播放",
                         onToggleLoop,
+                        if (isLooping) "已开启" else "已关闭",
                     ),
                 )
                 add(
                     ControllerIcon(
-                        icon = R.drawable.interaction_24px,
+                        icon = R.drawable.ic_player_action_interaction,
                         description = "交互",
                         action = onShowInteraction,
                     ),
                 )
                 add(
                     ControllerIcon(
-                        icon = R.drawable.comment,
+                        icon = R.drawable.ic_player_action_comment,
                         description = "评论",
                         action = onShowComments,
                     ),
@@ -464,6 +485,7 @@ fun ControllerVideoInfoBottom(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .focusRequester(buttonsFocusRequester)
                     .onKeyEvent {
                         if (it.key == Key.DirectionUp) {
@@ -472,27 +494,44 @@ fun ControllerVideoInfoBottom(
                             return@onKeyEvent true
                         }
                         false
-                    }.padding(horizontal = 24.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start),
+                    }.padding(horizontal = 24.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.Start),
         ) {
             icons.forEach { item ->
                 key(item.description) {
                     Surface(
                         modifier =
-                            Modifier.touchClickable(
-                                onClick = item.action,
-                            ),
+                            Modifier
+                                .size(48.dp)
+                                .semantics {
+                                    item.state?.let { stateDescription = it }
+                                }.touchClickable(onClick = item.action),
                         onClick = item.action,
-                        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-                        colors = ControlFocusDefaults.surfaceColors(),
+                        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
+                        border =
+                            ClickableSurfaceDefaults.border(
+                                border = Border.None,
+                                focusedBorder = Border.None,
+                                pressedBorder = Border.None,
+                            ),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f, pressedScale = 0.94f),
+                        colors =
+                            ClickableSurfaceDefaults.colors(
+                                containerColor = Color.Transparent,
+                                contentColor = Color.White,
+                                focusedContainerColor = Color.White,
+                                focusedContentColor = Color(0xFF171717),
+                                pressedContainerColor = Color.White.copy(alpha = 0.85f),
+                                pressedContentColor = Color(0xFF171717),
+                            ),
                     ) {
-                        Icon(
-                            painter = painterResource(id = item.icon),
-                            contentDescription = item.description,
-                            modifier = Modifier.padding(5.dp),
-                        )
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(
+                                painter = painterResource(id = item.icon),
+                                contentDescription = item.description,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -501,12 +540,13 @@ fun ControllerVideoInfoBottom(
 }
 
 /**
- * 操作按钮数据三元组。
+ * 操作按钮及其无障碍状态。描述保持稳定，播放和开关状态变化时不会重建焦点节点。
  */
 private data class ControllerIcon(
     val icon: Int,
     val description: String,
     val action: () -> Unit,
+    val state: String? = null,
 )
 
 /**
@@ -558,6 +598,7 @@ private fun ControllerVideoInfoPreview() {
             isPgc = false,
             danmakuEnabled = true,
             isLooping = false,
+            isPlaying = true,
             onDirectionLeft = {},
             onDirectionRight = {},
             onSeekGoTime = {},

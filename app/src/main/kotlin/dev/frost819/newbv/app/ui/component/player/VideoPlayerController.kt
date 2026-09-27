@@ -556,6 +556,7 @@ fun VideoPlayerController(
                 isPgc = isPgc,
                 danmakuEnabled = uiState.danmakuState.enabledTypes.isNotEmpty(),
                 isLooping = isLooping,
+                isPlaying = uiState.playerState == PlayerState.Playing,
                 onDirectionLeft = ::onDirectionLeft,
                 onDirectionRight = ::onDirectionRight,
                 onSeekGoTime = ::onSeekGoTime,
