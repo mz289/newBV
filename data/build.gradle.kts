@@ -50,6 +50,7 @@ ksp {
 
 dependencies {
     implementation(project(":bili-api"))
+    implementation(project(":core"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.datastore)

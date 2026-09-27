@@ -7,7 +7,6 @@ import dev.frost819.newbv.data.datastore.HomeTopNavItem
 import dev.frost819.newbv.data.datastore.PersonalTopNavItem
 import dev.frost819.newbv.data.datastore.PlaySpeed
 import dev.frost819.newbv.data.datastore.Resolution
-import dev.frost819.newbv.data.datastore.ThemeMode
 import dev.frost819.newbv.data.datastore.VideoCodec
 
 /** 画质显示名称。 */
@@ -76,15 +75,6 @@ val ApiType.displayName: String
         when (this) {
             ApiType.Web -> "Web"
             ApiType.App -> "App"
-        }
-
-/** 主题模式显示名称。 */
-val ThemeMode.displayName: String
-    get() =
-        when (this) {
-            ThemeMode.FollowSystem -> "跟随系统"
-            ThemeMode.Dark -> "深色"
-            ThemeMode.Light -> "浅色"
         }
 
 /** 首页 Tab 显示名称。 */

@@ -6,6 +6,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import dev.frost819.newbv.biliapi.entity.ApiType
+import dev.frost819.newbv.core.theme.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -405,7 +406,7 @@ object Prefs {
         PrefKeys.themeMode,
         ThemeMode.FollowSystem,
         save = { it.ordinal },
-        restore = { ThemeMode.fromOrdinal(it) },
+        restore = { ThemeMode.entries.getOrElse(it) { ThemeMode.FollowSystem } },
     )
 
     // --- 存储设置（PRD 7.6） ---

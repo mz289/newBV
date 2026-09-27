@@ -238,28 +238,3 @@ enum class PersonalTopNavItem {
     }
 }
 
-/**
- * 主题模式。
- *
- * 通过 ordinal 持久化，反序列化时越界回退到 [FollowSystem]。
- *
- * 注意：core 模块已有同名 `ThemeMode` 枚举，此处在 data 模块独立定义以避免循环依赖。
- * app 层负责两者之间的映射。
- */
-enum class ThemeMode {
-    /** 跟随系统暗色模式。 */
-    FollowSystem,
-
-    /** 强制深色。 */
-    Dark,
-
-    /** 强制浅色。 */
-    Light,
-
-    ;
-
-    companion object {
-        /** 从序号安全解析，越界返回 [FollowSystem]。 */
-        fun fromOrdinal(ordinal: Int): ThemeMode = entries.getOrElse(ordinal) { FollowSystem }
-    }
-}
