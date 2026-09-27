@@ -29,6 +29,20 @@ android {
     compileSdk = AppConfiguration.compileSdk
 
     signingConfigs {
+        // CI 使用显式密钥路径，避免 XDG_CONFIG_HOME 改变 Android 默认签名目录。
+        providers.environmentVariable("NEWBV_CI_KEYSTORE").orNull?.let { path ->
+            val ciKeystore = file(path)
+            require(ciKeystore.isFile && ciKeystore.length() > 0) {
+                "NEWBV_CI_KEYSTORE must point to an existing non-empty keystore"
+            }
+            getByName("debug") {
+                storeFile = ciKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+
         if (signingPropertiesFile.exists()) {
             create("release") {
                 storeFile = rootProject.file(signingProperties.getProperty("releaseStoreFile"))

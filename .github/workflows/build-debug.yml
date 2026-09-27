@@ -13,9 +13,6 @@ jobs:
   build-debug:
     name: Build Debug & Release APK
     runs-on: ubuntu-latest
-    env:
-      # job 级映射，供步骤的 if 判断（step 自身 env 在其 if 中不可见）
-      DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
 
     steps:
       - name: Checkout
@@ -33,20 +30,41 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # runner 的 debug keystore 是临时生成的，每次构建签名都不同，
-      # 会导致后续更新安装时签名不一致。改用仓库 secret 中的固定 keystore
-      # （与开发者本地 ~/.android/debug.keystore 相同，保证 CI 与本地构建可互相覆盖安装）。
+      # 不依赖默认 ~/.android 路径：AGP 可能优先使用 XDG_CONFIG_HOME。
+      # 缺少固定密钥时直接失败，绝不能发布自动生成临时签名的 APK。
       - name: Restore stable debug keystore
-        if: env.DEBUG_KEYSTORE_B64 != ''
+        env:
+          DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
         run: |
-          mkdir -p ~/.android
-          echo "$DEBUG_KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+          set -euo pipefail
+          test -n "$DEBUG_KEYSTORE_B64" || { echo "Missing DEBUG_KEYSTORE_B64" >&2; exit 1; }
+          NEWBV_CI_KEYSTORE="$RUNNER_TEMP/newbv-ci-signing.keystore"
+          echo "NEWBV_CI_KEYSTORE=$NEWBV_CI_KEYSTORE" >> "$GITHUB_ENV"
+          umask 077
+          printf '%s' "$DEBUG_KEYSTORE_B64" | base64 --decode > "$NEWBV_CI_KEYSTORE"
+          test -s "$NEWBV_CI_KEYSTORE"
+          keytool -exportcert -keystore "$NEWBV_CI_KEYSTORE" -storepass android \
+            -alias androiddebugkey -file "$RUNNER_TEMP/newbv-signing.cer"
+          sha256sum "$RUNNER_TEMP/newbv-signing.cer" | cut -d ' ' -f 1 > "$RUNNER_TEMP/newbv-signing.sha256"
+          echo "Expected signing certificate SHA-256: $(cat "$RUNNER_TEMP/newbv-signing.sha256")"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Test signing verification
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+
       - name: Build debug & release APK
         run: ./gradlew assembleDebug assembleRelease --stacktrace
+
+      - name: Verify APK signing certificates
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          python3 .github/scripts/verify_apk_signatures.py \
+            --apksigner "$APKSIGNER" \
+            --expected "$(cat "$RUNNER_TEMP/newbv-signing.sha256")" \
+            app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
