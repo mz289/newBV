@@ -114,9 +114,6 @@ class VideoDetailViewModel
         private val _uiState = MutableStateFlow(VideoDetailUiState())
         val uiState: StateFlow<VideoDetailUiState> = _uiState.asStateFlow()
 
-        private fun prefApiType(): ApiType =
-            if (Prefs.apiType == dev.frost819.newbv.data.datastore.ApiType.App) ApiType.App else ApiType.Web
-
         private val _uiEffect = MutableSharedFlow<VideoDetailUiEffect>()
         val uiEffect: SharedFlow<VideoDetailUiEffect> = _uiEffect.asSharedFlow()
 
@@ -236,7 +233,7 @@ class VideoDetailViewModel
                 favoriteRepository.getAllFavoriteFolderMetadataList(
                     mid = Prefs.uid,
                     rid = aid,
-                    preferApiType = prefApiType(),
+                    preferApiType = Prefs.apiType,
                 )
             }.onSuccess { folders ->
                 val folderIds = folders.filter { it.videoInThisFav }.map { it.id }.toSet()
@@ -270,7 +267,7 @@ class VideoDetailViewModel
         fun toggleFollow() {
             val currentDetail = _uiState.value.detail ?: return
             val isFollowing = _uiState.value.isFollowing
-            val preferApiType = prefApiType()
+            val preferApiType = Prefs.apiType
             viewModelScope.launch {
                 runCatching {
                     if (isFollowing) {
@@ -304,7 +301,7 @@ class VideoDetailViewModel
                         aid = currentDetail.aid,
                         bvid = currentDetail.bvid,
                         like = like,
-                        preferApiType = prefApiType(),
+                        preferApiType = Prefs.apiType,
                     )
                 }.onSuccess {
                     _uiState.update { it.copy(isLiked = like) }
@@ -333,7 +330,7 @@ class VideoDetailViewModel
                     coinRepository.sendVideoCoin(
                         aid = currentDetail.aid,
                         bvid = currentDetail.bvid,
-                        preferApiType = prefApiType(),
+                        preferApiType = Prefs.apiType,
                     )
                 }.onSuccess {
                     _uiState.update { it.copy(isCoined = true) }
@@ -361,7 +358,7 @@ class VideoDetailViewModel
                         aid = currentDetail.aid,
                         addMediaIds = folderIds,
                         delMediaIds = currentFolders.map { it.id } - folderIds.toSet(),
-                        preferApiType = prefApiType(),
+                        preferApiType = Prefs.apiType,
                     )
                 }.onSuccess {
                     _uiState.update {
@@ -421,7 +418,7 @@ class VideoDetailViewModel
                     oneClickTripleActionRepository.sendVideoOneClickTripleAction(
                         aid = currentDetail.aid,
                         bvid = currentDetail.bvid,
-                        preferApiType = prefApiType(),
+                        preferApiType = Prefs.apiType,
                     )
                 }.onSuccess { data ->
                     if (data != null) {

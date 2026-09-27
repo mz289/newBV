@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
 
 /**
  * 搜索结果页 ViewModel。
@@ -99,7 +98,7 @@ class SearchResultViewModel
                             order = state.selectedOrder,
                             duration = state.selectedDuration,
                             page = result.page,
-                            preferApiType = if (Prefs.apiType == DataApiType.App) ApiType.App else ApiType.Web,
+                            preferApiType = Prefs.apiType,
                         )
                     }
                 }.onSuccess { searchResult ->

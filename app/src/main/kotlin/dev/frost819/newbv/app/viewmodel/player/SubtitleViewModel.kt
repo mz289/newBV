@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
 
 /**
  * 字幕 ViewModel。
@@ -71,7 +70,7 @@ class SubtitleViewModel
         ) {
             viewModelScope.launch(Dispatchers.IO) {
                 runCatching {
-                    val apiType = if (Prefs.apiType == DataApiType.App) ApiType.App else ApiType.Web
+                    val apiType = Prefs.apiType
                     videoPlayRepository.getSubtitle(aid = aid, cid = cid, preferApiType = apiType)
                 }.onSuccess { list ->
                     _subtitleList.update { list }

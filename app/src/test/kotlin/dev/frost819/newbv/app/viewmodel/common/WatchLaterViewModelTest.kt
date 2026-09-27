@@ -21,7 +21,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
 import dev.frost819.newbv.biliapi.entity.ApiType as BiliApiType
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
+import dev.frost819.newbv.biliapi.entity.ApiType
 
 /**
  * [WatchLaterViewModel] 的单元测试。
@@ -41,7 +41,7 @@ class WatchLaterViewModelTest {
         toViewRepository = mockk()
 
         mockkObject(Prefs)
-        every { Prefs.apiType } returns DataApiType.Web
+        every { Prefs.apiType } returns ApiType.Web
     }
 
     @AfterEach
@@ -136,7 +136,7 @@ class WatchLaterViewModelTest {
     @Test
     fun `addToView uses App implementation when Prefs apiType is App`() =
         runTest(testDispatcher) {
-            every { Prefs.apiType } returns DataApiType.App
+            every { Prefs.apiType } returns ApiType.App
 
             coEvery {
                 toViewRepository.addToView(aid = 1L, bvid = null, preferApiType = BiliApiType.App)

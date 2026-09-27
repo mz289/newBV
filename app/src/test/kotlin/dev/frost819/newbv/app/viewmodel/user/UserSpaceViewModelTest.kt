@@ -25,7 +25,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
 import dev.frost819.newbv.biliapi.entity.ApiType as BiliApiType
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
+import dev.frost819.newbv.biliapi.entity.ApiType
 
 /**
  * [UserSpaceViewModel] 的单元测试。
@@ -46,7 +46,7 @@ class UserSpaceViewModelTest {
         userRepository = mockk()
 
         mockkObject(Prefs)
-        every { Prefs.apiType } returns DataApiType.Web
+        every { Prefs.apiType } returns ApiType.Web
     }
 
     @AfterEach
@@ -297,7 +297,7 @@ class UserSpaceViewModelTest {
     @Test
     fun `uses App apiType when Prefs apiType is App`() =
         runTest(testDispatcher) {
-            every { Prefs.apiType } returns DataApiType.App
+            every { Prefs.apiType } returns ApiType.App
 
             coEvery {
                 userRepository.getSpaceVideos(

@@ -70,7 +70,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.Calendar
 import javax.inject.Inject
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
 
 private const val PLAYER_ACTION_TIMEOUT_MS = 10_000L
 
@@ -307,7 +306,7 @@ class PlayerViewModel
             aid: Long,
             bvid: String = "",
         ) {
-            videoInfoRepository.loadVideoDetail(aid, getApiType(), bvid)
+            videoInfoRepository.loadVideoDetail(aid, Prefs.apiType, bvid)
             videoInfoRepository.videoDetail.value?.let { detail ->
                 _uiState.update {
                     it.copy(
@@ -369,7 +368,7 @@ class PlayerViewModel
                     videoInfoRepository.getOnlineWatchingText(
                         aid = state.aid,
                         cid = state.cid,
-                        preferApiType = getApiType(),
+                        preferApiType = Prefs.apiType,
                     )
                 }
             }.onSuccess { text ->
@@ -398,11 +397,11 @@ class PlayerViewModel
                 VideoPlayerOptions(
                     userAgent =
                         PlayerConstants.getUserAgent(
-                            if (apiType == DataApiType.App) ApiType.App else ApiType.Web,
+                            apiType,
                         ),
                     referer =
                         PlayerConstants.getReferer(
-                            if (apiType == DataApiType.App) ApiType.App else ApiType.Web,
+                            apiType,
                         ),
                     enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer,
                     enableSoftwareVideoDecoder = Prefs.enableSoftwareVideoDecoder,
@@ -458,7 +457,7 @@ class PlayerViewModel
             viewModelScope.launch {
                 runCatching {
                     withTimeout(PLAYER_ACTION_TIMEOUT_MS) {
-                        likeRepository.updateVideoLiked(aid = aid, like = !current, preferApiType = getApiType())
+                        likeRepository.updateVideoLiked(aid = aid, like = !current, preferApiType = Prefs.apiType)
                     }
                 }.onSuccess {
                     videoInfoRepository.updateVideoActionState(aid = aid, liked = !current)
@@ -476,7 +475,7 @@ class PlayerViewModel
             viewModelScope.launch {
                 runCatching {
                     withTimeout(PLAYER_ACTION_TIMEOUT_MS) {
-                        coinRepository.sendVideoCoin(aid = aid, preferApiType = getApiType())
+                        coinRepository.sendVideoCoin(aid = aid, preferApiType = Prefs.apiType)
                     }
                 }.onSuccess {
                     videoInfoRepository.updateVideoActionState(aid = aid, coined = true)
@@ -502,7 +501,7 @@ class PlayerViewModel
                             favoriteRepository.getAllFavoriteFolderMetadataList(
                                 mid = authRepository.mid ?: error("未登录"),
                                 rid = aid,
-                                preferApiType = getApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         val selected = folders.filter { it.videoInThisFav }.map { it.id }
                         val defaultFolder = folders.firstOrNull { it.title == "默认收藏夹" }?.id
@@ -511,14 +510,14 @@ class PlayerViewModel
                                 aid = aid,
                                 addMediaIds = emptyList(),
                                 delMediaIds = selected,
-                                preferApiType = getApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         } else {
                             favoriteRepository.updateVideoToFavoriteFolder(
                                 aid = aid,
                                 addMediaIds = listOfNotNull(defaultFolder),
                                 delMediaIds = emptyList(),
-                                preferApiType = getApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         }
                     }
@@ -542,7 +541,7 @@ class PlayerViewModel
                         oneClickTripleActionRepository.sendVideoOneClickTripleAction(
                             aid = aid,
                             bvid = bvid,
-                            preferApiType = getApiType(),
+                            preferApiType = Prefs.apiType,
                         )
                     }
                 }.onSuccess { result ->
@@ -727,7 +726,7 @@ class PlayerViewModel
             // 异步加载详情 + 历史进度（不阻塞 playVideoWithResources）
             if (shouldUpdateDetail) {
                 viewModelScope.launch(Dispatchers.IO) {
-                    videoInfoRepository.loadVideoDetail(newVideo.aid, getApiType())
+                    videoInfoRepository.loadVideoDetail(newVideo.aid, Prefs.apiType)
                     // 仅当历史 cid 与当前播放 cid 一致时才应用断点续播
                     val sharedState = videoInfoRepository.videoSharedState.value
                     val historyCid = sharedState?.lastPlayedCid ?: 0L
@@ -1003,7 +1002,7 @@ class PlayerViewModel
             cid: Long,
             epid: Int = 0,
         ): PlaybackConfig {
-            val apiType = getApiType()
+            val apiType = Prefs.apiType
             val playData = fetchPlayData(aid, cid, epid, apiType)
             this.playData = playData
 
@@ -1192,14 +1191,14 @@ class PlayerViewModel
                     videoPlayRepository.getVideoShot(
                         aid = state.aid,
                         cid = state.cid,
-                        preferApiType = getApiType(),
+                        preferApiType = Prefs.apiType,
                     )
                 _uiState.update { it.copy(videoShot = shot) }
             }.onFailure { logger.warn { "Load video shot failed: $it" } }
         }
 
         private suspend fun updateVideoPages() {
-            videoInfoRepository.updateUgcPages(getApiType())
+            videoInfoRepository.updateUgcPages(Prefs.apiType)
         }
 
         private fun syncProgress(
@@ -1246,7 +1245,7 @@ class PlayerViewModel
             time: Int,
         ) {
             try {
-                val apiType = getApiType()
+                val apiType = Prefs.apiType
                 if (!state.fromSeason) {
                     videoPlayRepository.sendHeartbeat(
                         aid = state.aid,
@@ -1471,9 +1470,6 @@ class PlayerViewModel
                     )
             }
         }
-
-        /** 将 DataApiType 映射为 bili-api 的 ApiType。 */
-        private fun getApiType(): ApiType = if (Prefs.apiType == DataApiType.App) ApiType.App else ApiType.Web
 
         private sealed interface NextPlayTarget {
             val title: String

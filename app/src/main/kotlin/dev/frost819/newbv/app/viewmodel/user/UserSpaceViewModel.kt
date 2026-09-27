@@ -18,8 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-import dev.frost819.newbv.biliapi.entity.ApiType as BiliApiType
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
+import dev.frost819.newbv.biliapi.entity.ApiType
 
 private const val LOAD_TIMEOUT_MS = 10_000L
 
@@ -58,12 +57,6 @@ class UserSpaceViewModel
         val uiState: StateFlow<UserSpaceUiState> = _uiState.asStateFlow()
 
         private var videoPage = SpaceVideoPage()
-
-        private fun prefApiType(): BiliApiType =
-            when (Prefs.apiType) {
-                DataApiType.Web -> BiliApiType.Web
-                DataApiType.App -> BiliApiType.App
-            }
 
         /**
          * 初始化：设置用户信息（由路由传入），加载投稿视频列表。
@@ -112,7 +105,7 @@ class UserSpaceViewModel
                             mid = mid,
                             order = SpaceVideoOrder.PubDate,
                             page = videoPage,
-                            preferApiType = prefApiType(),
+                            preferApiType = Prefs.apiType,
                         )
                     }
                 }.onSuccess { data ->

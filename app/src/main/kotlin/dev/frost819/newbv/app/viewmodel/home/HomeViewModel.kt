@@ -23,8 +23,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-import dev.frost819.newbv.biliapi.entity.ApiType as BiliApiType
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
+import dev.frost819.newbv.biliapi.entity.ApiType
 
 /** 网络请求超时时间（毫秒）。 */
 private const val LOAD_TIMEOUT_MS = 10_000L
@@ -68,13 +67,6 @@ class HomeViewModel
         private val accountRepository: AccountRepositoryImpl,
     ) : ViewModel() {
         private val logger = Loggers.get("HomeViewModel")
-
-        /** 将 data 层 ApiType 映射为 bili-api 层 ApiType。 */
-        private fun prefApiType(): BiliApiType =
-            when (Prefs.apiType) {
-                DataApiType.Web -> BiliApiType.Web
-                DataApiType.App -> BiliApiType.App
-            }
 
         private val _uiState = MutableStateFlow(HomeUiState())
         val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -133,7 +125,7 @@ class HomeViewModel
                             withTimeout(LOAD_TIMEOUT_MS) {
                                 recommendVideoRepository.getRecommendVideos(
                                     page = recommendNextPage,
-                                    preferApiType = prefApiType(),
+                                    preferApiType = Prefs.apiType,
                                 )
                             }
                         } catch (error: TimeoutCancellationException) {
@@ -197,7 +189,7 @@ class HomeViewModel
                         val data =
                             recommendVideoRepository.getPopularVideos(
                                 page = popularNextPage,
-                                preferApiType = prefApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         popularNextPage = data.nextPage
                         _uiState.update {
@@ -252,7 +244,7 @@ class HomeViewModel
                                 page = nextPage,
                                 offset = dynamicHistoryOffset.orEmpty(),
                                 updateBaseline = dynamicUpdateBaseline.orEmpty(),
-                                preferApiType = prefApiType(),
+                                preferApiType = Prefs.apiType,
                             )
                         dynamicCurrentPage = nextPage
                         dynamicHistoryOffset = data.historyOffset

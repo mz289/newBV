@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.biliapi.entity.ApiType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -405,11 +406,6 @@ class PrefsTest {
     @Test
     fun `PlaySpeed fromCode returns default for invalid`() {
         assertThat(PlaySpeed.fromCode(99999)).isEqualTo(PlaySpeed.X1)
-    }
-
-    @Test
-    fun `ApiType fromOrdinal returns default for invalid`() {
-        assertThat(ApiType.fromOrdinal(99999)).isEqualTo(ApiType.Web)
     }
 
     @Test

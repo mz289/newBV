@@ -9,18 +9,6 @@ import org.junit.jupiter.api.Test
  * 补充 [PrefsTest] 仅测试无效输入的不足，覆盖全部有效路径。
  */
 class PrefEnumsTest {
-    // ===== ApiType =====
-
-    @Test
-    fun `ApiType fromOrdinal returns Web for 0`() {
-        assertThat(ApiType.fromOrdinal(0)).isEqualTo(ApiType.Web)
-    }
-
-    @Test
-    fun `ApiType fromOrdinal returns App for 1`() {
-        assertThat(ApiType.fromOrdinal(1)).isEqualTo(ApiType.App)
-    }
-
     // ===== Resolution =====
 
     @Test

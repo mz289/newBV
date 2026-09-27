@@ -126,7 +126,7 @@ fun SearchResultContent(
             derivedStateOf {
                 uiState.activeType == SearchType.Video &&
                     dev.frost819.newbv.data.datastore.Prefs.apiType ==
-                    dev.frost819.newbv.data.datastore.ApiType.Web
+                    dev.frost819.newbv.biliapi.entity.ApiType.Web
             }
         }
 
