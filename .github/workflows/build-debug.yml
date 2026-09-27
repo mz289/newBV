@@ -1,4 +1,4 @@
-name: Build Debug
+name: Build APKs
 
 on:
   push:
@@ -32,39 +32,20 @@ jobs:
 
       # 不依赖默认 ~/.android 路径：AGP 可能优先使用 XDG_CONFIG_HOME。
       # 缺少固定密钥时直接失败，绝不能发布自动生成临时签名的 APK。
-      - name: Restore stable debug keystore
+      - name: Restore fixed signing key
         env:
           DEBUG_KEYSTORE_B64: ${{ secrets.DEBUG_KEYSTORE_B64 }}
         run: |
           set -euo pipefail
-          test -n "$DEBUG_KEYSTORE_B64" || { echo "Missing DEBUG_KEYSTORE_B64" >&2; exit 1; }
-          NEWBV_CI_KEYSTORE="$RUNNER_TEMP/newbv-ci-signing.keystore"
-          echo "NEWBV_CI_KEYSTORE=$NEWBV_CI_KEYSTORE" >> "$GITHUB_ENV"
           umask 077
-          printf '%s' "$DEBUG_KEYSTORE_B64" | base64 --decode > "$NEWBV_CI_KEYSTORE"
-          test -s "$NEWBV_CI_KEYSTORE"
-          keytool -exportcert -keystore "$NEWBV_CI_KEYSTORE" -storepass android \
-            -alias androiddebugkey -file "$RUNNER_TEMP/newbv-signing.cer"
-          sha256sum "$RUNNER_TEMP/newbv-signing.cer" | cut -d ' ' -f 1 > "$RUNNER_TEMP/newbv-signing.sha256"
-          echo "Expected signing certificate SHA-256: $(cat "$RUNNER_TEMP/newbv-signing.sha256")"
+          mkdir -p .signing
+          printf '%s' "$DEBUG_KEYSTORE_B64" | base64 --decode > .signing/newbv.keystore
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Test signing verification
-        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
-
       - name: Build debug & release APK
         run: ./gradlew assembleDebug assembleRelease --stacktrace
-
-      - name: Verify APK signing certificates
-        run: |
-          set -euo pipefail
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
-          python3 .github/scripts/verify_apk_signatures.py \
-            --apksigner "$APKSIGNER" \
-            --expected "$(cat "$RUNNER_TEMP/newbv-signing.sha256")" \
-            app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

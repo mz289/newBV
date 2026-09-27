@@ -18,38 +18,17 @@ localProperties.apply {
     }
 }
 
-val signingPropertiesFile = rootProject.file("signing.properties")
-val signingProperties = Properties()
-if (signingPropertiesFile.exists()) {
-    signingPropertiesFile.inputStream().use { signingProperties.load(it) }
-}
-
 android {
     namespace = AppConfiguration.appId
     compileSdk = AppConfiguration.compileSdk
 
     signingConfigs {
-        // CI 使用显式密钥路径，避免 XDG_CONFIG_HOME 改变 Android 默认签名目录。
-        providers.environmentVariable("NEWBV_CI_KEYSTORE").orNull?.let { path ->
-            val ciKeystore = file(path)
-            require(ciKeystore.isFile && ciKeystore.length() > 0) {
-                "NEWBV_CI_KEYSTORE must point to an existing non-empty keystore"
-            }
-            getByName("debug") {
-                storeFile = ciKeystore
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
-        }
-
-        if (signingPropertiesFile.exists()) {
-            create("release") {
-                storeFile = rootProject.file(signingProperties.getProperty("releaseStoreFile"))
-                storePassword = signingProperties.getProperty("releaseStorePassword")
-                keyAlias = signingProperties.getProperty("releaseKeyAlias")
-                keyPassword = signingProperties.getProperty("releaseKeyPassword")
-            }
+        // 本地和 CI 共用固定路径；缺失时由签名任务报错，禁止回退到临时密钥。
+        create("distribution") {
+            storeFile = rootProject.file(".signing/newbv.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
@@ -80,15 +59,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            if (signingPropertiesFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
-            } else {
-                // 无正式签名配置（本地/CI 自动构建）时回退 debug keystore，
-                // 保证 release 包可直接安装；正式发版仍走 signing.properties
-                signingConfig = signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("distribution")
         }
         debug {
+            signingConfig = signingConfigs.getByName("distribution")
             isMinifyEnabled = false
             applicationIdSuffix = ".debug"
         }
