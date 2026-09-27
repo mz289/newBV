@@ -50,15 +50,7 @@ class MainActivity : ComponentActivity() {
             val themeMode by Prefs.themeModeFlow.collectAsState(initial = ThemeMode.Dark)
             val density by Prefs.densityFlow.collectAsState(initial = 2.0f)
 
-            val coreThemeMode =
-                when (themeMode) {
-                    dev.frost819.newbv.data.datastore.ThemeMode.FollowSystem -> ThemeMode.FollowSystem
-                    dev.frost819.newbv.data.datastore.ThemeMode.Dark -> ThemeMode.Dark
-                    dev.frost819.newbv.data.datastore.ThemeMode.Light -> ThemeMode.Light
-                    else -> ThemeMode.Dark
-                }
-
-            BVTheme(themeMode = coreThemeMode, density = density) {
+            BVTheme(themeMode = themeMode, density = density) {
                 SystemBarsEffect()
                 CompositionLocalProvider(
                     LocalInteractionTracker provides interactionTracker,

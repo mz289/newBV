@@ -8,7 +8,6 @@ import dev.frost819.newbv.data.datastore.HomeTopNavItem
 import dev.frost819.newbv.data.datastore.PersonalTopNavItem
 import dev.frost819.newbv.data.datastore.PlaySpeed
 import dev.frost819.newbv.data.datastore.Resolution
-import dev.frost819.newbv.data.datastore.ThemeMode
 import dev.frost819.newbv.data.datastore.VideoCodec
 import org.junit.jupiter.api.Test
 
@@ -99,20 +98,6 @@ class EnumDisplayNamesTest {
     fun apiType_displayNames_knownValues() {
         assertThat(ApiType.Web.displayName).isEqualTo("Web")
         assertThat(ApiType.App.displayName).isEqualTo("App")
-    }
-
-    @Test
-    fun themeMode_displayNames_allNonEmpty() {
-        ThemeMode.entries.forEach { mode ->
-            assertThat(mode.displayName).isNotEmpty()
-        }
-    }
-
-    @Test
-    fun themeMode_displayNames_knownValues() {
-        assertThat(ThemeMode.FollowSystem.displayName).isEqualTo("跟随系统")
-        assertThat(ThemeMode.Dark.displayName).isEqualTo("深色")
-        assertThat(ThemeMode.Light.displayName).isEqualTo("浅色")
     }
 
     @Test
