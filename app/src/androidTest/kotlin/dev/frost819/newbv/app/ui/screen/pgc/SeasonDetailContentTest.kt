@@ -149,6 +149,19 @@ class SeasonDetailContentTest {
     }
 
     @Test
+    fun closing_all_episodes_restores_trigger_focus() {
+        show()
+        composeRule.onNodeWithText("全部选集").performTouchInput { click() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeBy(250)
+        composeRule.onNodeWithTag("episode_choice_1").assertIsFocused()
+        androidx.test.espresso.Espresso
+            .pressBack()
+        composeRule.mainClock.advanceTimeBy(250)
+        composeRule.onNodeWithText("全部选集").assertIsFocused()
+    }
+
+    @Test
     fun light_theme_handles_long_title_and_completed_history() {
         // Given
         show(
