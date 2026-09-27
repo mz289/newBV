@@ -41,7 +41,6 @@ import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
-import dev.frost819.newbv.core.focus.controlFocusOutline
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
@@ -241,7 +240,7 @@ fun <T> EpisodeListDialog(
                                         }
                                     ).touchClickable(
                                         onClick = { selectedTab = index },
-                                    ).controlFocusOutline()
+                                    ).padding(6.dp)
                                         .background(
                                             if (selectedTab ==
                                                 index
