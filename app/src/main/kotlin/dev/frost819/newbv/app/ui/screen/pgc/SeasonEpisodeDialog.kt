@@ -1,6 +1,5 @@
 package dev.frost819.newbv.app.ui.screen.pgc
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,7 +43,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -52,6 +50,7 @@ import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.biliapi.entity.video.season.Episode
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -169,7 +168,7 @@ internal fun SeasonEpisodeDialog(
                         LazyColumn(
                             state = rangeState,
                             modifier = Modifier.width(rangeWidth).fillMaxHeight(),
-                            contentPadding = PaddingValues(4.dp),
+                            contentPadding = PaddingValues(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             items(groupCount, key = { it }) { index ->
@@ -256,7 +255,7 @@ internal fun SeasonEpisodeDialog(
                                             )
                                         }
                                     },
-                                contentPadding = PaddingValues(start = 4.dp, top = 4.dp, end = 8.dp, bottom = 4.dp),
+                                contentPadding = PaddingValues(8.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
@@ -375,7 +374,7 @@ private fun EpisodeDialogAction(
             ),
         border =
             ClickableSurfaceDefaults.border(
-                focusedBorder = Border(BorderStroke(2.dp, MaterialTheme.colorScheme.border)),
+                focusedBorder = outerFocusBorder(),
             ),
     ) {
         Box(

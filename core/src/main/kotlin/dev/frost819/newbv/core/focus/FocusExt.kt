@@ -7,7 +7,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ShapeDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -25,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceColors
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
@@ -34,6 +37,23 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * 圆角 TV 控件的外侧焦点描边：2dp 线宽，与控件边缘保持 4dp 空隙。
+ *
+ * TV Border 的正 inset 向外扩展；描边中心外移 5dp 后，其内缘距控件 4dp。
+ * 调用方需预留至少 6dp 绘制空间，避免 Lazy 容器裁切。
+ *
+ * @param cornerRadius 控件自身的圆角半径，描边圆角同步向外扩展。
+ */
+@Composable
+@ReadOnlyComposable
+fun outerFocusBorder(cornerRadius: Dp = 8.dp): Border =
+    Border(
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+        inset = 5.dp,
+        shape = RoundedCornerShape(cornerRadius + 5.dp),
+    )
 
 /**
  * 获取焦点时显示边框。
