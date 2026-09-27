@@ -192,7 +192,12 @@ private fun MediaCodecListItems(
                 shape = ListItemDefaults.shape(shape = ControlFocusDefaults.shape),
                 scale = ListItemDefaults.scale(focusedScale = 1f),
                 colors = ControlFocusDefaults.listColors(),
-                border = ControlFocusDefaults.listBorder(),
+                border =
+                    ListItemDefaults.border(
+                        focusedBorder = androidx.tv.material3.Border.None,
+                        focusedSelectedBorder = androidx.tv.material3.Border.None,
+                        pressedSelectedBorder = androidx.tv.material3.Border.None,
+                    ),
             )
         }
     }

@@ -31,7 +31,6 @@ import androidx.tv.material3.Tab
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.TabRowScope
 import androidx.tv.material3.Text
-import dev.frost819.newbv.core.focus.controlFocusOutline
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -118,7 +117,7 @@ private fun TabRowScope.NavItemTab(
     Tab(
         modifier =
             modifier
-                .controlFocusOutline()
+                .padding(6.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(containerColor)
                 .touchClickable(onClick = onClick),

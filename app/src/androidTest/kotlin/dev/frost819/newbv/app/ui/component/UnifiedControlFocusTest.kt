@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
@@ -135,6 +137,7 @@ class UnifiedControlFocusTest {
             pressKey(Key.DirectionCenter)
         }
         rule.onNodeWithText("热门").assertIsFocused()
+        assertRing(rule.onNodeWithText("热门"), expected = false)
         rule.runOnIdle {
             assertThat(selected).isEqualTo("热门")
             assertThat(activated).isEqualTo("热门")
@@ -165,6 +168,30 @@ class UnifiedControlFocusTest {
         rule.runOnIdle { assertThat(result).isEqualTo(SearchFilterOrderType.MostClicks) }
     }
 
+    @Test
+    fun player_categories_use_selection_background_without_duplicate_ring() {
+        var selected by androidx.compose.runtime.mutableStateOf(false)
+        var clicks = 0
+        show {
+            dev.frost819.newbv.app.ui.component.player.menu.component.MenuListItem(
+                text = "画质分类",
+                selected = selected,
+                selectionFollowsFocus = true,
+                onFocus = { selected = true },
+                onClick = { clicks++ },
+            )
+        }
+        val category = rule.onNodeWithText("画质分类")
+        focus(category)
+        assertRing(category, expected = false)
+        category.performKeyInput { pressKey(Key.DirectionCenter) }
+        rule.runOnIdle {
+            assertThat(selected).isTrue()
+            assertThat(clicks).isEqualTo(1)
+        }
+        screenshot("global-focus-category.png")
+    }
+
     private fun focus(node: SemanticsNodeInteraction) {
         node.performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         rule.waitForIdle()
@@ -174,6 +201,7 @@ class UnifiedControlFocusTest {
     private fun assertRing(
         node: SemanticsNodeInteraction,
         dialog: Boolean = false,
+        expected: Boolean = true,
     ) {
         val root = if (dialog) rule.onNode(isDialog()) else rule.onRoot()
         val bounds = node.fetchSemanticsNode().boundsInRoot
@@ -182,7 +210,7 @@ class UnifiedControlFocusTest {
         val distance =
             kotlin.math.abs(pixel.red - borderColor.red) + kotlin.math.abs(pixel.green - borderColor.green) +
                 kotlin.math.abs(pixel.blue - borderColor.blue)
-        assertThat(distance).isLessThan(0.04f)
+        if (expected) assertThat(distance).isLessThan(0.04f) else assertThat(distance).isGreaterThan(0.1f)
     }
 
     private fun screenshot(
