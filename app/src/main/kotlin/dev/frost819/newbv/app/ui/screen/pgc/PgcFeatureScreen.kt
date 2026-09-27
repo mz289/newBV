@@ -77,6 +77,7 @@ import dev.frost819.newbv.app.viewmodel.pgc.SeasonDetailViewModel
 import dev.frost819.newbv.biliapi.entity.video.season.Episode
 import dev.frost819.newbv.biliapi.entity.video.season.SeasonDetail
 import dev.frost819.newbv.core.focus.focusInvertedColors
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -460,11 +461,7 @@ private fun SeasonActionButton(
         border =
             ClickableSurfaceDefaults.border(
                 focusedBorder =
-                    Border(
-                        BorderStroke(2.dp, MaterialTheme.colorScheme.border),
-                        inset = (-4).dp,
-                        shape = shape,
-                    ),
+                    outerFocusBorder(8.dp),
             ),
         colors =
             ClickableSurfaceDefaults.colors(
@@ -654,10 +651,22 @@ private fun SeasonSwitcherRow(
     LazyRow(
         modifier = Modifier.fillMaxWidth().focusRestorer(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
     ) {
         items(detail.seasons, key = { it.seasonId }) { season ->
             val current = season.seasonId == detail.seasonId
+            val container =
+                if (current) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                }
+            val content =
+                if (current) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
             Surface(
                 onClick = { onClick(season.seasonId) },
                 modifier =
@@ -669,26 +678,14 @@ private fun SeasonSwitcherRow(
                 border =
                     ClickableSurfaceDefaults.border(
                         focusedBorder =
-                            Border(
-                                BorderStroke(2.dp, MaterialTheme.colorScheme.border),
-                                inset = (-3).dp,
-                                shape = RoundedCornerShape(6.dp),
-                            ),
+                            outerFocusBorder(6.dp),
                     ),
                 colors =
-                    focusInvertedColors(
-                        containerColor =
-                            if (current) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            },
-                        contentColor =
-                            if (current) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                    ClickableSurfaceDefaults.colors(
+                        containerColor = container,
+                        focusedContainerColor = container,
+                        focusedContentColor = content,
+                        contentColor = content,
                     ),
             ) {
                 Text(
@@ -735,14 +732,7 @@ private fun SeasonErrorScreen(
                 border =
                     ClickableSurfaceDefaults.border(
                         focusedBorder =
-                            Border(
-                                border =
-                                    androidx.compose.foundation.BorderStroke(
-                                        2.dp,
-                                        MaterialTheme.colorScheme.border,
-                                    ),
-                                shape = MaterialTheme.shapes.medium,
-                            ),
+                            outerFocusBorder(12.dp),
                     ),
                 colors =
                     focusInvertedColors(
