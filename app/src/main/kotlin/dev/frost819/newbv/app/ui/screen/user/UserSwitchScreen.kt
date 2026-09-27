@@ -32,9 +32,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
+import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
@@ -43,6 +45,8 @@ import dev.frost819.newbv.R
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.viewmodel.user.UserSwitchViewModel
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.data.db.entity.UserEntity
 
@@ -113,6 +117,10 @@ fun UserSwitchScreen(
                                 Modifier
                                     .focusSaverItem(focusSaver, "add_user_empty")
                                     .touchClickable(onClick = onNavigateLogin),
+                            shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = ButtonDefaults.scale(focusedScale = 1f),
+                            colors = ControlFocusDefaults.buttonColors(),
+                            border = ControlFocusDefaults.buttonBorder(),
                         ) {
                             Text(text = stringResource(R.string.user_switch_add))
                         }
@@ -123,6 +131,9 @@ fun UserSwitchScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding =
+                        androidx.compose.foundation.layout
+                            .PaddingValues(8.dp),
                 ) {
                     items(uiState.users, key = { it.uid }) { user ->
                         UserListItem(
@@ -179,7 +190,7 @@ private fun UserListItem(
                     .touchClickable(onClick = onClick),
             onClick = onClick,
             colors =
-                ClickableSurfaceDefaults.colors(
+                ControlFocusDefaults.surfaceColors(
                     containerColor =
                         if (isCurrentUser) {
                             MaterialTheme.colorScheme.primaryContainer
@@ -193,6 +204,8 @@ private fun UserListItem(
                             MaterialTheme.colorScheme.onSurface
                         },
                 ),
+            border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         ) {
             Row(
                 modifier = Modifier.padding(12.dp),
@@ -246,6 +259,14 @@ private fun UserListItem(
         IconButton(
             onClick = onDelete,
             modifier = Modifier.touchClickable(onClick = onDelete),
+            shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+            scale = IconButtonDefaults.scale(focusedScale = 1f),
+            colors =
+                ControlFocusDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+            border = ControlFocusDefaults.buttonBorder(),
         ) {
             Icon(
                 imageVector = Icons.Default.Delete,
@@ -266,6 +287,10 @@ private fun AddUserButton(
     Button(
         onClick = onClick,
         modifier = modifier.touchClickable(onClick = onClick),
+        shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+        scale = ButtonDefaults.scale(focusedScale = 1f),
+        colors = ControlFocusDefaults.buttonColors(),
+        border = ControlFocusDefaults.buttonBorder(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

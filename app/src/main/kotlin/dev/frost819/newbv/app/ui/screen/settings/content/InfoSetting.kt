@@ -21,11 +21,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.screen.settings.SettingsMenuNavItem
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import java.text.DecimalFormat
 import kotlin.math.pow
@@ -117,6 +119,10 @@ fun InfoSetting(
         Button(
             onClick = onOpenMediaCodec,
             modifier = buttonModifier.touchClickable(onClick = onOpenMediaCodec),
+            shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+            scale = ButtonDefaults.scale(focusedScale = 1f),
+            colors = ControlFocusDefaults.buttonColors(),
+            border = ControlFocusDefaults.buttonBorder(),
         ) {
             Text(text = "编解码信息")
         }

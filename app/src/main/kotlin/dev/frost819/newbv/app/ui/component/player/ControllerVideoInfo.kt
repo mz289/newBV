@@ -61,6 +61,8 @@ import dev.frost819.newbv.app.ui.state.player.SeekerState
 import dev.frost819.newbv.app.util.VideoShotImageCache
 import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.biliapi.entity.video.VideoShot
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.theme.BVTheme
 import kotlinx.coroutines.delay
@@ -482,6 +484,9 @@ fun ControllerVideoInfoBottom(
                             ),
                         onClick = item.action,
                         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
+                        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                        colors = ControlFocusDefaults.surfaceColors(),
                     ) {
                         Icon(
                             painter = painterResource(id = item.icon),

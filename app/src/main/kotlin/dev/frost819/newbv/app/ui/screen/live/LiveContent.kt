@@ -59,6 +59,8 @@ import dev.frost819.newbv.app.ui.navigation.LiveFollowRoute
 import dev.frost819.newbv.app.ui.navigation.LivePlayerRoute
 import dev.frost819.newbv.app.viewmodel.live.LiveHomeViewModel
 import dev.frost819.newbv.biliapi.http.entity.live.LiveAreaParent
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -262,10 +264,12 @@ private fun FollowHeader(
             onClick = onMoreClick,
             shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
             colors =
-                ClickableSurfaceDefaults.colors(
+                ControlFocusDefaults.surfaceColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 ),
+            border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

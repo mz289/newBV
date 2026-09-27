@@ -30,6 +30,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -77,7 +79,7 @@ fun MenuListItem(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
         colors =
-            ClickableSurfaceDefaults.colors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor =
                     if (selected) {
                         MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.4f)
@@ -85,6 +87,8 @@ fun MenuListItem(
                         Color.Transparent
                     },
             ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Box {
             Row(

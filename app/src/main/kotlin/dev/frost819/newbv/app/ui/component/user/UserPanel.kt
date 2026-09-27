@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
@@ -31,6 +32,7 @@ import coil3.compose.AsyncImage
 import dev.frost819.newbv.R
 import dev.frost819.newbv.app.data.AccountUiState
 import dev.frost819.newbv.app.viewmodel.user.UserViewModel
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -146,6 +148,10 @@ private fun UserPanelContent(
                 Button(
                     onClick = onToggleIncognito,
                     modifier = Modifier.touchClickable(onClick = onToggleIncognito),
+                    shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                    scale = ButtonDefaults.scale(focusedScale = 1f),
+                    colors = ControlFocusDefaults.buttonColors(),
+                    border = ControlFocusDefaults.buttonBorder(),
                 ) {
                     Text(
                         text =
@@ -156,6 +162,10 @@ private fun UserPanelContent(
                 Button(
                     onClick = onGoUserSwitch,
                     modifier = Modifier.touchClickable(onClick = onGoUserSwitch),
+                    shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                    scale = ButtonDefaults.scale(focusedScale = 1f),
+                    colors = ControlFocusDefaults.buttonColors(),
+                    border = ControlFocusDefaults.buttonBorder(),
                 ) {
                     Text(text = stringResource(R.string.user_panel_account))
                 }
@@ -163,6 +173,10 @@ private fun UserPanelContent(
                     Button(
                         onClick = onGoFollowList,
                         modifier = Modifier.touchClickable(onClick = onGoFollowList),
+                        shape = ButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = ButtonDefaults.scale(focusedScale = 1f),
+                        colors = ControlFocusDefaults.buttonColors(),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) {
                         Text(text = "关注列表")
                     }

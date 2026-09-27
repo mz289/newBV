@@ -47,6 +47,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dev.frost819.newbv.R
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.delay
 
@@ -271,6 +273,9 @@ private fun LiveControllerInfoBottom(
                         modifier = Modifier.touchClickable(onClick = action),
                         onClick = action,
                         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
+                        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+                        colors = ControlFocusDefaults.surfaceColors(),
                     ) {
                         Icon(
                             painter = painterResource(id = icon),

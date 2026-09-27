@@ -37,9 +37,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
+import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.FocusSaver
@@ -47,6 +47,7 @@ import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.search.SearchKeyword
 import dev.frost819.newbv.app.ui.component.search.SoftKeyboard
 import dev.frost819.newbv.app.viewmodel.search.SearchInputViewModel
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.data.datastore.Prefs
 
@@ -202,11 +203,14 @@ private fun SearchHotwordsColumn(
                     showHotword = !showHotword
                     Prefs.showHotword = showHotword
                 },
+                shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                scale = IconButtonDefaults.scale(focusedScale = 1f),
                 colors =
-                    ButtonDefaults.colors(
+                    ControlFocusDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
+                border = ControlFocusDefaults.buttonBorder(),
             ) {
                 if (showHotword) {
                     Icon(
@@ -305,6 +309,14 @@ private fun SearchHistoryColumn(
                     IconButton(
                         modifier = Modifier.touchClickable(onClick = onDeleteAll),
                         onClick = onDeleteAll,
+                        shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                        scale = IconButtonDefaults.scale(focusedScale = 1f),
+                        colors =
+                            ControlFocusDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        border = ControlFocusDefaults.buttonBorder(),
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteSweep,
@@ -315,6 +327,14 @@ private fun SearchHistoryColumn(
                 IconButton(
                     modifier = Modifier.touchClickable(onClick = { deleteMode = !deleteMode }),
                     onClick = { deleteMode = !deleteMode },
+                    shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
+                    scale = IconButtonDefaults.scale(focusedScale = 1f),
+                    colors =
+                        ControlFocusDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    border = ControlFocusDefaults.buttonBorder(),
                 ) {
                     if (deleteMode) {
                         Icon(

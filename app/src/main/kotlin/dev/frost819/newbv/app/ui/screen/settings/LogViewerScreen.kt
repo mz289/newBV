@@ -39,9 +39,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.viewmodel.settings.LogViewerViewModel
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import io.github.g0dkar.qrcode.QRCode
 import java.io.ByteArrayInputStream
@@ -139,6 +141,10 @@ fun LogViewerScreen(
                             headlineContent = {
                                 Text(text = "手动保存日志")
                             },
+                            shape = ListItemDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = ListItemDefaults.scale(focusedScale = 1f),
+                            colors = ControlFocusDefaults.listColors(),
+                            border = ControlFocusDefaults.listBorder(),
                         )
                     }
 
@@ -165,6 +171,10 @@ fun LogViewerScreen(
                                     Text(text = "${file.length() / 1024} KB")
                                 }
                             },
+                            shape = ListItemDefaults.shape(shape = ControlFocusDefaults.shape),
+                            scale = ListItemDefaults.scale(focusedScale = 1f),
+                            colors = ControlFocusDefaults.listColors(),
+                            border = ControlFocusDefaults.listBorder(),
                         )
                     }
 

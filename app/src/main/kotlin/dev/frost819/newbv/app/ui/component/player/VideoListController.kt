@@ -43,6 +43,8 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.entity.player.VideoListItem
 import dev.frost819.newbv.biliapi.entity.video.VideoPage
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.theme.BVTheme
 
@@ -206,7 +208,7 @@ private fun VideoListItemRow(
         if (expanded && hasSubPages) {
             Column(
                 modifier = Modifier.padding(start = 16.dp, top = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 video.ugcPages?.forEach { page ->
                     val isPageSelected = page.cid == currentCid
@@ -276,7 +278,7 @@ fun PlayerListItem(
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
         colors =
-            ClickableSurfaceDefaults.colors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor =
                     if (selected) {
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
@@ -284,6 +286,8 @@ fun PlayerListItem(
                         Color.Transparent
                     },
             ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

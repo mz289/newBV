@@ -76,7 +76,7 @@ import dev.frost819.newbv.app.viewmodel.pgc.SeasonDetailUiState
 import dev.frost819.newbv.app.viewmodel.pgc.SeasonDetailViewModel
 import dev.frost819.newbv.biliapi.entity.video.season.Episode
 import dev.frost819.newbv.biliapi.entity.video.season.SeasonDetail
-import dev.frost819.newbv.core.focus.focusInvertedColors
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
@@ -457,19 +457,13 @@ private fun SeasonActionButton(
         enabled = enabled,
         onClick = onClick,
         shape = ClickableSurfaceDefaults.shape(shape = shape),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-        border =
-            ClickableSurfaceDefaults.border(
-                focusedBorder =
-                    outerFocusBorder(8.dp),
-            ),
         colors =
-            ClickableSurfaceDefaults.colors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor = container,
                 contentColor = content,
-                focusedContainerColor = container,
-                focusedContentColor = content,
             ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -674,19 +668,13 @@ private fun SeasonSwitcherRow(
                         .focusSaverItem(focusSaver, "season_${season.seasonId}")
                         .touchClickable(onClick = { onClick(season.seasonId) }),
                 shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(6.dp)),
-                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-                border =
-                    ClickableSurfaceDefaults.border(
-                        focusedBorder =
-                            outerFocusBorder(6.dp),
-                    ),
                 colors =
-                    ClickableSurfaceDefaults.colors(
+                    ControlFocusDefaults.surfaceColors(
                         containerColor = container,
-                        focusedContainerColor = container,
-                        focusedContentColor = content,
                         contentColor = content,
                     ),
+                border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(6.dp)),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
             ) {
                 Text(
                     season.shortTitle.ifBlank { season.title.orEmpty() },
@@ -729,16 +717,13 @@ private fun SeasonErrorScreen(
                         .touchClickable(onClick = onRetry),
                 onClick = onRetry,
                 shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
-                border =
-                    ClickableSurfaceDefaults.border(
-                        focusedBorder =
-                            outerFocusBorder(12.dp),
-                    ),
                 colors =
-                    focusInvertedColors(
+                    ControlFocusDefaults.surfaceColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
+                border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(12.dp)),
+                scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
             ) {
                 Text(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),

@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.MaterialTheme
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
@@ -34,7 +36,7 @@ import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.app.viewmodel.common.CollectWatchLaterEffects
 import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
 import dev.frost819.newbv.app.viewmodel.personal.PersonalViewModel
-import dev.frost819.newbv.core.focus.focusInvertedColors
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -98,6 +100,9 @@ fun FavoriteScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding =
+                    androidx.compose.foundation.layout
+                        .PaddingValues(8.dp),
             ) {
                 items(state.favoriteFolders.size) { index ->
                     val folder = state.favoriteFolders[index]
@@ -116,7 +121,7 @@ fun FavoriteScreen(
                                         .RoundedCornerShape(50),
                             ),
                         colors =
-                            focusInvertedColors(
+                            ControlFocusDefaults.surfaceColors(
                                 containerColor =
                                     if (state.currentFolderId == folder.id) {
                                         androidx.tv.material3.MaterialTheme.colorScheme.primary
