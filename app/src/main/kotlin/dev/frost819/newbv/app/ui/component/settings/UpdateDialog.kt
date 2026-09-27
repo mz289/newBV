@@ -1,6 +1,5 @@
 package dev.frost819.newbv.app.ui.component.settings
 
-import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,12 +17,12 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.content.FileProvider
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
@@ -40,9 +39,11 @@ import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -71,6 +72,7 @@ fun UpdateDialog(
     // 与当前构建 variant 一致的更新渠道：debug 包只能被 debug 附件覆盖安装
     val updateChannel = if (BuildConfig.DEBUG) UpdateChannel.DEBUG else UpdateChannel.RELEASE
 
+    var downloadedApkPath by rememberSaveable { mutableStateOf<String?>(null) }
     var updateStatus by remember { mutableStateOf(UpdateStatus.UpdatingInfo) }
     var bytesSentTotal by remember { mutableLongStateOf(0L) }
     var contentLength by remember { mutableLongStateOf(0L) }
@@ -124,28 +126,6 @@ fun UpdateDialog(
         }
     }
 
-    val installUpdate: (File) -> Unit = { file ->
-        updateStatus = UpdateStatus.Installing
-        runCatching {
-            val uri =
-                FileProvider.getUriForFile(
-                    context,
-                    "${BuildConfig.APPLICATION_ID}.provider",
-                    file,
-                )
-            val intent =
-                Intent(Intent.ACTION_VIEW).apply {
-                    addCategory(Intent.CATEGORY_DEFAULT)
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-            context.startActivity(intent)
-        }.onFailure {
-            updateStatus = UpdateStatus.InstallError
-        }
-    }
-
     val startUpdate: () -> Unit = {
         val release = latestRelease
         val asset = latestAsset
@@ -172,8 +152,9 @@ fun UpdateDialog(
                         }
                         // 缓存写入后检查阈值，保留刚下载的 APK 待安装
                         CacheManager(context).checkCache(preserve = tempFile)
-                        if (show) installUpdate(tempFile)
+                        withContext(Dispatchers.Main) { downloadedApkPath = tempFile.absolutePath }
                     }.onFailure {
+                        if (it is CancellationException) throw it
                         logger.error(it) { "Failed to download update" }
                         updateStatus = UpdateStatus.DownloadError
                     }
@@ -189,7 +170,15 @@ fun UpdateDialog(
         }
     }
 
-    if (show) {
+    if (show && downloadedApkPath != null) {
+        UpdateInstallDialog(
+            file = File(requireNotNull(downloadedApkPath)),
+            onDismiss = {
+                downloadedApkPath = null
+                onHideDialog()
+            },
+        )
+    } else if (show) {
         AlertDialog(
             modifier = modifier.width(400.dp),
             onDismissRequest = onHideDialog,
@@ -200,11 +189,9 @@ fun UpdateDialog(
                             UpdateStatus.UpdatingInfo -> "获取更新信息中"
                             UpdateStatus.Ready -> latestRelease?.name ?: "Loading..."
                             UpdateStatus.Downloading -> "下载中"
-                            UpdateStatus.Installing -> "安装中"
                             UpdateStatus.NoAvailableUpdate -> "无可用更新"
                             UpdateStatus.CheckError -> "检查更新失败"
                             UpdateStatus.DownloadError -> "下载失败"
-                            UpdateStatus.InstallError -> "安装失败"
                         },
                 )
             },
@@ -235,16 +222,8 @@ fun UpdateDialog(
                         }
                     }
 
-                    UpdateStatus.Installing -> {
-                        Text(text = "请坐和放宽")
-                    }
-
                     UpdateStatus.DownloadError -> {
                         Text(text = "下载失败")
-                    }
-
-                    UpdateStatus.InstallError -> {
-                        Text(text = "安装失败")
                     }
 
                     UpdateStatus.CheckError -> {
@@ -259,7 +238,7 @@ fun UpdateDialog(
             confirmButton = {
                 when (updateStatus) {
                     UpdateStatus.UpdatingInfo, UpdateStatus.NoAvailableUpdate,
-                    UpdateStatus.Downloading, UpdateStatus.Installing,
+                    UpdateStatus.Downloading,
                     -> {}
 
                     UpdateStatus.Ready -> {
@@ -275,7 +254,7 @@ fun UpdateDialog(
                         }
                     }
 
-                    UpdateStatus.InstallError, UpdateStatus.DownloadError, UpdateStatus.CheckError -> {
+                    UpdateStatus.DownloadError, UpdateStatus.CheckError -> {
                         Button(
                             onClick = checkUpdate,
                             modifier = Modifier.touchClickable(onClick = checkUpdate),
@@ -295,7 +274,6 @@ fun UpdateDialog(
                         updateStatus !in
                             setOf(
                                 UpdateStatus.Downloading,
-                                UpdateStatus.Installing,
                             ),
                     onClick = onHideDialog,
                     modifier =
@@ -303,7 +281,6 @@ fun UpdateDialog(
                             if (updateStatus !in
                                 setOf(
                                     UpdateStatus.Downloading,
-                                    UpdateStatus.Installing,
                                 )
                             ) {
                                 onHideDialog()
@@ -325,9 +302,8 @@ fun UpdateDialog(
                                 UpdateStatus.Ready -> "打死不更"
                                 UpdateStatus.NoAvailableUpdate -> "走了走了"
                                 UpdateStatus.CheckError, UpdateStatus.DownloadError,
-                                UpdateStatus.InstallError,
                                 -> "算了算了"
-                                UpdateStatus.Downloading, UpdateStatus.Installing -> "你已经无路可逃！"
+                                UpdateStatus.Downloading -> "你已经无路可逃！"
                             },
                     )
                 }
@@ -342,11 +318,9 @@ enum class UpdateStatus {
     UpdatingInfo,
     Ready,
     Downloading,
-    Installing,
     NoAvailableUpdate,
     CheckError,
     DownloadError,
-    InstallError,
 }
 
 private fun Long.toMBString(): String =

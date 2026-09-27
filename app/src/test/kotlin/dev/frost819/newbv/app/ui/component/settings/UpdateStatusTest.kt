@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test
  */
 class UpdateStatusTest {
     @Test
-    fun enum_hasEightEntries() {
-        assertThat(UpdateStatus.entries).hasSize(8)
+    fun enum_hasSixDownloadAndCheckStates() {
+        assertThat(UpdateStatus.entries).hasSize(6)
     }
 
     @Test
@@ -18,11 +18,9 @@ class UpdateStatusTest {
             UpdateStatus.UpdatingInfo,
             UpdateStatus.Ready,
             UpdateStatus.Downloading,
-            UpdateStatus.Installing,
             UpdateStatus.NoAvailableUpdate,
             UpdateStatus.CheckError,
             UpdateStatus.DownloadError,
-            UpdateStatus.InstallError,
         )
     }
 }
