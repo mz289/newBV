@@ -6,12 +6,17 @@ import subprocess
 
 
 def verify_output(output: str, expected: str) -> None:
-    """Require exactly one signer matching the expected SHA-256 certificate digest."""
+    """Require every signing scheme to use only the expected certificate digest."""
     expected = expected.replace(":", "").lower()
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
         raise ValueError("Expected certificate digest must contain 64 hexadecimal digits")
-    digests = re.findall(r"^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)$", output, re.MULTILINE)
-    if [digest.lower() for digest in digests] != [expected]:
+    # Build Tools 37 labels certificates by scheme ("V2 Signer:"); older tools
+    # use "Signer #1". The same certificate may appear once per signing scheme.
+    digests = re.findall(
+        r"^(?:Signer #\d+|V\d+(?:\.\d+)? Signer(?: #\d+)?):? certificate SHA-256 digest: ([0-9a-fA-F]+)\s*$",
+        output, re.MULTILINE,
+    )
+    if {digest.lower() for digest in digests} != {expected}:
         raise ValueError(f"Signing certificate mismatch: expected {expected}, found {digests}")
 
 
