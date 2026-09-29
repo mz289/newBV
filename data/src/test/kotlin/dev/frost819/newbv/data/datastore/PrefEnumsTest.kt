@@ -1,6 +1,7 @@
 package dev.frost819.newbv.data.datastore
 
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.core.theme.ThemeMode
 import org.junit.jupiter.api.Test
 
 /**
