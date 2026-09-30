@@ -48,12 +48,13 @@ import dev.frost819.newbv.data.datastore.HomeTopNavItem
 import dev.frost819.newbv.data.datastore.LeftNaviItem
 import dev.frost819.newbv.data.datastore.PersonalTopNavItem
 import dev.frost819.newbv.data.datastore.Prefs
+import dev.frost819.newbv.data.datastore.VideoColumnCount
 import kotlin.math.roundToInt
 
 /**
  * 界面设置页。
  *
- * 启动页/首页 Tab/个人页 Tab/显示视频详情/常显进度条/Density/主题模式。
+ * 启动页/首页 Tab/个人页 Tab/显示视频详情/常显进度条/视频卡片列数/Density/主题模式。
  */
 @Composable
 fun UISetting(modifier: Modifier = Modifier) {
@@ -66,6 +67,7 @@ fun UISetting(modifier: Modifier = Modifier) {
     var showPersonalPageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showAccentDialog by remember { mutableStateOf(false) }
+    var showVideoColumnsDialog by remember { mutableStateOf(false) }
 
     var showVideoInfo by remember { mutableStateOf(Prefs.showVideoInfo) }
     var showPersistentSeek by remember { mutableStateOf(Prefs.showPersistentSeek) }
@@ -74,6 +76,7 @@ fun UISetting(modifier: Modifier = Modifier) {
     var selectedFirstPersonalTopNavItem by remember { mutableStateOf(Prefs.firstPersonalTopNavItem) }
     var selectedThemeMode by remember { mutableStateOf(Prefs.themeMode) }
     var selectedAccentColor by remember { mutableStateOf(Prefs.accentColor) }
+    var selectedVideoColumns by remember { mutableStateOf(Prefs.videoColumns) }
     var density by remember { mutableFloatStateOf(Prefs.density) }
 
     Box(modifier = modifier) {
@@ -148,6 +151,13 @@ fun UISetting(modifier: Modifier = Modifier) {
                             showPersistentSeek = it
                             Prefs.showPersistentSeek = it
                         },
+                    )
+                }
+                item {
+                    SettingListItem(
+                        title = "视频卡片列数",
+                        supportText = "当前：${selectedVideoColumns.displayName}",
+                        onClick = { showVideoColumnsDialog = true },
                     )
                 }
                 item {
@@ -237,6 +247,19 @@ fun UISetting(modifier: Modifier = Modifier) {
             onSelect = {
                 Prefs.accentColor = it
                 selectedAccentColor = it
+            },
+            getDisplayName = { it.displayName },
+        )
+    }
+
+    if (showVideoColumnsDialog) {
+        OptionDialog(
+            options = VideoColumnCount.entries.toTypedArray(),
+            selectedOption = selectedVideoColumns,
+            onDismiss = { showVideoColumnsDialog = false },
+            onSelect = {
+                Prefs.videoColumns = it
+                selectedVideoColumns = it
             },
             getDisplayName = { it.displayName },
         )

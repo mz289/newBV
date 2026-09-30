@@ -21,7 +21,7 @@ import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TabbedContent
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
-import dev.frost819.newbv.app.ui.component.videoCardMinWidth
+import dev.frost819.newbv.app.ui.component.videoCardGridCells
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
@@ -115,7 +115,7 @@ private fun UgcGrid(
 
     TvLazyVerticalGrid(
         state = gridState,
-        columns = GridCells.Adaptive(videoCardMinWidth()),
+        columns = videoCardGridCells(),
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),

@@ -52,7 +52,7 @@ import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
-import dev.frost819.newbv.app.ui.component.videoCardMinWidth
+import dev.frost819.newbv.app.ui.component.videoCardGridCells
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.navigation.LiveAreaRoute
@@ -116,7 +116,7 @@ fun LiveContent(
                     false
                 },
         state = gridState,
-        columns = GridCells.Adaptive(videoCardMinWidth()),
+        columns = videoCardGridCells(),
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),

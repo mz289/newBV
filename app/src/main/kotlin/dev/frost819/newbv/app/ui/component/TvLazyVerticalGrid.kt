@@ -12,12 +12,15 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.frost819.newbv.data.datastore.Prefs
 
 /**
  * 视频卡片栅格的最小卡片宽度（P1-1 自适应列数）。
@@ -29,7 +32,7 @@ import androidx.compose.ui.unit.dp
  * 4K(1920dp) 6 列、2K(1280dp) 5 列、1080p(960dp) 5 列（5×140 + 4×24 = 796 ≤ 可用 ~820dp）。
  */
 @Composable
-fun videoCardMinWidth(): Dp {
+private fun videoCardMinWidth(): Dp {
     val density = LocalDensity.current
     val screenWidth = with(density) {
         LocalView.current.resources.displayMetrics.widthPixels.toDp()
@@ -43,6 +46,23 @@ fun videoCardMinWidth(): Dp {
 
 /** 海报卡片栅格（番剧/影视封面卡）的最小卡片宽度。 */
 val POSTER_CARD_MIN_WIDTH: Dp = 260.dp
+
+/**
+ * 视频卡片栅格列配置（设置项"视频卡片列数"驱动）。
+ *
+ * 设置为固定列数（≥2）时用 [GridCells.Fixed] 强制；"自动"按屏宽分档（[videoCardMinWidth]）。
+ * 通过 [Prefs.videoColumnsFlow] 实时响应设置变更，改完立即生效。
+ */
+@Composable
+fun videoCardGridCells(): GridCells {
+    val prefColumns by Prefs.videoColumnsFlow.collectAsState()
+    val fixed = prefColumns.code
+    return if (fixed >= 2) {
+        GridCells.Fixed(fixed)
+    } else {
+        GridCells.Adaptive(videoCardMinWidth())
+    }
+}
 
 /**
  * 封装了 TV 焦点定轴逻辑的 [LazyVerticalGrid]。
