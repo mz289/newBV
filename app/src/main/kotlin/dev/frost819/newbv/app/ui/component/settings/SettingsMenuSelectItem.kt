@@ -15,6 +15,7 @@ import androidx.tv.material3.RadioButton
 import androidx.tv.material3.RadioButtonDefaults
 import androidx.tv.material3.Text
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.focusShakeTarget
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -38,6 +39,7 @@ fun SettingsMenuSelectItem(
     ListItem(
         modifier =
             modifier
+                .focusShakeTarget()
                 .onFocusChanged { hasFocus = it.hasFocus }
                 .touchClickable(onClick = onClick),
         headlineContent = { Text(text = text) },
@@ -58,7 +60,7 @@ fun SettingsMenuSelectItem(
                             if (hasFocus) {
                                 MaterialTheme.colorScheme.primaryContainer
                             } else {
-                                MaterialTheme.colorScheme.border
+                                MaterialTheme.colorScheme.onSurfaceVariant
                             },
                     ),
             )

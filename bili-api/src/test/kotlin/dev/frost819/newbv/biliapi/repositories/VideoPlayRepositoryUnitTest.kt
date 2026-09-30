@@ -2,7 +2,6 @@ package dev.frost819.newbv.biliapi.repositories
 
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.biliapi.entity.ApiType
-import dev.frost819.newbv.biliapi.entity.video.HeartbeatVideoType
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.BiliResponse
 import dev.frost819.newbv.biliapi.http.entity.RiskControlException
@@ -13,7 +12,6 @@ import dev.frost819.newbv.biliapi.http.entity.video.DashDolby
 import dev.frost819.newbv.biliapi.http.entity.video.DashFlac
 import dev.frost819.newbv.biliapi.http.entity.video.Durl
 import dev.frost819.newbv.biliapi.http.entity.video.PlayUrlData
-import dev.frost819.newbv.biliapi.http.entity.video.PlayUrlV2Data
 import dev.frost819.newbv.biliapi.http.entity.video.SegmentBase
 import dev.frost819.newbv.biliapi.http.entity.video.SupportFormat
 import dev.frost819.newbv.biliapi.http.entity.video.VideoMoreInfo
@@ -185,183 +183,13 @@ class VideoPlayRepositoryUnitTest {
         }
 
     // ------------------------------------------------------------------
-    // getPgcPlayData - Web
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `getPgcPlayData Web returns PlayData from PlayUrlV2Data`() =
-        runTest {
-            val playUrlV2Data = fakePlayUrlV2Data()
-            coEvery {
-                BiliHttpApi.getPgcVideoPlayUrlV2(
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                )
-            } returns
-                BiliResponse(code = 0, message = "", data = playUrlV2Data)
-
-            val result =
-                repository.getPgcPlayData(
-                    aid = AID,
-                    cid = CID,
-                    epid = EPID,
-                    preferApiType = ApiType.Web,
-                )
-
-            assertThat(result.dashVideos).hasSize(1)
-            assertThat(result.dashVideos[0].quality).isEqualTo(80)
-            assertThat(result.needPay).isFalse()
-        }
-
-    @Test
-    fun `getPgcPlayData Web passes fnval 4048 and qn 127`() =
-        runTest {
-            coEvery {
-                BiliHttpApi.getPgcVideoPlayUrlV2(
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                )
-            } returns
-                BiliResponse(code = 0, message = "", data = fakePlayUrlV2Data())
-
-            repository.getPgcPlayData(aid = AID, cid = CID, epid = EPID, preferApiType = ApiType.Web)
-
-            coVerify {
-                BiliHttpApi.getPgcVideoPlayUrlV2(
-                    av = eq(AID),
-                    cid = eq(CID),
-                    epid = eq(EPID),
-                    fnval = eq(4048),
-                    qn = eq(127),
-                    fnver = eq(0),
-                    fourk = eq(1),
-                )
-            }
-        }
-
-    // ------------------------------------------------------------------
-    // getPgcPlayData - App (channel is null, stub is null)
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `getPgcPlayData App throws when all codec types fail with null channel`() =
-        runTest {
-            assertThrows<IllegalStateException> {
-                repository.getPgcPlayData(aid = AID, cid = CID, epid = EPID, preferApiType = ApiType.App)
-            }
-        }
-
-    // ------------------------------------------------------------------
-    // getSubtitle - Web
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `getSubtitle Web maps subtitle items`() =
-        runTest {
-            val videoMoreInfo = fakeVideoMoreInfoWithSubtitles()
-            coEvery { BiliHttpApi.getVideoMoreInfo(any(), any()) } returns
-                BiliResponse(code = 0, message = "", data = videoMoreInfo)
-
-            val result = repository.getSubtitle(aid = AID, cid = CID, preferApiType = ApiType.Web)
-
-            assertThat(result).hasSize(2)
-            assertThat(result[0].lang).isEqualTo("zh-Hans")
-            assertThat(result[0].langDoc).isEqualTo("中文（简体）")
-            assertThat(result[0].type).isEqualTo(dev.frost819.newbv.biliapi.entity.video.SubtitleType.CC)
-            assertThat(result[1].lang).isEqualTo("ai-zh")
-            assertThat(result[1].type).isEqualTo(dev.frost819.newbv.biliapi.entity.video.SubtitleType.AI)
-        }
-
-    @Test
-    fun `getSubtitle Web returns empty list when subtitle is null`() =
-        runTest {
-            coEvery { BiliHttpApi.getVideoMoreInfo(any(), any()) } returns
-                BiliResponse(code = 0, message = "", data = fakeVideoMoreInfoNoSubtitle())
-
-            val result = repository.getSubtitle(aid = AID, cid = CID, preferApiType = ApiType.Web)
-
-            assertThat(result).isEmpty()
-        }
-
-    @Test
-    fun `getSubtitle Web returns empty list when subtitles list is empty`() =
-        runTest {
-            val videoMoreInfo =
-                fakeVideoMoreInfoNoSubtitle().copy(
-                    subtitle =
-                        VideoMoreInfo.Subtitle(
-                            allowSubmit = false,
-                            lan = "",
-                            lanDoc = "",
-                            subtitles = emptyList(),
-                        ),
-                )
-            coEvery { BiliHttpApi.getVideoMoreInfo(any(), any()) } returns
-                BiliResponse(code = 0, message = "", data = videoMoreInfo)
-
-            val result = repository.getSubtitle(aid = AID, cid = CID, preferApiType = ApiType.Web)
-
-            assertThat(result).isEmpty()
-        }
-
-    // ------------------------------------------------------------------
-    // getSubtitle - App (channel is null, stub is null)
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `getSubtitle App returns empty list when danmakuStub is null`() =
-        runTest {
-            val result = repository.getSubtitle(aid = AID, cid = CID, preferApiType = ApiType.App)
-
-            assertThat(result).isEmpty()
-        }
-
-    // ------------------------------------------------------------------
     // sendHeartbeat
     // ------------------------------------------------------------------
 
     @Test
     fun `sendHeartbeat Web calls BiliHttpApi sendHeartbeat with csrf`() =
         runTest {
-            coEvery {
-                BiliHttpApi.sendHeartbeat(
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                )
-            } returns
-                "{\"code\":0}"
+            coEvery { BiliHttpApi.sendHeartbeat(any(), any(), any(), any()) } returns "{\"code\":0}"
 
             repository.sendHeartbeat(
                 aid = AID,
@@ -375,7 +203,6 @@ class VideoPlayRepositoryUnitTest {
                     avid = eq(AID),
                     cid = eq(CID),
                     playedTime = eq(60),
-                    type = eq(HeartbeatVideoType.Video.value),
                     csrf = eq(BILI_JCT),
                 )
             }
@@ -410,7 +237,6 @@ class VideoPlayRepositoryUnitTest {
                     avid = eq(AID),
                     cid = eq(CID),
                     playedTime = eq(30),
-                    type = eq(HeartbeatVideoType.Video.value),
                     accessKey = any(),
                 )
             }
@@ -420,25 +246,7 @@ class VideoPlayRepositoryUnitTest {
     fun `sendHeartbeat Web uses null csrf when biliJct is null`() =
         runTest {
             authRepository.biliJct = null
-            coEvery {
-                BiliHttpApi.sendHeartbeat(
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                )
-            } returns
-                "{\"code\":0}"
+            coEvery { BiliHttpApi.sendHeartbeat(any(), any(), any(), any()) } returns "{\"code\":0}"
 
             repository.sendHeartbeat(aid = AID, cid = CID, time = 10, preferApiType = ApiType.Web)
 
@@ -447,56 +255,7 @@ class VideoPlayRepositoryUnitTest {
                     avid = eq(AID),
                     cid = eq(CID),
                     playedTime = eq(10),
-                    type = eq(HeartbeatVideoType.Video.value),
                     csrf = isNull(),
-                )
-            }
-        }
-
-    @Test
-    fun `sendHeartbeat Web passes season type and subType`() =
-        runTest {
-            coEvery {
-                BiliHttpApi.sendHeartbeat(
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                )
-            } returns
-                "{\"code\":0}"
-
-            repository.sendHeartbeat(
-                aid = AID,
-                cid = CID,
-                time = 100,
-                type = HeartbeatVideoType.Season,
-                subType = 4,
-                epid = 706666,
-                seasonId = 39707,
-                preferApiType = ApiType.Web,
-            )
-
-            coVerify {
-                BiliHttpApi.sendHeartbeat(
-                    avid = eq(AID),
-                    cid = eq(CID),
-                    playedTime = eq(100),
-                    type = eq(HeartbeatVideoType.Season.value),
-                    subType = eq(4),
-                    epid = eq(706666),
-                    sid = eq(39707),
-                    csrf = eq(BILI_JCT),
                 )
             }
         }
@@ -530,7 +289,6 @@ class VideoPlayRepositoryUnitTest {
                     avid = eq(AID),
                     cid = eq(CID),
                     playedTime = eq(5),
-                    type = eq(HeartbeatVideoType.Video.value),
                     accessKey = eq(ACCESS_TOKEN),
                 )
             }
@@ -933,81 +691,6 @@ class VideoPlayRepositoryUnitTest {
             dash = null,
             supportFormats = emptyList(),
         )
-
-    private fun fakePlayUrlV2Data(): PlayUrlV2Data {
-        val videoInfo = fakePlayUrlDataWithDash()
-        return PlayUrlV2Data(
-            expInfo = PlayUrlV2Data.ExpInfo(buyVipDonatedSeason = 0),
-            playCheck = PlayUrlV2Data.PlayCheck(playDetail = ""),
-            playViewBusinessInfo =
-                PlayUrlV2Data.PlayViewBusinessInfo(
-                    episodeInfo =
-                        PlayUrlV2Data.PlayViewBusinessInfo.EpisodeInfo(
-                            aid = AID,
-                            bvid = "BV1xx",
-                            cid = CID,
-                            deliveryBusinessFragmentVideo = false,
-                            deliveryFragmentVideo = false,
-                            epId = EPID,
-                            epStatus = 0,
-                            interaction =
-                                PlayUrlV2Data.PlayViewBusinessInfo.EpisodeInfo.Interaction(
-                                    interaction = false,
-                                ),
-                            longTitle = "EP1",
-                            title = "第一集",
-                        ),
-                    seasonInfo =
-                        PlayUrlV2Data.PlayViewBusinessInfo.SeasonInfo(
-                            seasonId = 39707,
-                            seasonType = 1,
-                        ),
-                    userStatus =
-                        PlayUrlV2Data.PlayViewBusinessInfo.UserStatus(
-                            followInfo =
-                                PlayUrlV2Data.PlayViewBusinessInfo.UserStatus.FollowInfo(
-                                    follow = 0,
-                                    followStatus = 0,
-                                ),
-                            isLogin = 1,
-                            payInfo =
-                                PlayUrlV2Data.PlayViewBusinessInfo.UserStatus.PayInfo(
-                                    payCheck = 0,
-                                    payPackPaid = 0,
-                                    sponsor = 0,
-                                ),
-                            vipInfo =
-                                PlayUrlV2Data.PlayViewBusinessInfo.UserStatus.VipInfo(
-                                    realVip = false,
-                                ),
-                            watchProgress =
-                                PlayUrlV2Data.PlayViewBusinessInfo.UserStatus.WatchProgress(
-                                    currentWatchProgress = 0,
-                                    lastEpId = 0,
-                                    lastTime = 0,
-                                ),
-                        ),
-                ),
-            videoInfo = videoInfo,
-            viewInfo =
-                PlayUrlV2Data.ViewInfo(
-                    aiRepairQnTrialInfo = PlayUrlV2Data.ViewInfo.AiRepairQnTrialInfo(trialAble = false),
-                    endPage = PlayUrlV2Data.ViewInfo.EndPage(hide = true),
-                    extToast = kotlinx.serialization.json.JsonPrimitive(""),
-                    qnTrialInfo = PlayUrlV2Data.ViewInfo.QnTrialInfo(trialAble = false),
-                    report =
-                        PlayUrlV2Data.ViewInfo.Report(
-                            epId = "$EPID",
-                            epStatus = "0",
-                            seasonId = "39707",
-                            seasonStatus = "0",
-                            seasonType = "1",
-                            vipStatus = "0",
-                            vipType = "0",
-                        ),
-                ),
-        )
-    }
 
     private fun fakeVideoMoreInfoWithSubtitles(): VideoMoreInfo =
         fakeVideoMoreInfoNoSubtitle().copy(

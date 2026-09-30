@@ -1,5 +1,8 @@
 package dev.frost819.newbv.app.ui.component.livecard
 
+import dev.frost819.newbv.biliapi.http.entity.live.FollowLiveRoom
+import dev.frost819.newbv.biliapi.http.entity.live.LiveRoomItem
+
 /**
  * 直播卡片数据。
  *
@@ -35,3 +38,37 @@ fun formatOnlineCount(online: Int): String =
         online >= 10_000 -> String.format("%.1f万", online / 10_000.0)
         else -> online.toString()
     }
+
+/** 关注直播间列表项 -> 卡片数据。 */
+fun FollowLiveRoom.toCardData(): LiveRoomCardData {
+    val coverUrl = coverFromUser.ifBlank { keyframe }
+    return LiveRoomCardData(
+        roomId = roomId,
+        title = title,
+        uname = uname.ifBlank { nickname },
+        uid = uid,
+        cover = coverUrl,
+        face = face,
+        areaV2Name = areaV2Name,
+        areaV2ParentName = areaV2ParentName,
+        onlineString = formatOnlineCount(online),
+        watchedString = "",
+    )
+}
+
+/** 分区直播间列表项 -> 卡片数据。 */
+fun LiveRoomItem.toCardData(): LiveRoomCardData {
+    val coverUrl = cover.ifBlank { keyframe.ifBlank { userCover } }
+    return LiveRoomCardData(
+        roomId = roomId.toLong(),
+        title = title,
+        uname = uname,
+        uid = uid,
+        cover = coverUrl,
+        face = face,
+        areaV2Name = areaV2Name,
+        areaV2ParentName = areaV2ParentName,
+        onlineString = formatOnlineCount(online),
+        watchedString = watchedShow?.textSmall ?: "",
+    )
+}

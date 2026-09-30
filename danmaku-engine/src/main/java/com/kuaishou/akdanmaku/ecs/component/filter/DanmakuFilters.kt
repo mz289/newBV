@@ -74,17 +74,5 @@ class DanmakuFilters {
     companion object {
         // filter type
         const val FILTER_TYPE_TYPE = 1
-        const val FILTER_TYPE_QUANTITY = 1 shl 1
-        const val FILTER_TYPE_ELAPSED_TIME = 1 shl 2
-        const val FILTER_TYPE_TEXT_COLOR = 1 shl 3
-        const val FILTER_TYPE_USER_ID = 1 shl 4
-        const val FILTER_TYPE_USER_HASH = 1 shl 5
-        const val FILTER_TYPE_USER_GUEST = 1 shl 6
-        const val FILTER_TYPE_DUPLICATE_MERGE = 1 shl 7
-        const val FILTER_TYPE_MAXIMUM_LINES = 1 shl 8
-        const val FILTER_TYPE_OVERLAPPING = 1 shl 9
-        const val FILTER_TYPE_SCREEN_PART = 1 shl 10
-        const val FILTER_TYPE_BLOCKED_TEXT = 1 shl 11
-        const val FILTER_TYPE_DUPLICATE_MERGED = 1 shl 12
     }
 }

@@ -33,6 +33,7 @@ import dev.frost819.newbv.app.ui.component.videocard.isPgc
 import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
 import dev.frost819.newbv.app.ui.navigation.navigateFromVideoCard
 import dev.frost819.newbv.app.ui.navigation.navigateToVideoDetailFromPlayer
+import dev.frost819.newbv.app.ui.state.player.PlayerOverlayState
 import dev.frost819.newbv.app.ui.state.player.PlayerState
 import dev.frost819.newbv.app.util.PlayerConstants
 import dev.frost819.newbv.app.util.ToastUtils
@@ -41,7 +42,6 @@ import dev.frost819.newbv.app.viewmodel.comment.CommentViewModel
 import dev.frost819.newbv.app.viewmodel.player.DanmakuViewModel
 import dev.frost819.newbv.app.viewmodel.player.PlayerViewModel
 import dev.frost819.newbv.app.viewmodel.player.SubtitleViewModel
-import dev.frost819.newbv.app.viewmodel.player.VideoListViewModel
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMaskFrame
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.danmaku.component.DanmakuPlayerCompose
@@ -66,7 +66,6 @@ fun VideoPlayerScreen(
     playerViewModel: PlayerViewModel = hiltViewModel(),
     danmakuViewModel: DanmakuViewModel = hiltViewModel(),
     subtitleViewModel: SubtitleViewModel = hiltViewModel(),
-    videoListViewModel: VideoListViewModel = hiltViewModel(),
     commentViewModel: CommentViewModel = hiltViewModel(),
 ) {
     val logger = Loggers.get("VideoPlayerScreen")
@@ -80,12 +79,21 @@ fun VideoPlayerScreen(
     val seekerState = playerViewModel.seekerState.collectAsState()
     val danmakuState by danmakuViewModel.danmakuState.collectAsState()
     val danmakuMask by danmakuViewModel.danmakuMask.collectAsState()
-    val videoListState by videoListViewModel.videoListState.collectAsState()
     val subtitleState by subtitleViewModel.subtitleState.collectAsState()
     val subtitleId by subtitleViewModel.subtitleId.collectAsState()
     val subtitleData by subtitleViewModel.subtitleData.collectAsState()
     val subtitleList by subtitleViewModel.subtitleList.collectAsState()
     val sharedState by playerViewModel.videoSharedState.collectAsState()
+
+    // 播放列表与相关视频：直接观察共享仓库
+    val videoInfoRepository = playerViewModel.videoInfoRepository
+    val videoList by videoInfoRepository.videoList.collectAsState()
+    val relatedVideosRaw by videoInfoRepository.relatedVideos.collectAsState()
+    val videoDetailAid =
+        videoInfoRepository.videoDetail
+            .collectAsState()
+            .value
+            ?.aid
 
     val maskFinder = remember { DanmakuMaskFinder() }
     var currentDanmakuMaskFrame by remember { mutableStateOf<DanmakuMaskFrame?>(null) }
@@ -96,28 +104,32 @@ fun VideoPlayerScreen(
 
     val videoShotCache by remember(uiState.videoShot) { mutableStateOf(VideoShotImageCache()) }
 
-    // 合并 UI 状态（包含 videoList 和 relatedVideos）
-    val mergedUiState =
+    // 覆盖层聚合状态（弹幕/字幕/列表）与播放核心状态分离传给控制器
+    val overlayState =
         remember(
-            uiState,
             danmakuState,
-            danmakuMask,
             subtitleState,
             subtitleId,
             subtitleData,
             subtitleList,
-            videoListState.videoList,
-            videoListState.relatedVideos,
+            videoList,
+            relatedVideosRaw,
+            uiState.aid,
         ) {
-            uiState.copy(
+            PlayerOverlayState(
                 danmakuState = danmakuState,
-                danmakuMask = danmakuMask,
                 subtitleState = subtitleState,
                 subtitleId = subtitleId,
                 subtitleData = subtitleData,
                 subtitleList = subtitleList,
-                videoList = videoListState.videoList,
-                relatedVideos = videoListState.relatedVideos.map { VideoCardData.fromRelatedVideo(it) },
+                videoList = videoList,
+                // 仅当详情归属当前视频时展示，防止切集瞬间闪现旧相关视频
+                relatedVideos =
+                    if (videoDetailAid == uiState.aid && uiState.aid != 0L) {
+                        relatedVideosRaw.map { VideoCardData.fromRelatedVideo(it) }
+                    } else {
+                        emptyList()
+                    },
             )
         }
 
@@ -246,7 +258,8 @@ fun VideoPlayerScreen(
         isPgc = uiState.isPgc,
         isLooping = uiState.isLooping,
         videoShotCache = videoShotCache,
-        uiState = mergedUiState,
+        uiState = uiState,
+        overlayState = overlayState,
         seekerState = seekerState,
         onPlay = {
             logger.info { "[PLAYBACK] play aid=${uiState.aid}, cid=${uiState.cid}" }
@@ -327,7 +340,7 @@ fun VideoPlayerScreen(
             }
         },
         onToggleDanmaku = { danmakuViewModel.toggleDanmaku() },
-        onShowShortcutTip = { text -> playerViewModel.showShortcutTip(text) },
+        onShowShortcutTip = { key, text -> playerViewModel.showShortcutTip(text, key) },
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),

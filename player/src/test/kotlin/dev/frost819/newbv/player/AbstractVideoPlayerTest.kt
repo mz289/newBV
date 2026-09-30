@@ -25,8 +25,6 @@ class AbstractVideoPlayerTest {
     private class TestVideoPlayer : AbstractVideoPlayer() {
         override fun initPlayer() {}
 
-        override fun setHeader(headers: Map<String, String>) {}
-
         override fun playUrl(
             videoUrl: String?,
             audioUrl: String?,
@@ -39,8 +37,6 @@ class AbstractVideoPlayerTest {
         override fun pause() {}
 
         override fun stop() {}
-
-        override fun reset() {}
 
         override val isPlaying: Boolean = false
 
@@ -55,7 +51,6 @@ class AbstractVideoPlayerTest {
         override fun setOptions() {}
 
         override var speed: Float = 1.0f
-        override val tcpSpeed: Long = 0L
         override val debugInfo: String = "test"
         override val videoWidth: Int = 0
         override val videoHeight: Int = 0
@@ -74,8 +69,6 @@ class AbstractVideoPlayerTest {
         var onPauseCalled = false
         var onBufferingCalled = false
         var onEndCalled = false
-        var seekBackMs: Long? = null
-        var seekForwardMs: Long? = null
         var lastError: Exception? = null
         var callbackOrder = mutableListOf<String>()
 
@@ -110,16 +103,6 @@ class AbstractVideoPlayerTest {
             callbackOrder.add("onEnd")
         }
 
-        override fun onSeekBack(seekBackIncrementMs: Long) {
-            seekBackMs = seekBackIncrementMs
-            callbackOrder.add("onSeekBack")
-        }
-
-        override fun onSeekForward(seekForwardIncrementMs: Long) {
-            seekForwardMs = seekForwardIncrementMs
-            callbackOrder.add("onSeekForward")
-        }
-
         fun reset() {
             onErrorCalled = false
             onReadyCalled = false
@@ -127,8 +110,6 @@ class AbstractVideoPlayerTest {
             onPauseCalled = false
             onBufferingCalled = false
             onEndCalled = false
-            seekBackMs = null
-            seekForwardMs = null
             lastError = null
             callbackOrder.clear()
         }
@@ -145,7 +126,6 @@ class AbstractVideoPlayerTest {
         var lastSeekTime: Long? = null
         var lastVideoUrl: String? = null
         var lastAudioUrl: String? = null
-        var lastHeaders: Map<String, String>? = null
         var lastSpeed: Float? = null
 
         private var _isPlaying = false
@@ -158,11 +138,6 @@ class AbstractVideoPlayerTest {
 
         override fun initPlayer() {
             calls.add("initPlayer")
-        }
-
-        override fun setHeader(headers: Map<String, String>) {
-            calls.add("setHeader")
-            lastHeaders = headers
         }
 
         override fun playUrl(
@@ -193,13 +168,6 @@ class AbstractVideoPlayerTest {
             _isPlaying = false
         }
 
-        override fun reset() {
-            calls.add("reset")
-            _isPlaying = false
-            _currentPosition = 0
-            _duration = 0
-        }
-
         override val isPlaying: Boolean get() = _isPlaying
 
         override fun seekTo(time: Long) {
@@ -227,7 +195,6 @@ class AbstractVideoPlayerTest {
                 lastSpeed = value
                 calls.add("speed=$value")
             }
-        override val tcpSpeed: Long = 0L
         override val debugInfo: String = "spy-debug"
         override val videoWidth: Int get() = _videoWidth
         override val videoHeight: Int get() = _videoHeight
@@ -276,14 +243,6 @@ class AbstractVideoPlayerTest {
 
         fun simulateError(e: Exception) {
             mPlayerEventListener?.onError(e)
-        }
-
-        fun simulateSeekBack(ms: Long) {
-            mPlayerEventListener?.onSeekBack(ms)
-        }
-
-        fun simulateSeekForward(ms: Long) {
-            mPlayerEventListener?.onSeekForward(ms)
         }
 
         fun listener(): VideoPlayerListener? = mPlayerEventListener
@@ -431,32 +390,6 @@ class AbstractVideoPlayerTest {
     }
 
     @Test
-    fun `listener receives seekBack with correct increment`() {
-        val player = TestVideoPlayer()
-        val listener = TestListener()
-        player.setPlayerEventListener(listener)
-
-        player.listener()?.onSeekBack(5000L)
-
-        assertThat(listener.seekBackMs).isEqualTo(5000L)
-    }
-
-    @Test
-    fun `listener receives seekForward with correct increment`() {
-        val player = TestVideoPlayer()
-        val listener = TestListener()
-        player.setPlayerEventListener(listener)
-
-        player.listener()?.onSeekForward(10000L)
-
-        assertThat(listener.seekForwardMs).isEqualTo(10000L)
-    }
-
-    // ------------------------------------------------------------------
-    //  Null safety tests — callbacks must not crash when listener is null
-    // ------------------------------------------------------------------
-
-    @Test
     fun `simulateBuffering does not crash when listener is null`() {
         val player = SpyVideoPlayer()
 
@@ -497,24 +430,6 @@ class AbstractVideoPlayerTest {
 
         player.simulateError(RuntimeException("boom"))
     }
-
-    @Test
-    fun `simulateSeekBack does not crash when listener is null`() {
-        val player = SpyVideoPlayer()
-
-        player.simulateSeekBack(5000L)
-    }
-
-    @Test
-    fun `simulateSeekForward does not crash when listener is null`() {
-        val player = SpyVideoPlayer()
-
-        player.simulateSeekForward(10000L)
-    }
-
-    // ------------------------------------------------------------------
-    //  Callback dispatch via spy (mirrors ExoMediaPlayer Player.Listener pattern)
-    // ------------------------------------------------------------------
 
     @Test
     fun `spy simulateBuffering dispatches onBuffering to listener`() {
@@ -585,28 +500,6 @@ class AbstractVideoPlayerTest {
     }
 
     @Test
-    fun `spy simulateSeekBack dispatches onSeekBack with increment`() {
-        val player = SpyVideoPlayer()
-        val listener = TestListener()
-        player.setPlayerEventListener(listener)
-
-        player.simulateSeekBack(5000L)
-
-        assertThat(listener.seekBackMs).isEqualTo(5000L)
-    }
-
-    @Test
-    fun `spy simulateSeekForward dispatches onSeekForward with increment`() {
-        val player = SpyVideoPlayer()
-        val listener = TestListener()
-        player.setPlayerEventListener(listener)
-
-        player.simulateSeekForward(10000L)
-
-        assertThat(listener.seekForwardMs).isEqualTo(10000L)
-    }
-
-    @Test
     fun `callbacks fire in the order they are dispatched`() {
         val player = SpyVideoPlayer()
         val listener = TestListener()
@@ -654,7 +547,6 @@ class AbstractVideoPlayerTest {
         val player = SpyVideoPlayer()
 
         player.initPlayer()
-        player.setHeader(mapOf("User-Agent" to "TestUA"))
         player.playUrl("https://video.url", "https://audio.url")
         player.prepare()
         player.start()
@@ -662,13 +554,11 @@ class AbstractVideoPlayerTest {
         player.seekTo(30000L)
         player.start()
         player.stop()
-        player.reset()
         player.release()
 
         assertThat(player.calls)
             .containsExactly(
                 "initPlayer",
-                "setHeader",
                 "playUrl",
                 "prepare",
                 "start",
@@ -676,7 +566,6 @@ class AbstractVideoPlayerTest {
                 "seekTo",
                 "start",
                 "stop",
-                "reset",
                 "release",
             ).inOrder()
     }
@@ -719,25 +608,6 @@ class AbstractVideoPlayerTest {
 
         assertThat(player.lastVideoUrl).isEqualTo("https://video.url")
         assertThat(player.lastAudioUrl).isNull()
-    }
-
-    @Test
-    fun `setHeader stores headers map`() {
-        val player = SpyVideoPlayer()
-        val headers = mapOf("User-Agent" to "TestUA", "Referer" to "https://bilibili.com")
-
-        player.setHeader(headers)
-
-        assertThat(player.lastHeaders).isEqualTo(headers)
-    }
-
-    @Test
-    fun `setHeader with empty map stores empty map`() {
-        val player = SpyVideoPlayer()
-
-        player.setHeader(emptyMap())
-
-        assertThat(player.lastHeaders).isEmpty()
     }
 
     @Test
@@ -794,16 +664,6 @@ class AbstractVideoPlayerTest {
         player.start()
 
         player.stop()
-
-        assertThat(player.isPlaying).isFalse()
-    }
-
-    @Test
-    fun `isPlaying is false after reset`() {
-        val player = SpyVideoPlayer()
-        player.start()
-
-        player.reset()
 
         assertThat(player.isPlaying).isFalse()
     }
@@ -900,13 +760,6 @@ class AbstractVideoPlayerTest {
     }
 
     @Test
-    fun `tcpSpeed is always zero`() {
-        val player = SpyVideoPlayer()
-
-        assertThat(player.tcpSpeed).isEqualTo(0L)
-    }
-
-    @Test
     fun `debugInfo is non-empty`() {
         val player = SpyVideoPlayer()
 
@@ -998,19 +851,6 @@ class AbstractVideoPlayerTest {
     }
 
     @Test
-    fun `seekBack and seekForward dispatch with correct increments`() {
-        val player = SpyVideoPlayer()
-        val listener = TestListener()
-        player.setPlayerEventListener(listener)
-
-        player.simulateSeekBack(5000L)
-        player.simulateSeekForward(10000L)
-
-        assertThat(listener.seekBackMs).isEqualTo(5000L)
-        assertThat(listener.seekForwardMs).isEqualTo(10000L)
-    }
-
-    @Test
     fun `full playback lifecycle with callbacks`() {
         val player = SpyVideoPlayer()
         val listener = TestListener()
@@ -1040,21 +880,6 @@ class AbstractVideoPlayerTest {
     }
 
     @Test
-    fun `reset clears playback state`() {
-        val player = SpyVideoPlayer()
-
-        player.start()
-        player.seekTo(60000L)
-        player.setTestDuration(120000L)
-
-        player.reset()
-
-        assertThat(player.isPlaying).isFalse()
-        assertThat(player.currentPosition).isEqualTo(0L)
-        assertThat(player.duration).isEqualTo(0L)
-    }
-
-    @Test
     fun `release is callable without side effects on state queries`() {
         val player = SpyVideoPlayer()
 
@@ -1069,7 +894,7 @@ class AbstractVideoPlayerTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun `VideoPlayerListener has all nine callback methods`() {
+    fun `VideoPlayerListener has all seven callback methods`() {
         // 过滤合成方法（默认实现会生成 access$...$jd 合成桥接）
         val methods = VideoPlayerListener::class.java.declaredMethods.filterNot { it.isSynthetic }
 
@@ -1081,8 +906,6 @@ class AbstractVideoPlayerTest {
             "onPause",
             "onBuffering",
             "onEnd",
-            "onSeekBack",
-            "onSeekForward",
         )
     }
 
@@ -1092,20 +915,6 @@ class AbstractVideoPlayerTest {
 
         assertThat(method.parameterCount).isEqualTo(1)
         assertThat(method.parameterTypes[0]).isEqualTo(Exception::class.java)
-    }
-
-    @Test
-    fun `VideoPlayerListener onSeekBack accepts Long parameter`() {
-        val method = VideoPlayerListener::class.java.getDeclaredMethod("onSeekBack", Long::class.javaPrimitiveType)
-
-        assertThat(method.parameterCount).isEqualTo(1)
-    }
-
-    @Test
-    fun `VideoPlayerListener onSeekForward accepts Long parameter`() {
-        val method = VideoPlayerListener::class.java.getDeclaredMethod("onSeekForward", Long::class.javaPrimitiveType)
-
-        assertThat(method.parameterCount).isEqualTo(1)
     }
 
     @Test

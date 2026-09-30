@@ -1,9 +1,9 @@
 package dev.frost819.newbv.app.viewmodel.search
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.app.testutil.InMemoryPreferencesDataStore
 import dev.frost819.newbv.biliapi.repositories.SearchFilterDuration
 import dev.frost819.newbv.biliapi.repositories.SearchFilterOrderType
 import dev.frost819.newbv.biliapi.repositories.SearchRepository
@@ -14,9 +14,7 @@ import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -29,7 +27,6 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import java.io.File
 
 /**
  * [SearchResultViewModel] 的单元测试。
@@ -51,14 +48,7 @@ class SearchResultViewModelTest {
         @BeforeAll
         fun initPrefs() {
             Prefs.resetForTesting()
-            val scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
-            val file = File.createTempFile("test_search_result_vm", ".preferences_pb")
-            file.deleteOnExit()
-            testDataStore =
-                PreferenceDataStoreFactory.create(
-                    scope = scope,
-                    produceFile = { file },
-                )
+            testDataStore = InMemoryPreferencesDataStore()
             Prefs.init(testDataStore)
         }
 

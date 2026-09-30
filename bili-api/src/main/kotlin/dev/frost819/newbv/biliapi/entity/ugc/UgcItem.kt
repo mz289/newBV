@@ -102,20 +102,6 @@ data class UgcItem(
             )
         }
 
-        @Deprecated("User region v2 instead")
-        fun fromRegionDynamicListItem(item: dev.frost819.newbv.biliapi.http.entity.region.RegionDynamicList.Item) =
-            UgcItem(
-                aid = item.param.toLong(),
-                title = item.title,
-                duration = item.duration,
-                author = item.name,
-                authorMid = null,
-                cover = item.cover,
-                play = item.play ?: -1,
-                danmaku = item.danmaku ?: -1,
-                pubTime = item.pubDate.smartDate,
-            )
-
         fun fromRegionRcmdArchive(archive: dev.frost819.newbv.biliapi.http.entity.region.RegionFeedRcmd.Archive) =
             UgcItem(
                 aid = archive.aid,

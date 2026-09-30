@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.VideoInfoRepository
 import dev.frost819.newbv.app.entity.player.VideoListItem
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.FavoriteFolderMetadata
 import dev.frost819.newbv.biliapi.entity.video.VideoDetail
@@ -17,8 +18,6 @@ import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.biliapi.repositories.VideoDetailRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -71,11 +70,6 @@ sealed interface VideoDetailUiEffect {
     /** 显示 Toast 消息。 */
     data class ShowToast(
         val message: String,
-    ) : VideoDetailUiEffect
-
-    /** 跳转到 PGC 番剧详情页。 */
-    data class NavigateToSeason(
-        val epid: Int,
     ) : VideoDetailUiEffect
 }
 
@@ -209,9 +203,7 @@ class VideoDetailViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load video detail: $aid" }
                     _uiState.update {
                         it.copy(

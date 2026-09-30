@@ -29,7 +29,12 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import dev.frost819.newbv.core.focus.focusShakeTarget
 import dev.frost819.newbv.core.focus.touchClickable
+import dev.frost819.newbv.core.theme.LocalFocusOutlineColor
+
+/** 封面圆角：与视频卡统一的 8dp。 */
+private val coverShape = RoundedCornerShape(8.dp)
 
 /**
  * 直播卡片。
@@ -51,15 +56,17 @@ fun LiveRoomCard(
             onClick = onClick,
             modifier =
                 Modifier
+                    .focusShakeTarget()
+                    .padding(horizontal = 6.dp, vertical = 6.dp)
                     .fillMaxWidth()
                     .aspectRatio(1.78f)
                     .touchClickable(onClick = onClick),
-            shape = CardDefaults.shape(MaterialTheme.shapes.large),
+            shape = CardDefaults.shape(RoundedCornerShape(8.dp)),
             border =
                 CardDefaults.border(
                     focusedBorder =
                         Border(
-                            border = androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.border),
+                            border = androidx.compose.foundation.BorderStroke(3.dp, LocalFocusOutlineColor.current),
                             shape = MaterialTheme.shapes.large,
                         ),
                 ),
@@ -90,13 +97,13 @@ private fun LiveCardCover(
         modifier =
             modifier
                 .fillMaxSize()
-                .clip(MaterialTheme.shapes.large),
+                .clip(coverShape),
     ) {
         AsyncImage(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .clip(MaterialTheme.shapes.large),
+                    .clip(coverShape),
             model = cover,
             contentDescription = null,
             contentScale = ContentScale.Crop,

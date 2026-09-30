@@ -11,7 +11,6 @@ import dev.frost819.newbv.biliapi.entity.video.VideoPage
  * @property aid 视频 AV 号
  * @property cid 视频 CID
  * @property epid 番剧分集 ID，UGC 视频为 null
- * @property seasonId 番剧 season ID，UGC 视频为 null
  * @property title 视频标题
  * @property ugcPages UGC 合集内的分 P 列表，无分 P 时为 null
  */
@@ -19,7 +18,6 @@ data class VideoListItem(
     val aid: Long,
     val cid: Long,
     val epid: Int? = null,
-    val seasonId: Int? = null,
     val title: String,
     val ugcPages: List<VideoPage>? = null,
 )

@@ -25,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -48,7 +47,7 @@ import dev.frost819.newbv.data.datastore.Prefs
  * 左侧 [NavigationDrawer]（永久展开）+ 右侧内容区（[AnimatedContent] 切换）。
  *
  * 左侧栏：用户头像（点击显示 [UserPanel]）+ 6 导航项 + 设置。
- * 内容区：Home / Search / Personal / UGC / PGC / Live（后 5 项为占位）。
+ * 内容区：Home / Search / Personal / UGC / PGC / Live。
  *
  * 双击返回退出：首次返回显示 Toast，3 秒内再次返回退出 App。
  *
@@ -240,29 +239,5 @@ fun MainScreen(
                 }
             }
         }
-    }
-}
-
-/**
- * 占位内容（UGC/PGC/Live 等未实现的页面）。
- */
-@Composable
-private fun PlaceholderContent(title: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        androidx.tv.material3.Text(
-            text = "$title (待实现)",
-            style = androidx.tv.material3.MaterialTheme.typography.displaySmall,
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun PlaceholderContentPreview() {
-    dev.frost819.newbv.core.theme.BVTheme {
-        PlaceholderContent(title = "分区")
     }
 }

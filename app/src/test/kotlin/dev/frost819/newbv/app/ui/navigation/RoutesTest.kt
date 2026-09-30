@@ -89,16 +89,6 @@ class RoutesTest {
     }
 
     @Test
-    fun `SeasonPlayerRoute serializes correctly`() {
-        val route = SeasonPlayerRoute(epid = 1L, sid = 2L, title = "Anime")
-        val encoded = json.encodeToString(route)
-        val decoded = json.decodeFromString<SeasonPlayerRoute>(encoded)
-        assertThat(decoded.epid).isEqualTo(1L)
-        assertThat(decoded.sid).isEqualTo(2L)
-        assertThat(decoded.title).isEqualTo("Anime")
-    }
-
-    @Test
     fun `LivePlayerRoute serializes correctly`() {
         val route = LivePlayerRoute(roomId = 999L, title = "Live Stream")
         val encoded = json.encodeToString(route)
@@ -135,13 +125,6 @@ class RoutesTest {
     fun `VideoPlayerRoute defaults are correct`() {
         val route = VideoPlayerRoute(aid = 1L, cid = 2L)
         assertThat(route.epid).isNull()
-        assertThat(route.title).isEmpty()
-        assertThat(route.cover).isEmpty()
-    }
-
-    @Test
-    fun `SeasonPlayerRoute defaults are correct`() {
-        val route = SeasonPlayerRoute(epid = 1L, sid = 2L)
         assertThat(route.title).isEmpty()
         assertThat(route.cover).isEmpty()
     }

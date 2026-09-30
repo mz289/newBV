@@ -4,6 +4,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.FavoriteFolderData
 import dev.frost819.newbv.biliapi.entity.FavoriteFolderMetadata
 import dev.frost819.newbv.biliapi.entity.FavoriteItem
@@ -18,8 +20,6 @@ import dev.frost819.newbv.biliapi.repositories.SeasonRepository
 import dev.frost819.newbv.biliapi.repositories.ToViewRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,9 +29,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-
-/** 网络请求超时时间（毫秒）。 */
-private const val LOAD_TIMEOUT_MS = 10_000L
 
 /** PersonalViewModel 的 UI 效果（一次性事件）。 */
 sealed interface PersonalUiEffect {
@@ -156,9 +153,7 @@ class PersonalViewModel
                         toViewItems.addAll(data.data)
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load toview" }
                     _uiState.update { it.copy(toViewError = true) }
                 }
@@ -186,9 +181,7 @@ class PersonalViewModel
                     toViewItems.removeAll { it.oid == aid }
                     _effect.emit(PersonalUiEffect.ShowToast("已移除稍后再看"))
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to delete toview $aid" }
                     _effect.emit(PersonalUiEffect.ShowToast("移除失败: ${error.message ?: "未知错误"}"))
                 }
@@ -237,9 +230,7 @@ class PersonalViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load history" }
                     _uiState.update { it.copy(historyError = true) }
                 }
@@ -290,9 +281,7 @@ class PersonalViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load favorite folders" }
                     _uiState.update { it.copy(favoriteError = true) }
                 }
@@ -353,9 +342,7 @@ class PersonalViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load favorite items for folder $folderId" }
                     _uiState.update { it.copy(favoriteError = true) }
                 }
@@ -415,9 +402,7 @@ class PersonalViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load following seasons" }
                     _uiState.update { it.copy(followingError = true) }
                 }

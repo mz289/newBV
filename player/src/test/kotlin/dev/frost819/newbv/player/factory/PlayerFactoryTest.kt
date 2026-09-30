@@ -17,8 +17,6 @@ class PlayerFactoryTest {
     private class DummyPlayer : AbstractVideoPlayer() {
         override fun initPlayer() {}
 
-        override fun setHeader(headers: Map<String, String>) {}
-
         override fun playUrl(
             videoUrl: String?,
             audioUrl: String?,
@@ -31,8 +29,6 @@ class PlayerFactoryTest {
         override fun pause() {}
 
         override fun stop() {}
-
-        override fun reset() {}
 
         override val isPlaying: Boolean = false
 
@@ -47,7 +43,6 @@ class PlayerFactoryTest {
         override fun setOptions() {}
 
         override var speed: Float = 1.0f
-        override val tcpSpeed: Long = 0L
         override val debugInfo: String = "dummy"
         override val videoWidth: Int = 1920
         override val videoHeight: Int = 1080

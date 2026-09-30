@@ -33,6 +33,7 @@ import dev.frost819.newbv.app.entity.player.VideoAspectRatio
 import dev.frost819.newbv.app.ui.state.player.LocalMenuFocusStateData
 import dev.frost819.newbv.app.ui.state.player.MenuFocusState
 import dev.frost819.newbv.app.ui.state.player.MenuFocusStateData
+import dev.frost819.newbv.app.ui.state.player.PlayerOverlayState
 import dev.frost819.newbv.app.ui.state.player.PlayerUiState
 import dev.frost819.newbv.app.ui.state.player.VideoPlayerMenuNavItem
 import dev.frost819.newbv.biliapi.entity.video.Subtitle
@@ -74,6 +75,7 @@ fun MenuController(
     modifier: Modifier = Modifier,
     show: Boolean,
     uiState: PlayerUiState,
+    overlayState: PlayerOverlayState,
     onResolutionChange: (Int) -> Unit = {},
     onCodecChange: (VideoCodec) -> Unit = {},
     onAspectRatioChange: (VideoAspectRatio) -> Unit,
@@ -113,6 +115,7 @@ fun MenuController(
         ) {
             MenuControllerContent(
                 uiState = uiState,
+                overlayState = overlayState,
                 onResolutionChange = onResolutionChange,
                 onCodecChange = onCodecChange,
                 onAspectRatioChange = onAspectRatioChange,
@@ -140,6 +143,7 @@ fun MenuController(
 @Suppress("LongParameterList")
 private fun MenuControllerContent(
     uiState: PlayerUiState,
+    overlayState: PlayerOverlayState,
     onResolutionChange: (Int) -> Unit,
     onCodecChange: (VideoCodec) -> Unit,
     onAspectRatioChange: (VideoAspectRatio) -> Unit,
@@ -175,6 +179,7 @@ private fun MenuControllerContent(
             ) {
                 MenuList(
                     uiState = uiState,
+                    overlayState = overlayState,
                     selectedNavMenu = selectedNavItem,
                     onResolutionChange = onResolutionChange,
                     onCodecChange = onCodecChange,
@@ -224,6 +229,7 @@ private fun MenuControllerContent(
 @Suppress("LongParameterList")
 private fun MenuList(
     uiState: PlayerUiState,
+    overlayState: PlayerOverlayState,
     selectedNavMenu: VideoPlayerMenuNavItem,
     onResolutionChange: (Int) -> Unit,
     onCodecChange: (VideoCodec) -> Unit,
@@ -268,14 +274,14 @@ private fun MenuList(
                 )
 
             VideoPlayerMenuNavItem.Danmaku -> {
-                val dataTypes = uiState.danmakuState.enabledTypes.toDataDanmakuTypes()
+                val dataTypes = overlayState.danmakuState.enabledTypes.toDataDanmakuTypes()
                 DanmakuMenuList(
                     currentEnabledTypes = dataTypes,
-                    currentScale = uiState.danmakuState.scale,
-                    currentOpacity = uiState.danmakuState.opacity,
-                    currentSpeedFactor = uiState.danmakuState.speedFactor,
-                    currentArea = uiState.danmakuState.area,
-                    currentMaskEnabled = uiState.danmakuState.maskEnabled,
+                    currentScale = overlayState.danmakuState.scale,
+                    currentOpacity = overlayState.danmakuState.opacity,
+                    currentSpeedFactor = overlayState.danmakuState.speedFactor,
+                    currentArea = overlayState.danmakuState.area,
+                    currentMaskEnabled = overlayState.danmakuState.maskEnabled,
                     onDanmakuSwitchChange = onDanmakuSwitchChange,
                     onDanmakuSizeChange = onDanmakuSizeChange,
                     onDanmakuOpacityChange = onDanmakuOpacityChange,
@@ -300,15 +306,15 @@ private fun MenuList(
                                 aiStatus = SubtitleAiStatus.None,
                             ),
                         )
-                        addAll(uiState.subtitleList)
+                        addAll(overlayState.subtitleList)
                         sortBy { it.id }
                     }
                 ClosedCaptionMenuList(
-                    currentSubtitleId = uiState.subtitleId,
+                    currentSubtitleId = overlayState.subtitleId,
                     availableSubtitleTracks = subtitleTracks,
-                    currentFontSize = uiState.subtitleState.fontSize,
-                    currentOpacity = uiState.subtitleState.opacity,
-                    currentPadding = uiState.subtitleState.bottomPadding,
+                    currentFontSize = overlayState.subtitleState.fontSize,
+                    currentOpacity = overlayState.subtitleState.opacity,
+                    currentPadding = overlayState.subtitleState.bottomPadding,
                     onSubtitleChange = onSubtitleChange,
                     onSubtitleSizeChange = onSubtitleSizeChange,
                     onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,

@@ -10,6 +10,8 @@ data class PgcItem(
     var episodeId: Int,
     var seasonType: SeasonIndexType,
     var rating: String,
+    /** 最新一话时长（秒），仅番剧/国创 feed 提供。 */
+    var duration: Int? = null,
 ) {
     companion object {
         fun fromFeedSubItem(feedSubItem: dev.frost819.newbv.biliapi.http.entity.pgc.PgcFeedData.FeedSubItem): PgcItem =
@@ -34,6 +36,7 @@ data class PgcItem(
                 episodeId = feedSubItem.episodeId ?: feedSubItem.inline!!.epId,
                 seasonType = SeasonIndexType.fromId(feedSubItem.seasonType!!),
                 rating = feedSubItem.rating ?: "0",
+                duration = feedSubItem.stat?.duration,
             )
 
         fun fromIndexResultItem(

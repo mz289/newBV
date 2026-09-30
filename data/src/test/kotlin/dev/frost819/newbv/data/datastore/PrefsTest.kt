@@ -1,14 +1,11 @@
 package dev.frost819.newbv.data.datastore
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.core.theme.ThemeMode
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import dev.frost819.newbv.data.testutil.InMemoryPreferencesDataStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
@@ -32,11 +29,7 @@ class PrefsTest {
             kotlin.io.path
                 .createTempDirectory(prefix = "prefs_test")
                 .toFile()
-        dataStore =
-            PreferenceDataStoreFactory.create(
-                scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-                produceFile = { File(tempDir, "Test.preferences_pb") },
-            )
+        dataStore = InMemoryPreferencesDataStore()
         Prefs.resetForTesting()
         Prefs.init(dataStore)
     }

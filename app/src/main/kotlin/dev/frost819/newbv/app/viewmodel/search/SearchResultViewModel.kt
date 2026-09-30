@@ -6,14 +6,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.state.search.SearchResultItem
 import dev.frost819.newbv.app.ui.state.search.SearchResultUiState
 import dev.frost819.newbv.app.ui.state.search.TypedSearchResult
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.repositories.SearchFilterDuration
 import dev.frost819.newbv.biliapi.repositories.SearchFilterOrderType
 import dev.frost819.newbv.biliapi.repositories.SearchRepository
 import dev.frost819.newbv.biliapi.repositories.SearchType
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -37,7 +37,6 @@ class SearchResultViewModel
         private val logger = Loggers.get("SearchResultViewModel")
 
         companion object {
-            private const val LOAD_TIMEOUT_MS = 10_000L
         }
 
         private val _uiState = MutableStateFlow(SearchResultUiState())
@@ -149,9 +148,7 @@ class SearchResultViewModel
                         "Loaded search result: type=$type, new=${newItems.size}, total=${result.items.size + newItems.size}"
                     }
                 }.onFailure { e ->
-                    if (e is CancellationException && e !is TimeoutCancellationException) {
-                        throw e
-                    }
+                    e.rethrowUnlessTimeout()
                     logger.warn { "Failed to load search result: type=$type, $e" }
                     updateResult(type) { it.copy(isLoading = false, error = true) }
                 }

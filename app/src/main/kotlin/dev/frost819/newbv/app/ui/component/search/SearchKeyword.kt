@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.tv.material3.DenseListItem
 import androidx.tv.material3.Text
+import dev.frost819.newbv.core.focus.focusShakeTarget
 
 /**
  * 搜索关键词列表项。
@@ -23,7 +24,7 @@ fun SearchKeyword(
     trailingIcon: @Composable (() -> Unit)? = null,
 ) {
     DenseListItem(
-        modifier = modifier,
+        modifier = modifier.focusShakeTarget(),
         selected = false,
         onClick = onClick,
         headlineContent = {

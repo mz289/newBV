@@ -10,6 +10,7 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.Text
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.focusShakeTarget
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -34,6 +35,7 @@ fun SettingListItem(
     ListItem(
         modifier =
             modifier
+                .focusShakeTarget()
                 .padding(horizontal = 12.dp)
                 .touchClickable(onClick = onClick),
         headlineContent = { Text(text = title) },

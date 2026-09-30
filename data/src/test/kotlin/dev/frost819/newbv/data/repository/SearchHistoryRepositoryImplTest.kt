@@ -1,18 +1,15 @@
 package dev.frost819.newbv.data.repository
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.db.dao.SearchHistoryDao
 import dev.frost819.newbv.data.db.entity.SearchHistoryEntity
+import dev.frost819.newbv.data.testutil.InMemoryPreferencesDataStore
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -40,11 +37,7 @@ class SearchHistoryRepositoryImplTest {
             kotlin.io.path
                 .createTempDirectory(prefix = "repo_test")
                 .toFile()
-        dataStore =
-            PreferenceDataStoreFactory.create(
-                scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-                produceFile = { File(tempDir, "Test.preferences_pb") },
-            )
+        dataStore = InMemoryPreferencesDataStore()
         Prefs.resetForTesting()
         Prefs.init(dataStore)
 

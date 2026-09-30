@@ -12,11 +12,9 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -25,8 +23,10 @@ import androidx.navigation.NavController
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import dev.frost819.newbv.app.ui.component.FocusSaver
+import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.VIDEO_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
@@ -38,8 +38,6 @@ import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
 import dev.frost819.newbv.app.viewmodel.personal.PersonalViewModel
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 
 /**
  * 收藏页面。
@@ -77,20 +75,15 @@ fun FavoriteScreen(
         return
     }
 
-    LaunchedEffect(gridState) {
-        snapshotFlow {
-            gridState.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index
-        }.distinctUntilChanged()
-            .filter { index ->
-                index != null && index >= state.favoriteItems.size - 20
-            }.collect {
-                if (state.currentFolderId != -1L) {
-                    viewModel.loadFavoriteItems(state.currentFolderId)
-                }
+    InfiniteScrollEffect(
+        state = gridState,
+        itemCount = { state.favoriteItems.size },
+        onLoadMore = {
+            if (state.currentFolderId != -1L) {
+                viewModel.loadFavoriteItems(state.currentFolderId)
             }
-    }
+        },
+    )
 
     Column(modifier = modifier.fillMaxSize()) {
         if (state.favoriteFolders.isNotEmpty()) {
@@ -148,7 +141,7 @@ fun FavoriteScreen(
 
         TvLazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Fixed(4),
+            columns = GridCells.Adaptive(VIDEO_CARD_MIN_WIDTH),
             contentPadding = PaddingValues(24.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -192,6 +185,7 @@ fun FavoriteScreen(
                     isError = state.favoriteError,
                     hasMore = state.favoriteHasMore,
                     itemsIsEmpty = state.favoriteItems.isEmpty(),
+                    onRetry = viewModel::refreshFavorite,
                 )
             }
         }

@@ -31,6 +31,7 @@ import androidx.tv.material3.Tab
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.TabRowScope
 import androidx.tv.material3.Text
+import dev.frost819.newbv.core.focus.controlFocusOutline
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -40,19 +41,21 @@ import dev.frost819.newbv.core.focus.touchClickable
  * Tab 切换时触发 [onSelectedChanged]，点击同一 Tab 触发 [onClick]（用于刷新）。
  *
  * @param items Tab 项列表（已按首选项排序）。
+ * @param displayName Tab 项显示名称。
  * @param selectedIndex 当前选中的 Tab 索引（由外部控制，用于导航返回后恢复）。
  * @param isLargePadding 内容区未获焦点时使用较大内边距。
  * @param onSelectedChanged Tab 焦点切换回调。
  * @param onClick Tab 点击回调。
  */
 @Composable
-fun TopNav(
+fun <T> TopNav(
     modifier: Modifier = Modifier,
-    items: List<TopNavItem>,
+    items: List<T>,
+    displayName: (T) -> String,
     selectedIndex: Int = 0,
     isLargePadding: Boolean,
-    onSelectedChanged: (TopNavItem) -> Unit = {},
-    onClick: (TopNavItem) -> Unit = {},
+    onSelectedChanged: (T) -> Unit = {},
+    onClick: (T) -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
 
@@ -70,8 +73,8 @@ fun TopNav(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(12.dp, verticalPadding),
-        horizontalArrangement = Arrangement.Center,
+                .padding(horizontal = 24.dp, vertical = verticalPadding),
+        horizontalArrangement = Arrangement.Start,
     ) {
         TabRow(
             modifier =
@@ -84,7 +87,7 @@ fun TopNav(
             items.forEachIndexed { index, tab ->
                 NavItemTab(
                     modifier = if (index == 0) Modifier.focusRequester(focusRequester) else Modifier,
-                    topNavItem = tab,
+                    text = displayName(tab),
                     selected = index == selectedTabIndex,
                     onFocus = {
                         selectedTabIndex = index
@@ -100,16 +103,17 @@ fun TopNav(
 @Composable
 private fun TabRowScope.NavItemTab(
     modifier: Modifier = Modifier,
-    topNavItem: TopNavItem,
+    text: String,
     selected: Boolean,
     onClick: () -> Unit,
     onFocus: () -> Unit,
 ) {
-    // 统一使用品牌青绿作为 TopNav 强调色，避免各页面颜色不一致
-    val accentColor = MaterialTheme.colorScheme.secondary
+    // 强调色统一为主品牌色（P0-1）：全应用的选中态只用一个色相
+    val accentColor = MaterialTheme.colorScheme.primary
+    // 扁平文字 Tab（P1-3）：选中态靠文字变色表达，仅保留极淡的底色作辅助
     val containerColor =
         if (selected) {
-            accentColor.copy(alpha = 0.14f)
+            accentColor.copy(alpha = 0.08f)
         } else {
             Color.Transparent
         }
@@ -117,7 +121,7 @@ private fun TabRowScope.NavItemTab(
     Tab(
         modifier =
             modifier
-                .padding(6.dp)
+                .controlFocusOutline()
                 .clip(RoundedCornerShape(8.dp))
                 .background(containerColor)
                 .touchClickable(onClick = onClick),
@@ -135,7 +139,7 @@ private fun TabRowScope.NavItemTab(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = topNavItem.displayName,
+                text = text,
                 color = if (selected) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
             )
@@ -143,28 +147,13 @@ private fun TabRowScope.NavItemTab(
     }
 }
 
-/**
- * 顶部导航项接口。
- */
-interface TopNavItem {
-    val displayName: String
-}
-
-private data class DummyTopNavItem(
-    override val displayName: String,
-) : TopNavItem
-
 @Preview(showBackground = true)
 @Composable
 private fun TopNavPreview() {
     dev.frost819.newbv.core.theme.BVTheme {
         TopNav(
-            items =
-                listOf(
-                    DummyTopNavItem("推荐"),
-                    DummyTopNavItem("热门"),
-                    DummyTopNavItem("动态"),
-                ),
+            items = listOf("推荐", "热门", "动态"),
+            displayName = { it },
             isLargePadding = true,
         )
     }

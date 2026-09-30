@@ -6,11 +6,9 @@ import com.tfowl.ktor.client.plugins.JsoupPlugin
 import dev.frost819.newbv.biliapi.entity.SpiData
 import dev.frost819.newbv.biliapi.entity.SpiResult
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
-import dev.frost819.newbv.biliapi.http.BiliHttpApi.getRegionDynamic
 import dev.frost819.newbv.biliapi.http.entity.BiliResponse
 import dev.frost819.newbv.biliapi.http.entity.BiliResponseWithoutData
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
-import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuResponse
 import dev.frost819.newbv.biliapi.http.entity.dynamic.DynamicData
 import dev.frost819.newbv.biliapi.http.entity.history.HistoryData
 import dev.frost819.newbv.biliapi.http.entity.home.RcmdIndexData
@@ -18,12 +16,10 @@ import dev.frost819.newbv.biliapi.http.entity.home.RcmdTopData
 import dev.frost819.newbv.biliapi.http.entity.index.IndexResultData
 import dev.frost819.newbv.biliapi.http.entity.pgc.PgcFeedData
 import dev.frost819.newbv.biliapi.http.entity.pgc.PgcFeedV3Data
+import dev.frost819.newbv.biliapi.http.entity.pgc.PgcPageTabData
 import dev.frost819.newbv.biliapi.http.entity.pgc.PgcWebInitialStateData
-import dev.frost819.newbv.biliapi.http.entity.region.RegionDynamic
-import dev.frost819.newbv.biliapi.http.entity.region.RegionDynamicList
+import dev.frost819.newbv.biliapi.http.entity.pgc.PgcWebRankData
 import dev.frost819.newbv.biliapi.http.entity.region.RegionFeedRcmd
-import dev.frost819.newbv.biliapi.http.entity.region.RegionLocs
-import dev.frost819.newbv.biliapi.http.entity.search.AppSearchSquareData
 import dev.frost819.newbv.biliapi.http.entity.search.KeywordSuggest
 import dev.frost819.newbv.biliapi.http.entity.search.SearchResultData
 import dev.frost819.newbv.biliapi.http.entity.search.SearchTendingData
@@ -40,16 +36,11 @@ import dev.frost819.newbv.biliapi.http.entity.user.FollowActionSource
 import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
 import dev.frost819.newbv.biliapi.http.entity.user.RelationData
 import dev.frost819.newbv.biliapi.http.entity.user.RelationStat
-import dev.frost819.newbv.biliapi.http.entity.user.UserCardData
 import dev.frost819.newbv.biliapi.http.entity.user.UserFollowData
 import dev.frost819.newbv.biliapi.http.entity.user.UserInfoData
 import dev.frost819.newbv.biliapi.http.entity.user.WebSpaceVideoData
-import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteFolderInfo
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteFolderInfoListData
-import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteItemIdListResponse
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.UserFavoriteFoldersData
-import dev.frost819.newbv.biliapi.http.entity.user.garb.Equip
-import dev.frost819.newbv.biliapi.http.entity.user.garb.EquipPart
 import dev.frost819.newbv.biliapi.http.entity.video.AddCoin
 import dev.frost819.newbv.biliapi.http.entity.video.CheckSentCoin
 import dev.frost819.newbv.biliapi.http.entity.video.CheckVideoFavoured
@@ -57,13 +48,8 @@ import dev.frost819.newbv.biliapi.http.entity.video.OneClickTripleAction
 import dev.frost819.newbv.biliapi.http.entity.video.OnlineTotal
 import dev.frost819.newbv.biliapi.http.entity.video.OnlineTotalApp
 import dev.frost819.newbv.biliapi.http.entity.video.PlayUrlData
-import dev.frost819.newbv.biliapi.http.entity.video.PlayUrlV2Data
 import dev.frost819.newbv.biliapi.http.entity.video.PopularVideoData
-import dev.frost819.newbv.biliapi.http.entity.video.RelatedVideosResponse
 import dev.frost819.newbv.biliapi.http.entity.video.SetVideoFavorite
-import dev.frost819.newbv.biliapi.http.entity.video.Tag
-import dev.frost819.newbv.biliapi.http.entity.video.TagDetail
-import dev.frost819.newbv.biliapi.http.entity.video.TagTopVideosResponse
 import dev.frost819.newbv.biliapi.http.entity.video.Timeline
 import dev.frost819.newbv.biliapi.http.entity.video.TimelineAppData
 import dev.frost819.newbv.biliapi.http.entity.video.VideoDetail
@@ -72,7 +58,6 @@ import dev.frost819.newbv.biliapi.http.entity.video.VideoMoreInfo
 import dev.frost819.newbv.biliapi.http.entity.video.VideoShot
 import dev.frost819.newbv.biliapi.http.entity.web.NavResponseData
 import dev.frost819.newbv.biliapi.http.plugins.BiliUserAgent
-import dev.frost819.newbv.biliapi.http.util.BiliAppConf
 import dev.frost819.newbv.biliapi.http.util.encApiSign
 import dev.frost819.newbv.biliapi.http.util.injectCookies
 import io.ktor.client.HttpClient
@@ -100,13 +85,11 @@ import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.jsoup.nodes.Document
 import java.io.InputStream
-import javax.xml.parsers.DocumentBuilderFactory
 
 @Suppress("SpellCheckingInspection")
 object BiliHttpApi {
@@ -351,137 +334,6 @@ object BiliHttpApi {
     }
 
     /**
-     * 获取剧集视频流
-     */
-    suspend fun getPgcVideoPlayUrl(
-        av: Long? = null,
-        bv: String? = null,
-        epid: Int? = null,
-        cid: Long? = null,
-        qn: Int? = null,
-        fnval: Int? = null,
-        fnver: Int? = null,
-        fourk: Int? = null,
-        session: String? = null,
-        supportMultiAudio: Boolean? = null,
-        drmTechType: Int? = null,
-        fromClient: String? = null,
-    ): BiliResponse<PlayUrlData> =
-        client
-            .get("/pgc/player/web/playurl") {
-                require(av != null || bv != null) { "av and bv cannot be null at the same time" }
-                require(epid != null || cid != null) { "epid and cid cannot be null at the same time" }
-                av?.let { parameter("avid", it) }
-                bv?.let { parameter("bvid", it) }
-                epid?.let { parameter("ep_id", it) }
-                cid?.let { parameter("cid", it) }
-                qn?.let { parameter("qn", it) }
-                fnval?.let { parameter("fnval", it) }
-                fnver?.let { parameter("fnver", it) }
-                fourk?.let { parameter("fourk", it) }
-                session?.let { parameter("session", it) }
-                supportMultiAudio?.let { parameter("support_multi_audio", it) }
-                drmTechType?.let { parameter("drm_tech_type", it) }
-                fromClient?.let { parameter("from_client", it) }
-                header("referer", "https://www.bilibili.com")
-            }.body()
-
-    /**
-     * 获取剧集视频流 v2
-     */
-    suspend fun getPgcVideoPlayUrlV2(
-        av: Long? = null,
-        bv: String? = null,
-        epid: Int? = null,
-        cid: Long? = null,
-        qn: Int? = null,
-        fnval: Int? = null,
-        fnver: Int? = null,
-        fourk: Int? = null,
-        session: String? = null,
-        supportMultiAudio: Boolean? = null,
-        drmTechType: Int? = null,
-        fromClient: String? = null,
-    ): BiliResponse<PlayUrlV2Data> =
-        client
-            .get("/pgc/player/web/v2/playurl") {
-                av?.let { parameter("avid", it) }
-                bv?.let { parameter("bvid", it) }
-                epid?.let { parameter("ep_id", it) }
-                cid?.let { parameter("cid", it) }
-                qn?.let { parameter("qn", it) }
-                fnval?.let { parameter("fnval", it) }
-                fnver?.let { parameter("fnver", it) }
-                fourk?.let { parameter("fourk", it) }
-                session?.let { parameter("session", it) }
-                supportMultiAudio?.let { parameter("support_multi_audio", it) }
-                drmTechType?.let { parameter("drm_tech_type", it) }
-                fromClient?.let { parameter("from_client", it) }
-                header("referer", "https://www.bilibili.com")
-            }.body()
-
-    /**
-     * 通过[cid]获取视频弹幕
-     */
-    suspend fun getDanmakuXml(cid: Long): DanmakuResponse {
-        val xmlChannel =
-            client
-                .get("/x/v1/dm/list.so") {
-                    parameter("oid", cid)
-                }.bodyAsChannel()
-
-        val dbFactory = DocumentBuilderFactory.newInstance()
-        val dBuilder = dbFactory.newDocumentBuilder()
-        val doc =
-            withContext(Dispatchers.IO) {
-                dBuilder.parse(xmlChannel.toInputStream())
-            }
-        doc.documentElement.normalize()
-
-        val chatServer = doc.getElementsByTagName("chatserver").item(0).textContent
-        val chatId =
-            doc
-                .getElementsByTagName("chatid")
-                .item(0)
-                .textContent
-                .toLong()
-        val maxLimit =
-            doc
-                .getElementsByTagName("maxlimit")
-                .item(0)
-                .textContent
-                .toInt()
-        val state =
-            doc
-                .getElementsByTagName("state")
-                .item(0)
-                .textContent
-                .toInt()
-        val realName =
-            doc
-                .getElementsByTagName("real_name")
-                .item(0)
-                .textContent
-                .toInt()
-        val source =
-            runCatching {
-                doc.getElementsByTagName("source").item(0).textContent
-            }.getOrDefault("")
-
-        val data = mutableListOf<DanmakuData>()
-        val danmakuNodes = doc.getElementsByTagName("d")
-
-        for (i in 0 until danmakuNodes.length) {
-            val danmakuNode = danmakuNodes.item(i)
-            val p = danmakuNode.attributes.item(0).textContent
-            val text = danmakuNode.textContent
-            data.add(DanmakuData.fromString(p, text))
-        }
-
-        return DanmakuResponse(chatServer, chatId, maxLimit, state, realName, source, data)
-    }
-
-    /**
      * 获取视频弹幕分段（Web protobuf 接口）。
      *
      * 对应文档：docs/bilibili-API-collect-master/docs/danmaku/danmaku_proto.md
@@ -565,22 +417,6 @@ object BiliHttpApi {
         client
             .get("/x/space/wbi/acc/info") {
                 parameter("mid", uid)
-            }.body()
-
-    /**
-     * 获取用户[uid]的卡片信息
-     *
-     * @param uid 用户id
-     * @param photo 是否请求用户主页头图
-     */
-    suspend fun getUserCardInfo(
-        uid: Long,
-        photo: Boolean = false,
-    ): BiliResponse<UserCardData> =
-        client
-            .get("/x/web-interface/card") {
-                parameter("mid", uid)
-                parameter("photo", photo)
             }.body()
 
     /**
@@ -712,34 +548,6 @@ object BiliHttpApi {
     }
 
     /**
-     * 获取与视频[avid]或[bvid]有关的相关推荐视频
-     */
-    suspend fun getRelatedVideos(
-        avid: Long? = null,
-        bvid: String? = null,
-    ): RelatedVideosResponse =
-        client
-            .get("/x/web-interface/archive/related") {
-                require(avid != null || bvid != null) { "avid and bvid cannot be null at the same time" }
-                parameter("aid", avid)
-                parameter("bvid", bvid)
-            }.body()
-
-    /**
-     * 获取收藏夹[mediaId]的元数据
-     */
-    suspend fun getFavoriteFolderInfo(
-        mediaId: Long,
-        accessKey: String? = null,
-    ): BiliResponse<FavoriteFolderInfo> =
-        client
-            .get("/x/v3/fav/folder/info") {
-                checkToken(accessKey)
-                parameter("media_id", mediaId)
-                accessKey?.let { parameter("access_key", it) }
-            }.body()
-
-    /**
      * 获取用户[mid]的所有收藏夹信息
      *
      * @param type 目标内容属性 默认为全部 0：全部 2：视频稿件
@@ -792,22 +600,6 @@ object BiliHttpApi {
                 parameter("type", type)
                 parameter("ps", pageSize)
                 parameter("pn", pageNumber)
-                parameter("platform", platform)
-                accessKey?.let { parameter("access_key", it) }
-            }.body()
-
-    /**
-     * 获取收藏夹[mediaId]的全部内容id
-     */
-    suspend fun getFavoriteIdList(
-        mediaId: Long,
-        platform: String? = null,
-        accessKey: String? = null,
-    ): FavoriteItemIdListResponse =
-        client
-            .get("/x/v3/fav/resource/ids") {
-                checkToken(accessKey)
-                parameter("media_id", mediaId)
                 parameter("platform", platform)
                 accessKey?.let { parameter("access_key", it) }
             }.body()
@@ -1552,60 +1344,6 @@ object BiliHttpApi {
             }.body()
 
     /**
-     * 单独获取剧集[seasonId]的用户信息[WebSeasonData.UserStatus]
-     */
-    suspend fun getSeasonUserStatus(seasonId: Int): BiliResponse<WebSeasonData.UserStatus> =
-        client
-            .get("/pgc/view/web/season/user/status") {
-                parameter("season_id", seasonId)
-                header("referer", "https://www.bilibili.com")
-            }.body()
-
-    /**
-     * 获取视频[avid]/[bvid]的视频标签[Tag]
-     */
-    suspend fun getVideoTags(
-        avid: Long? = null,
-        bvid: String? = null,
-    ): BiliResponse<List<Tag>> =
-        client
-            .get("/x/tag/archive/tags") {
-                require(avid != null || bvid != null) { "avid and bvid cannot be null at the same time" }
-                avid?.let { parameter("aid", it) }
-                bvid?.let { parameter("bvid", it) }
-            }.body()
-
-    /**
-     * 获取视频标签[tagId]的详细信息，包含相关标签和最新视频
-     */
-    suspend fun getTagDetail(
-        tagId: Int,
-        pageNumber: Int,
-        pageSize: Int,
-    ): BiliResponse<TagDetail> =
-        client
-            .get("/x/tag/detail") {
-                parameter("tag_id", tagId)
-                parameter("pn", pageNumber)
-                parameter("ps", pageSize)
-            }.body()
-
-    /**
-     * 获取视频标签[tagId]的最热门的视频列表
-     */
-    suspend fun getTagTopVideos(
-        tagId: Int,
-        pageNumber: Int,
-        pageSize: Int,
-    ): TagTopVideosResponse =
-        client
-            .get("/x/web-interface/tag/top") {
-                parameter("tid", tagId)
-                parameter("pn", pageNumber)
-                parameter("ps", pageSize)
-            }.body()
-
-    /**
      * 获取剧集更新时间表
      *
      * @param type 番剧: 1 影视（貌似只有少数几个纪录片）: 3, 国创: 4
@@ -1730,25 +1468,6 @@ object BiliHttpApi {
             }.body()
 
     /**
-     * 获取搜索提示（App）
-     *
-     * @param limit 返回数量，上限仅为 10
-     * @param platform 平台标识
-     */
-    suspend fun getAppSearchSquare(
-        limit: Int = 10,
-        platform: String? = null,
-        // accessKey: String = ""
-    ): BiliResponse<List<AppSearchSquareData>> =
-        client
-            .get("https://app.bilibili.com/x/v2/search/square") {
-                parameter("limit", limit)
-                platform?.let { parameter("platform", platform) }
-                parameter("build", BiliAppConf.APP_BUILD_CODE)
-                // parameter("access_key", accessKey)
-            }.body()
-
-    /**
      * 获取搜索趋势（App）
      *
      * @param limit 返回数量
@@ -1757,8 +1476,6 @@ object BiliHttpApi {
         client
             .get("https://app.bilibili.com/x/v2/search/trending/ranking") {
                 parameter("limit", limit)
-                // platform?.let { parameter("platform", platform) }
-                // parameter("build", BiliAppConf.APP_BUILD_CODE)
             }.body()
 
     /**
@@ -1854,8 +1571,6 @@ object BiliHttpApi {
         val initinalData =
             runCatching {
                 json.decodeFromString<PgcWebInitialStateData>(dataJson)
-            }.onFailure {
-                println("parse initial state data failed: ${it.stackTraceToString()}")
             }.getOrNull() ?: throw IllegalStateException("parse initial state data failed")
         return initinalData
     }
@@ -1941,6 +1656,41 @@ object BiliHttpApi {
             }.body()
 
     /**
+     * 获取 PGC 热播榜（番剧/国创等各分区的排行榜）
+     *
+     * @param seasonType 分区类型：1 番剧 / 2 电影 / 3 纪录片 / 4 国创 / 5 电视剧 / 7 综艺
+     * @param day 统计天数
+     */
+    suspend fun getPgcRankList(
+        seasonType: Int,
+        day: Int = 3,
+    ): BiliResponse<PgcWebRankData> =
+        client
+            .get("/pgc/web/rank/list") {
+                parameter("season_type", seasonType)
+                parameter("day", day)
+            }.body()
+
+    /**
+     * 获取番剧页模块化数据（TV/PC 端番剧 Tab）
+     *
+     * 内含我的追番（follow）、番剧/国创推荐（v_card）、
+     * 猜你喜欢（double_feed）等模块，免登录可用；猜你喜欢翻页用 [cursor]。
+     *
+     * @param isRefresh 是否刷新（1 会更换推荐内容）
+     * @param cursor 翻页游标，首页传 "0"，后续传响应中的 next_cursor
+     */
+    suspend fun getPgcPageTab(
+        isRefresh: Int = 0,
+        cursor: String = "0",
+    ): BiliResponse<PgcPageTabData> =
+        client
+            .get("/pgc/page/pc/bangumi/tab") {
+                parameter("is_refresh", isRefresh)
+                parameter("cursor", cursor)
+            }.body()
+
+    /**
      * 获取导航栏用户信息
      *
      * 内含 wbi keys
@@ -1957,19 +1707,13 @@ object BiliHttpApi {
                 wbiSubKey == null ||
                 (now - wbiLastRefreshDate > 2 * 60 * 60 * 1000L)
 
-        if (!needToUpdate) {
-            println("Skip update wbi keys")
-            return
-        }
+        if (!needToUpdate) return
 
         runCatching {
             val wbiData = getWebInterfaceNav().data!!.wbiImg
             wbiImgKey = wbiData.getImgKey()
             wbiSubKey = wbiData.getSubKey()
-            println("Update wbi keys: $wbiImgKey, $wbiSubKey")
             wbiLastRefreshDate = now
-        }.onFailure {
-            println("Update wbi data failed: ${it.stackTraceToString()}")
         }
     }
 
@@ -2221,72 +1965,6 @@ object BiliHttpApi {
                 parameter("aid", aid)
                 parameter("cid", cid)
                 parameter("ts", 0)
-            }.body()
-
-    suspend fun getUserEquippedGarb(part: EquipPart): BiliResponse<Equip> =
-        client
-            .get("/x/garb/user/equip") {
-                parameter("part", part.value)
-            }.body()
-
-    /**
-     * 获取分区动态（App），包含顶部轮播图，大卡片活动推广位，和视频列表第一页
-     */
-    suspend fun getRegionDynamic(
-        rid: Int,
-        accessKey: String,
-    ): BiliResponse<RegionDynamic> =
-        client
-            .get("https://app.bilibili.com/x/v2/region/dynamic") {
-                parameter("access_key", accessKey)
-                parameter("build", BiliAppConf.APP_BUILD_CODE)
-                parameter("rid", rid)
-            }.body()
-
-    /**
-     * 获取分区视频列表（App）,用于[getRegionDynamic]加载数据后下滑加载更多数据
-     */
-    suspend fun getRegionDynamicList(
-        rid: Int,
-        ctime: Long = 0,
-        accessKey: String,
-    ): BiliResponse<RegionDynamicList> =
-        client
-            .get("https://app.bilibili.com/x/v2/region/dynamic/list") {
-                parameter("access_key", accessKey)
-                parameter("build", BiliAppConf.APP_BUILD_CODE)
-                parameter("rid", rid)
-                parameter("ctime", ctime)
-                parameter("pull", "false")
-            }.body()
-
-    //
-
-    /**
-     * 获取分区内各种插入的banner，例如顶部轮播图，还有插入的广告横幅（Web）
-     *
-     * id:
-     * 4973  动画  douga
-     * 4991  游戏  game
-     * 5004  鬼畜  kichiku
-     * 4979  音乐  music
-     * 4985  舞蹈  dance
-     * 5008  影视  cinephile
-     * 5007  娱乐  ent
-     * 4997  知识  knowledge
-     * 4998  科技  tech
-     * 5005  资讯  information
-     * 5002  美食  food
-     * 5001  生活  life
-     * 5000  汽车  car
-     * 5006  时尚  fashion
-     * 4999  运动  sports
-     * 5003  动物圈 animal
-     */
-    suspend fun getLocs(ids: List<Int>): RegionLocs =
-        client
-            .get("/x/web-show/res/locs") {
-                parameter("ids", ids.joinToString(","))
             }.body()
 
     /**

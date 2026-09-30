@@ -29,7 +29,7 @@ import androidx.tv.material3.lightColorScheme as tvLight
 /**
  * new BV 根主题。
  *
- * 根据 [ThemeMode] 与系统状态选择深/浅色板，并提供自定义密度与字体缩放。
+ * 根据 [ThemeMode] 与系统状态选择深/浅色板，并提供自定义密度、字体缩放与强调色。
  * 可嵌套调用：播放器需要在浅色应用下固定使用深色主题时，用
  * `BVTheme(themeMode = ThemeMode.Dark, density = LocalDensity.current.density)` 包裹即可。
  *
@@ -37,6 +37,7 @@ import androidx.tv.material3.lightColorScheme as tvLight
  *
  * @param themeMode 主题模式（跟随系统 / 深色 / 浅色）。
  * @param density 屏幕密度（TV 场景通常为 2.0）。
+ * @param accentColor 强调色预设（默认品牌蓝紫）；派生色由 [AccentColor.resolve] 计算。
  * @param surfaceColor 主题 Surface 的底色，null 表示使用 `colorScheme.surface`。
  *                     嵌套调用时（如播放器强制深色）可传 [Color.Black] 覆盖默认深灰底色。
  * @param content 主题包裹的内容。
@@ -46,19 +47,21 @@ import androidx.tv.material3.lightColorScheme as tvLight
 fun BVTheme(
     themeMode: ThemeMode = ThemeMode.FollowSystem,
     density: Float = 1f,
+    accentColor: AccentColor = AccentColor.Brand,
     surfaceColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
     val fontScale = LocalDensity.current.fontScale
     val systemIsDark = isSystemInDarkTheme()
     val isDark = themeMode.isDark(systemIsDark)
+    val accent = accentColor.resolve()
 
     val tvColorScheme =
         if (isDark) {
             tvDark(
-                primary = BVColors.Primary,
+                primary = accent.primaryDark,
                 onPrimary = Color.White,
-                primaryContainer = BVColors.PrimaryStrong,
+                primaryContainer = accent.containerDark,
                 onPrimaryContainer = Color.White,
                 secondary = BVColors.Secondary,
                 onSecondary = BVColors.DarkOnBackground,
@@ -70,13 +73,13 @@ fun BVTheme(
                 onSurface = BVColors.DarkOnSurface,
                 surfaceVariant = BVColors.DarkSurfaceVariant,
                 onSurfaceVariant = BVColors.DarkOnSurfaceVariant,
-                border = BVColors.DarkBorder,
+                border = accent.borderDark,
             )
         } else {
             tvLight(
-                primary = BVColors.PrimaryStrong,
+                primary = accent.primaryLight,
                 onPrimary = Color.White,
-                primaryContainer = BVColors.PrimaryLight,
+                primaryContainer = accent.containerLight,
                 onPrimaryContainer = BVColors.LightOnBackground,
                 // secondary 作为强调色（选中态文字/图标）使用时需要足够对比度，
                 // 浅色背景下使用加深变体，避免低对比导致文字发虚
@@ -90,16 +93,16 @@ fun BVTheme(
                 onSurface = BVColors.LightOnSurface,
                 surfaceVariant = BVColors.LightSurfaceVariant,
                 onSurfaceVariant = BVColors.LightOnSurfaceVariant,
-                border = BVColors.LightBorder,
+                border = accent.borderLight,
             )
         }
 
     val commonColorScheme =
         if (isDark) {
             commonDark(
-                primary = BVColors.Primary,
+                primary = accent.primaryDark,
                 onPrimary = Color.White,
-                primaryContainer = BVColors.PrimaryStrong,
+                primaryContainer = accent.containerDark,
                 onPrimaryContainer = Color.White,
                 secondary = BVColors.Secondary,
                 onSecondary = BVColors.DarkOnBackground,
@@ -114,9 +117,9 @@ fun BVTheme(
             )
         } else {
             commonLight(
-                primary = BVColors.PrimaryStrong,
+                primary = accent.primaryLight,
                 onPrimary = Color.White,
-                primaryContainer = BVColors.PrimaryLight,
+                primaryContainer = accent.containerLight,
                 onPrimaryContainer = BVColors.LightOnBackground,
                 secondary = BVColors.SecondaryStrong,
                 onSecondary = Color.White,
@@ -141,6 +144,8 @@ fun BVTheme(
         ) {
             CompositionLocalProvider(
                 LocalRippleConfiguration provides null,
+                LocalFocusOutlineColor provides
+                    if (isDark) BVColors.FocusOutlineDark else BVColors.FocusOutlineLight,
                 LocalDensity provides Density(density = density, fontScale = fontScale),
             ) {
                 CommonSurface(color = Color.Transparent) {
@@ -169,12 +174,14 @@ fun BVTheme(
  *
  * 必须在根主题 [BVTheme] 内调用一次。嵌套主题（如播放器强制深色）不需要、
  * 也不应重复调用，否则退出后状态栏会停留在内层主题的颜色上。
+ *
+ * 状态栏跟随主题底色（surface）而非品牌色，避免浅色模式下顶部出现突兀的色块。
  */
 @Composable
 fun SystemBarsEffect() {
     val view = LocalView.current
     if (view.isInEditMode) return
-    val statusBarColor = TvMaterialTheme.colorScheme.primary
+    val statusBarColor = TvMaterialTheme.colorScheme.surface
     SideEffect {
         val window = (view.context as Activity).window
         window.statusBarColor = statusBarColor.toArgb()

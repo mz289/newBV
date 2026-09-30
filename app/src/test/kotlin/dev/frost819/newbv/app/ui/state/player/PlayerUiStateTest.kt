@@ -6,8 +6,7 @@ import org.junit.jupiter.api.Test
 /**
  * [PlayerUiState.isPgc] 的单元测试。
  *
- * 验证番剧（PGC）判定仅取决于 [PlayerUiState.epid]，
- * 与播放侧 [PlayerUiState.fromSeason] 解耦。
+ * 验证番剧（PGC）判定仅取决于 [PlayerUiState.epid]。
  */
 class PlayerUiStateTest {
     @Test
@@ -23,11 +22,5 @@ class PlayerUiStateTest {
     @Test
     fun `isPgc is true when epid is positive`() {
         assertThat(PlayerUiState(epid = 12345).isPgc).isTrue()
-    }
-
-    @Test
-    fun `isPgc is independent of fromSeason`() {
-        assertThat(PlayerUiState(epid = null, fromSeason = true).isPgc).isFalse()
-        assertThat(PlayerUiState(epid = 1, fromSeason = false).isPgc).isTrue()
     }
 }

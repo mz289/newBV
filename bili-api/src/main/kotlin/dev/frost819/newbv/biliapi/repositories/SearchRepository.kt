@@ -32,39 +32,6 @@ class SearchRepository(
                 )
             }.getOrNull()
 
-    /*private val searchStub
-        get() = runCatching {
-            SearchGrpcKt.SearchCoroutineStub(channelRepository.defaultChannel!!)
-        }.getOrNull()
-
-    suspend fun search(
-        keyword: String,
-        page: Int = 1,
-        pageSize: Int = 20,
-        preferApiType: ApiType
-    ): SearchData {
-        return when (preferApiType) {
-            ApiType.Web -> {
-                val data = BiliHttpApi.search(
-                    keyword = keyword,
-                    page = page,
-                    pageSize = pageSize,
-                    sessData = authRepository.sessionData!!,
-                ).getResponseData()
-                SearchData.fromSearchResponse(data)
-            }
-
-            ApiType.App -> {
-                val reply = searchStub?.searchV2(searchV2Req {
-                    this.keyword = keyword
-                    this.page = page
-                    this.pageSize = pageSize
-                })
-                SearchData.fromSearchResponse(reply!!)
-            }
-        }
-    }*/
-
     suspend fun getSearchHotwords(
         limit: Int = 30,
         preferApiType: ApiType,

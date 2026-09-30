@@ -334,41 +334,6 @@ internal class DataSystem(
         }
     }
 
-    /**
-     * 持有一个弹幕，使其悬停在当前位置，也不会因为超时而被从屏幕移除
-     * 之前持有的弹幕会被恢复正常的流程
-     *
-     * @param item 持有的弹幕，如果为空，则不持有悬停任何弹幕
-     */
-    fun hold(item: DanmakuItem?) {
-        if (isPaused && item != holdingItem) {
-            danmakuContext.config.updateRender()
-        }
-        if (item == null || (item != holdingItem && holdingItem != null)) {
-            holdingItem?.let {
-                it.unhold()
-                synchronized(this) {
-                    sortedData.add(it)
-                }
-                currentData.data.add(it)
-                currentData.endIndex++
-                currentData.shouldSort = true
-                shouldSort = true
-            }
-            holdingItem = null
-        }
-        if (item == null) return
-        synchronized(this) {
-            sortedData.remove(item)
-        }
-        shouldSort = true
-        currentData.data.remove(item)
-        currentData.endIndex--
-        currentData.shouldSort = true
-        item.hold()
-        holdingItem = item
-    }
-
     private fun sort() {
         if (shouldSort) {
             synchronized(this) {

@@ -42,6 +42,7 @@ import dev.frost819.newbv.app.ui.component.settings.SettingSwitchListItem
 import dev.frost819.newbv.app.ui.component.settings.displayName
 import dev.frost819.newbv.app.ui.screen.main.displayName
 import dev.frost819.newbv.app.ui.screen.settings.SettingsMenuNavItem
+import dev.frost819.newbv.core.theme.AccentColor
 import dev.frost819.newbv.core.theme.ThemeMode
 import dev.frost819.newbv.data.datastore.HomeTopNavItem
 import dev.frost819.newbv.data.datastore.LeftNaviItem
@@ -64,6 +65,7 @@ fun UISetting(modifier: Modifier = Modifier) {
     var showHomepageDialog by remember { mutableStateOf(false) }
     var showPersonalPageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showAccentDialog by remember { mutableStateOf(false) }
 
     var showVideoInfo by remember { mutableStateOf(Prefs.showVideoInfo) }
     var showPersistentSeek by remember { mutableStateOf(Prefs.showPersistentSeek) }
@@ -71,6 +73,7 @@ fun UISetting(modifier: Modifier = Modifier) {
     var selectedFirstHomeTopNavItem by remember { mutableStateOf(Prefs.firstHomeTopNavItem) }
     var selectedFirstPersonalTopNavItem by remember { mutableStateOf(Prefs.firstPersonalTopNavItem) }
     var selectedThemeMode by remember { mutableStateOf(Prefs.themeMode) }
+    var selectedAccentColor by remember { mutableStateOf(Prefs.accentColor) }
     var density by remember { mutableFloatStateOf(Prefs.density) }
 
     Box(modifier = modifier) {
@@ -116,6 +119,13 @@ fun UISetting(modifier: Modifier = Modifier) {
                         title = "主题模式",
                         supportText = "当前：${selectedThemeMode.displayName}",
                         onClick = { showThemeDialog = true },
+                    )
+                }
+                item {
+                    SettingListItem(
+                        title = "强调色",
+                        supportText = "当前：${selectedAccentColor.displayName}",
+                        onClick = { showAccentDialog = true },
                     )
                 }
                 item {
@@ -214,6 +224,19 @@ fun UISetting(modifier: Modifier = Modifier) {
             onSelect = {
                 Prefs.themeMode = it
                 selectedThemeMode = it
+            },
+            getDisplayName = { it.displayName },
+        )
+    }
+
+    if (showAccentDialog) {
+        OptionDialog(
+            options = AccentColor.entries.toTypedArray(),
+            selectedOption = selectedAccentColor,
+            onDismiss = { showAccentDialog = false },
+            onSelect = {
+                Prefs.accentColor = it
+                selectedAccentColor = it
             },
             getDisplayName = { it.displayName },
         )

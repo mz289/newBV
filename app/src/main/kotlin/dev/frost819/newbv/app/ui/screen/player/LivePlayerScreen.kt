@@ -83,7 +83,6 @@ fun LivePlayerScreen(
         title = uiState.title,
         areaName = uiState.areaName,
         onlineCount = uiState.onlineCount,
-        clock = getClock(),
         danmakuEnabled = danmakuEnabled,
         danmakuState = danmakuState,
         availableQualities = uiState.availableQualities,
@@ -122,12 +121,4 @@ fun LivePlayerScreen(
             )
         }
     }
-}
-
-/**
- * 获取当前时钟（小时，分钟）。
- */
-private fun getClock(): Pair<Int, Int> {
-    val calendar = java.util.Calendar.getInstance()
-    return calendar.get(java.util.Calendar.HOUR_OF_DAY) to calendar.get(java.util.Calendar.MINUTE)
 }

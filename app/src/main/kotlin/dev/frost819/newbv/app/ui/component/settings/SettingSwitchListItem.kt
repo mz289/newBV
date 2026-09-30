@@ -19,6 +19,7 @@ import androidx.tv.material3.Switch
 import androidx.tv.material3.SwitchDefaults
 import androidx.tv.material3.Text
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.focusShakeTarget
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -44,6 +45,7 @@ fun SettingSwitchListItem(
     ListItem(
         modifier =
             modifier
+                .focusShakeTarget()
                 .padding(horizontal = 12.dp)
                 .touchClickable(onClick = {
                     switchChecked = !switchChecked

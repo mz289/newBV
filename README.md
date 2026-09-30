@@ -79,7 +79,7 @@ newBV 是基于 [BV](https://github.com/aaa1115910/bv) 重构的 [哔哩哔哩](
 
 如果冷启动后 `adb shell cmd wifi status` 显示 `Wifi is not connected`，执行 `adb shell cmd wifi connect-network AndroidWifi open` 重连模拟器 Wi-Fi，再重试应用。
 
-当前兼容策略仅对 Android 12 及以上 `ranchu` / `goldfish` 模拟器的旧 `OMX.google.*` 视频解码器使用同步模式；音频、新版 C2 解码器和真机继续使用 Media3 默认模式。本机已验证“软件图形渲染 + 同步视频解码”组合可以正常播放，尚未通过完整对照测试证明两项分别必需。DNS 参数说明见 [Android 官方文档](https://developer.android.com/studio/run/emulator-networking-dns)。
+播放器保留 Media3 默认解码调度和 PlayerView 默认 SurfaceView 输出，不根据模拟器型号强制同步解码。本机在软件图形渲染下已实测默认异步解码正常播放，因此移除了此前的强制同步补丁。图形兼容问题优先通过模拟器的 GPU 配置处理；软件图形渲染与应用中的软件视频解码设置是不同选项。参考 [Android DNS 配置](https://developer.android.com/studio/run/emulator-networking-dns)、[模拟器图形加速](https://developer.android.com/studio/run/emulator-acceleration)与 [Media3 Surface 选择](https://developer.android.com/media/media3/ui/surface)。
 
 ## 开发文档
 

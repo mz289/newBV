@@ -40,7 +40,6 @@ import com.kuaishou.akdanmaku.ecs.DanmakuContext
 import com.kuaishou.akdanmaku.ecs.DanmakuEngine
 import com.kuaishou.akdanmaku.ecs.base.DanmakuEntitySystem
 import com.kuaishou.akdanmaku.ext.*
-import com.kuaishou.akdanmaku.inDebugMode
 import com.kuaishou.akdanmaku.render.RenderObject
 import com.kuaishou.akdanmaku.ui.DanmakuDisplayer
 import com.kuaishou.akdanmaku.ui.DanmakuListener
@@ -178,18 +177,6 @@ internal class RenderSystem(
     }
 
     private var lastRenderGeneration = -1
-
-    private val debugPaint: Paint? by lazy {
-        if (inDebugMode) {
-            Paint().apply {
-                style = Paint.Style.STROKE
-                color = Color.RED
-                strokeWidth = 2f
-            }
-        } else {
-            null
-        }
-    }
     private var lastDrawTime = 0L
 
     /**
@@ -244,9 +231,6 @@ internal class RenderSystem(
             var holdingObj: RenderObject? = null
             val displayer = danmakuDisplayer
             renderResult.renderObjects.forEach { renderObj ->
-                debugPaint?.let {
-                    canvas.drawRect(renderObj.rect, it)
-                }
                 if (renderObj.holding) {
                     holdingObj = renderObj
                     return@forEach
@@ -273,26 +257,6 @@ internal class RenderSystem(
         cacheHit.num = cacheHitCount
         cacheHit.den = renderResult.renderObjects.size
         endTrace()
-    }
-
-    fun getDanmakus(point: Point): List<DanmakuItem>? {
-        if (!danmakuContext.config.visibility) return null
-        val renderResult = this.renderResult ?: return null
-        return renderResult.renderObjects
-            .asSequence()
-            .filter { it.rect.contains(point.x.toFloat(), point.y.toFloat()) }
-            .map { r -> r.item }
-            .toList()
-    }
-
-    fun getDanmakus(rect: RectF): List<DanmakuItem>? {
-        if (!danmakuContext.config.visibility) return null
-        val renderResult = this.renderResult ?: return null
-        return renderResult.renderObjects
-            .asSequence()
-            .filter { it.rect.intersects(rect.left, rect.top, rect.right, rect.bottom) }
-            .map { r -> r.item }
-            .toList()
     }
 
     private fun drawRenderObject(

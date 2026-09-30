@@ -5,7 +5,6 @@ import bilibili.app.playerunite.v1.playViewUniteReq
 import bilibili.community.service.dm.v1.DMGrpcKt
 import bilibili.community.service.dm.v1.dmSegMobileReq
 import bilibili.community.service.dm.v1.dmViewReq
-import bilibili.pgc.gateway.player.v2.playViewReq
 import bilibili.playershared.videoVod
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.CodeType
@@ -14,17 +13,16 @@ import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMask
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMaskType
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMeta
 import dev.frost819.newbv.biliapi.entity.danmaku.toDanmakuMeta
-import dev.frost819.newbv.biliapi.entity.video.HeartbeatVideoType
 import dev.frost819.newbv.biliapi.entity.video.Subtitle
 import dev.frost819.newbv.biliapi.entity.video.VideoShot
 import dev.frost819.newbv.biliapi.grpc.utils.handleGrpcException
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
+import dev.frost819.newbv.biliapi.util.BiliLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
-import bilibili.pgc.gateway.player.v2.PlayURLGrpcKt as PgcPlayURLGrpcKt
 
 class VideoPlayRepository(
     private val authRepository: AuthRepository,
@@ -34,11 +32,6 @@ class VideoPlayRepository(
         get() =
             runCatching {
                 PlayerGrpcKt.PlayerCoroutineStub(channelRepository.requireDefaultChannel())
-            }.getOrNull()
-    private val pgcPlayUrlStub
-        get() =
-            runCatching {
-                PgcPlayURLGrpcKt.PlayURLCoroutineStub(channelRepository.requireDefaultChannel())
             }.getOrNull()
     private val danmakuStub
         get() =
@@ -99,11 +92,9 @@ class VideoPlayRepository(
                                             // dont throw
                                             runCatching { handleGrpcException(it) }
                                                 .onFailure {
-                                                    println(
-                                                        "get play data failed: " +
-                                                            "[aid=$aid, cid=$cid, codec=$codecType, api=$preferApiType]",
-                                                    )
-                                                    it.printStackTrace()
+                                                    BiliLogger.error(it) {
+                                                        "get play data failed: [aid=$aid, cid=$cid, codec=$codecType, api=$preferApiType]"
+                                                    }
                                                 }
                                         }.getOrNull()
                                     playUniteReply
@@ -120,89 +111,6 @@ class VideoPlayRepository(
                 }
             }
         }
-
-    suspend fun getPgcPlayData(
-        aid: Long?,
-        cid: Long?,
-        epid: Int,
-        preferCodec: CodeType = CodeType.NoCode,
-        preferApiType: ApiType,
-    ): PlayData {
-        println(
-            "get pgc play data: " +
-                "[aid=$aid, cid=$cid, epid=$epid, preferCodec=$preferCodec, preferApiType=$preferApiType]",
-        )
-        return when (preferApiType) {
-            ApiType.Web -> {
-                val playUrlData =
-                    BiliHttpApi
-                        .getPgcVideoPlayUrlV2(
-                            av = aid,
-                            cid = cid,
-                            epid = epid,
-                            fnval = 4048,
-                            qn = 127,
-                            fnver = 0,
-                            fourk = 1,
-                        ).getResponseData()
-
-                PlayData.fromPlayUrlV2Data(playUrlData)
-            }
-
-            ApiType.App -> {
-                withContext(Dispatchers.IO) {
-                    val codecTypes =
-                        listOf(
-                            CodeType.Code264,
-                            CodeType.Code265,
-                            CodeType.CodeAv1,
-                        )
-                    val replies =
-                        codecTypes
-                            .map { codecType ->
-                                val req =
-                                    playViewReq {
-                                        this.epid = epid.toLong()
-                                        cid?.let { this.cid = it }
-                                        qn = 127
-                                        fnver = 0
-                                        fnval = 4048
-                                        fourk = true
-                                        forceHost = 0
-                                        download = 0
-                                        preferCodecType = codecType.toPgcPlayUrlCodeType()
-                                    }
-                                async {
-                                    val playReply =
-                                        runCatching {
-                                            pgcPlayUrlStub?.playView(req)
-                                                ?: throw IllegalStateException("Pgc play url stub is not initialized")
-                                        }.onFailure {
-                                            // dont throw
-                                            runCatching { handleGrpcException(it) }
-                                                .onFailure {
-                                                    println(
-                                                        "get pgc play data failed: " +
-                                                            "[aid=$aid, cid=$cid, epid=$epid, codec=$codecType]",
-                                                    )
-                                                    it.printStackTrace()
-                                                }
-                                        }.getOrNull()
-                                    playReply
-                                }
-                            }.awaitAll()
-                    val result =
-                        replies
-                            .map {
-                                it?.let { PlayData.fromPgcPlayViewReply(it) }
-                            }.reduce { acc, playData ->
-                                acc?.let { playData?.let { acc + playData } ?: acc } ?: playData
-                            } ?: throw IllegalStateException("All codec types are failed to get play data")
-                    result
-                }
-            }
-        }
-    }
 
     suspend fun getSubtitle(
         aid: Long,
@@ -246,10 +154,6 @@ class VideoPlayRepository(
         aid: Long,
         cid: Long,
         time: Int,
-        type: HeartbeatVideoType = HeartbeatVideoType.Video,
-        subType: Int? = null,
-        epid: Int? = null,
-        seasonId: Int? = null,
         preferApiType: ApiType,
     ) {
         val result =
@@ -259,10 +163,6 @@ class VideoPlayRepository(
                         avid = aid,
                         cid = cid,
                         playedTime = time,
-                        type = type.value,
-                        subType = subType,
-                        epid = epid,
-                        sid = seasonId,
                         csrf = authRepository.biliJct,
                     )
 
@@ -271,15 +171,11 @@ class VideoPlayRepository(
                         avid = aid,
                         cid = cid,
                         playedTime = time,
-                        type = type.value,
-                        subType = subType,
-                        epid = epid,
-                        sid = seasonId,
                         mid = authRepository.mid,
                         accessKey = authRepository.accessToken,
                     )
             }
-        println("send heartbeat result: $result")
+        BiliLogger.info { "send heartbeat result: $result" }
     }
 
     /**

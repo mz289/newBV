@@ -16,6 +16,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.toDanmakuEntity
 import dev.frost819.newbv.app.data.toDataDanmakuType
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMask
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMeta
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
@@ -214,7 +216,7 @@ class DanmakuViewModel
                             videoPlayRepository.getDanmakuMeta(aid = aid, cid = cid)
                         }
                     }.getOrElse { e ->
-                        if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                        e.rethrowUnlessTimeout()
                         logger.warn { "Load danmaku meta failed, fallback to default segment size: $e" }
                         DanmakuMeta.DEFAULT
                     }
@@ -502,56 +504,40 @@ class DanmakuViewModel
             }
         }
 
-        private fun initDanmakuConfig() {
-            val types = Prefs.defaultDanmakuTypes.map { it.toDanmakuEntity() }
-            val area = Prefs.defaultDanmakuArea
-            val scale = Prefs.defaultDanmakuScale
-            val factor = Prefs.defaultDanmakuSpeedFactor
-
+        /**
+         * 用勾选的显示类型重建类型过滤器。
+         *
+         * 含 [DanmakuEntityDanmakuType.All] 表示不过滤；否则屏蔽未勾选的类型
+         * （直接使用 [dev.frost819.newbv.danmaku.entity.DanmakuType.modeValue]）。
+         */
+        private fun rebuildTypeFilter(enabledTypes: List<DanmakuEntityDanmakuType>) {
             danmakuTypeFilter.clear()
-            if (!types.contains(DanmakuEntityDanmakuType.All)) {
-                val allTypes = DanmakuEntityDanmakuType.entries.toMutableList()
-                allTypes.remove(DanmakuEntityDanmakuType.All)
-                allTypes.removeAll(types)
-                allTypes
-                    .mapNotNull {
-                        when (it) {
-                            DanmakuEntityDanmakuType.Rolling -> DanmakuItemData.DANMAKU_MODE_ROLLING
-                            DanmakuEntityDanmakuType.Top -> DanmakuItemData.DANMAKU_MODE_CENTER_TOP
-                            DanmakuEntityDanmakuType.Bottom -> DanmakuItemData.DANMAKU_MODE_CENTER_BOTTOM
-                            else -> null
-                        }
-                    }.forEach { danmakuTypeFilter.addFilterItem(it) }
+            if (!enabledTypes.contains(DanmakuEntityDanmakuType.All)) {
+                val blocked =
+                    DanmakuEntityDanmakuType.entries.toSet() -
+                        DanmakuEntityDanmakuType.All -
+                        enabledTypes.toSet()
+                blocked.forEach { danmakuTypeFilter.addFilterItem(it.modeValue) }
             }
+        }
+
+        private fun initDanmakuConfig() {
+            rebuildTypeFilter(Prefs.defaultDanmakuTypes.map { it.toDanmakuEntity() })
 
             danmakuConfig =
                 danmakuConfig.copy(
                     density = 120,
-                    textSizeScale = scale,
-                    screenPart = area,
+                    textSizeScale = Prefs.defaultDanmakuScale,
+                    screenPart = Prefs.defaultDanmakuArea,
                     dataFilter = listOf(danmakuTypeFilter),
-                    rollingSpeedFactor = factor,
+                    rollingSpeedFactor = Prefs.defaultDanmakuSpeedFactor,
                 )
             danmakuConfig.updateFilter()
             danmakuPlayer?.updateConfig(danmakuConfig)
         }
 
         private fun updateDanmakuConfigTypeFilter(enabledTypes: List<DanmakuEntityDanmakuType>) {
-            danmakuTypeFilter.clear()
-            if (!enabledTypes.contains(DanmakuEntityDanmakuType.All)) {
-                val allTypes = DanmakuEntityDanmakuType.entries.toMutableList()
-                allTypes.remove(DanmakuEntityDanmakuType.All)
-                allTypes.removeAll(enabledTypes)
-                allTypes
-                    .mapNotNull {
-                        when (it) {
-                            DanmakuEntityDanmakuType.Rolling -> DanmakuItemData.DANMAKU_MODE_ROLLING
-                            DanmakuEntityDanmakuType.Top -> DanmakuItemData.DANMAKU_MODE_CENTER_TOP
-                            DanmakuEntityDanmakuType.Bottom -> DanmakuItemData.DANMAKU_MODE_CENTER_BOTTOM
-                            else -> null
-                        }
-                    }.forEach { danmakuTypeFilter.addFilterItem(it) }
-            }
+            rebuildTypeFilter(enabledTypes)
             danmakuConfig.updateFilter()
             danmakuPlayer?.updateConfig(danmakuConfig)
         }
@@ -567,8 +553,6 @@ class DanmakuViewModel
         }
 
         companion object {
-            private const val LOAD_TIMEOUT_MS = 10_000L
-
             /**
              * 引擎时钟与视频位置的对齐阈值（毫秒）。
              *

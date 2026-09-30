@@ -43,6 +43,7 @@ import dev.frost819.newbv.app.ui.screen.settings.content.OtherSetting
 import dev.frost819.newbv.app.ui.screen.settings.content.StorageSetting
 import dev.frost819.newbv.app.ui.screen.settings.content.UISetting
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.focusShakeTarget
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -253,6 +254,7 @@ private fun SettingsMenuButton(
     ListItem(
         modifier =
             modifier
+                .focusShakeTarget()
                 .onFocusChanged { if (it.hasFocus) onFocus() }
                 .touchClickable(onClick = { onFocus() }),
         selected = selected,

@@ -25,18 +25,18 @@ import androidx.tv.material3.Text
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.VIDEO_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
-import dev.frost819.newbv.app.ui.component.livecard.formatOnlineCount
+import dev.frost819.newbv.app.ui.component.livecard.toCardData
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.navigation.LiveFollowRoute
 import dev.frost819.newbv.app.ui.navigation.LivePlayerRoute
-import dev.frost819.newbv.biliapi.http.entity.live.FollowLiveRoom
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.repositories.LiveRepository
 import dev.frost819.newbv.core.log.Loggers
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,7 +57,6 @@ class LiveFollowViewModel
         private val liveRepository: LiveRepository,
     ) : ViewModel() {
         companion object {
-            private const val LOAD_TIMEOUT_MS = 10_000L
         }
 
         private val logger = Loggers.get("LiveFollowScreen")
@@ -96,9 +95,7 @@ class LiveFollowViewModel
                         )
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.warn(error) { "Failed to load follow live" }
                     _uiState.update {
                         it.copy(
@@ -110,22 +107,6 @@ class LiveFollowViewModel
             }
         }
     }
-
-private fun FollowLiveRoom.toCardData(): LiveRoomCardData {
-    val coverUrl = coverFromUser.ifBlank { keyframe }
-    return LiveRoomCardData(
-        roomId = roomId,
-        title = title,
-        uname = uname.ifBlank { nickname },
-        uid = uid,
-        cover = coverUrl,
-        face = face,
-        areaV2Name = areaV2Name,
-        areaV2ParentName = areaV2ParentName,
-        onlineString = formatOnlineCount(online),
-        watchedString = "",
-    )
-}
 
 data class LiveFollowUiState(
     val items: List<LiveRoomCardData> = emptyList(),
@@ -172,7 +153,7 @@ private fun LiveFollowScreen(
 
         TvLazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Fixed(4),
+            columns = GridCells.Adaptive(VIDEO_CARD_MIN_WIDTH),
             contentPadding = PaddingValues(24.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -202,6 +183,7 @@ private fun LiveFollowScreen(
                     isError = state.isError,
                     hasMore = false,
                     itemsIsEmpty = state.items.isEmpty(),
+                    onRetry = viewModel::loadFollowLive,
                 )
             }
         }

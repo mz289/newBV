@@ -101,7 +101,6 @@ class LoginRepository {
                 localId = "0",
                 ts = (System.currentTimeMillis() / 1000).toInt(),
             )
-        println(response)
         var resultCookies: WebCookies? = null
         val resultState =
             when (response.code) {

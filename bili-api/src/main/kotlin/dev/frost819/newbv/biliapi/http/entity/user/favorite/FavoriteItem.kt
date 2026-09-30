@@ -42,24 +42,3 @@ data class FavoriteItem(
     val favTime: Long,
     val bvid: String,
 )
-
-@Serializable
-data class FavoriteItemIdListResponse(
-    val code: Int,
-    val message: String,
-    val data: List<FavoriteItemId>? = null,
-)
-
-/**
- * 收藏夹内容 ID
- *
- * @param id 内容id 视频稿件：视频稿件avid 音频：音频auid 视频合集：视频合集id
- * @param type 内容类型 2：视频稿件 12：音频 21：视频合集
- * @param bvid 视频稿件bvid
- */
-@Serializable
-data class FavoriteItemId(
-    val id: Long,
-    val type: Int,
-    val bvid: String,
-)

@@ -1,20 +1,16 @@
 package dev.frost819.newbv.app.data
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.app.testutil.InMemoryPreferencesDataStore
 import dev.frost819.newbv.data.datastore.Prefs
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import java.io.File
 
 /**
  * [AuthData] 的单元测试。
@@ -31,14 +27,7 @@ class AuthDataTest {
         @BeforeAll
         fun initPrefs() {
             Prefs.resetForTesting()
-            val scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
-            val file = File.createTempFile("test_authdata", ".preferences_pb")
-            file.deleteOnExit()
-            testDataStore =
-                PreferenceDataStoreFactory.create(
-                    scope = scope,
-                    produceFile = { file },
-                )
+            testDataStore = InMemoryPreferencesDataStore()
             Prefs.init(testDataStore)
         }
 

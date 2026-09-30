@@ -41,7 +41,6 @@ import java.util.*
 internal class BottomRetainer(
     endRatio: Float,
 ) : DanmakuRetainer {
-    private val bilibiliRetainer by lazy { BilibiliRetainer() }
     private val akRetainer by lazy { AkRetainer(endRatio) }
 
     override fun layout(
@@ -49,20 +48,13 @@ internal class BottomRetainer(
         currentTimeMills: Long,
         displayer: DanmakuDisplayer,
         config: DanmakuConfig,
-    ): Float =
-        if (config.retainerPolicy == RETAINER_BILIBILI) {
-            bilibiliRetainer.layout(drawItem, currentTimeMills, displayer, config)
-        } else {
-            akRetainer.layout(drawItem, currentTimeMills, displayer, config)
-        }
+    ): Float = akRetainer.layout(drawItem, currentTimeMills, displayer, config)
 
     override fun clear() {
-        bilibiliRetainer.clear()
         akRetainer.clear()
     }
 
     override fun remove(item: DanmakuItem) {
-        bilibiliRetainer.remove(item)
         akRetainer.remove(item)
     }
 
@@ -70,126 +62,7 @@ internal class BottomRetainer(
         start: Int,
         end: Int,
     ) {
-        bilibiliRetainer.update(start, end)
         akRetainer.update(start, end)
-    }
-
-    private class BilibiliRetainer : DanmakuRetainer {
-        private var cancelFlag = false
-        private val lastVisibleEntities = TreeSet(DanmakuRetainer.YPosDescComparator())
-
-        override fun layout(
-            drawItem: DanmakuItem,
-            currentTimeMills: Long,
-            displayer: DanmakuDisplayer,
-            config: DanmakuConfig,
-        ): Float {
-            val drawState = drawItem.drawState
-            if (drawItem.isOutside(currentTimeMills)) {
-                remove(drawItem)
-                return -1f
-            }
-            val drawHolder =
-                DanmakuRetainer.SpaceHolder(
-                    drawItem,
-                    drawItem.timePosition,
-                    drawState.positionY.toInt(),
-                    drawState.positionX.toInt(),
-                    drawState.width.toInt(),
-                    drawState.height.toInt(),
-                )
-            var isShown = drawState.visibility && drawState.layoutGeneration == config.layoutGeneration
-            var willHit: Boolean
-            var topPos: Float =
-                if (!isShown || drawState.positionY < displayer.allMarginTop) {
-                    (displayer.height - drawState.height)
-                } else {
-                    drawState.positionY
-                }
-            var isOutOfVerticalEdge = false
-            val state = DanmakuRetainer.RetainerState()
-            if (!isShown) {
-                cancelFlag = false
-                lastVisibleEntities
-                    .asSequence()
-                    .takeWhile { !cancelFlag && !state.found }
-                    .forEach { holder ->
-                        state.lines++
-                        if (drawHolder == holder) {
-                            with(state) {
-                                removeEntity = null
-                                willHit = false
-                                found = true
-                                return@forEach
-                            }
-                        }
-                        if (state.firstEntity == null) {
-                            state.firstEntity = holder
-                            if (drawState.rect.bottom.toInt() != displayer.height) {
-                                state.found = true
-                                return@forEach
-                            }
-                        }
-                        if (topPos < displayer.allMarginTop) {
-                            state.removeEntity = null
-                            state.found = true
-                            return@forEach
-                        }
-                        willHit =
-                            holder.item.willCollision(
-                                holder.item,
-                                displayer,
-                                currentTimeMills,
-                                config.durationMs,
-                            )
-                        if (!willHit) {
-                            state.removeEntity = holder
-                            state.found = true
-                            return@forEach
-                        }
-                        topPos = holder.top.toFloat() - displayer.margin - drawState.height
-                    }
-
-                isOutOfVerticalEdge =
-                    (topPos < displayer.allMarginTop || state.firstEntity?.bottom != displayer.height)
-                if (isOutOfVerticalEdge) {
-                    topPos = (displayer.height - drawState.height)
-                    willHit = true
-                    state.lines = 1
-                } else {
-                    if (topPos == displayer.allMarginTop) {
-                        isShown = false
-                    }
-                }
-            }
-
-//      if (verifier != null && verifier.skipLayout(drawItem, willHit)) return -1f
-            if (isOutOfVerticalEdge) clear()
-
-//      if (verifier != null && verifier.skipDraw(drawItem, topPos, state.lines, willHit)) return -1f
-
-            if (!isShown) {
-                state.removeEntity?.let { lastVisibleEntities.remove(it) }
-                lastVisibleEntities.add(drawHolder)
-                drawHolder.index = state.lines
-            }
-            return topPos
-        }
-
-        override fun clear() {
-            cancelFlag = true
-            lastVisibleEntities.clear()
-        }
-
-        override fun remove(item: DanmakuItem) {
-            lastVisibleEntities.removeAll { it.item == item }
-        }
-
-        override fun update(
-            start: Int,
-            end: Int,
-        ) {
-        }
     }
 
     private class AkRetainer(

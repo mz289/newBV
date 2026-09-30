@@ -14,7 +14,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+
+/** 视频卡片栅格的最小卡片宽度（P1-1 自适应列数）：4K(1920dp) 约 6 列，避免卡过小标题难读。 */
+val VIDEO_CARD_MIN_WIDTH: Dp = 260.dp
+
+/** 海报卡片栅格（番剧/影视封面卡）的最小卡片宽度。 */
+val POSTER_CARD_MIN_WIDTH: Dp = 260.dp
 
 /**
  * 封装了 TV 焦点定轴逻辑的 [LazyVerticalGrid]。

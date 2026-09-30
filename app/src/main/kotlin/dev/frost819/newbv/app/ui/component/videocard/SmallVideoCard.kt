@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,9 +45,14 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.R
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.focusShakeTarget
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.interaction.InputMethod
 import dev.frost819.newbv.core.interaction.currentInputMethod
+import dev.frost819.newbv.core.theme.LocalFocusOutlineColor
+
+/** 封面圆角（P1-2）：小圆角让封面成为主角，避免大圆角的"贴纸感"。 */
+private val coverShape = RoundedCornerShape(8.dp)
 
 /**
  * 小型视频卡片。
@@ -59,6 +65,9 @@ import dev.frost819.newbv.core.interaction.currentInputMethod
  * - 自动将焦点移至第一个操作按钮
  * - D-Pad center 释放不会误触发按钮点击（[releaseLongPress] 守卫）
  * - 失焦或返回键自动关闭操作面板
+ *
+ * 焦点样式与全应用一致：不缩放，聚焦时描边包住整卡（封面 + 标题信息），
+ * 避免封面外扩压住标题。
  *
  * @param data 卡片数据。
  * @param onClick 点击卡片回调。
@@ -100,31 +109,46 @@ fun SmallVideoCard(
         }
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        Card(
-            onClick = { if (!showActions) onClick() },
-            onLongClick = {
-                if (hasAnyAction) showActions = true
-            },
+    Card(
+        onClick = { if (!showActions) onClick() },
+        onLongClick = {
+            if (hasAnyAction) showActions = true
+        },
+        modifier =
+            modifier
+                .focusShakeTarget()
+                // 卡片内容（封面+文字）整体内缩：标题与封面左缘对齐，
+                // 视觉间距由网格间距 + 该边距共同构成；描边随 Card 边界内缩仍贴合内容
+                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .fillMaxWidth()
+                .touchClickable(
+                    onClick = { if (!showActions) onClick() },
+                    onLongClick = { if (hasAnyAction) showActions = true },
+                ).onFocusChanged { focusState ->
+                    if (!focusState.hasFocus) showActions = false
+                },
+        scale = CardDefaults.scale(focusedScale = 1f, pressedScale = 1f),
+        colors =
+            CardDefaults.colors(
+                containerColor = Color.Transparent,
+                focusedContainerColor = Color.Transparent,
+                pressedContainerColor = Color.Transparent,
+            ),
+        shape = CardDefaults.shape(coverShape),
+        border =
+            CardDefaults.border(
+                focusedBorder =
+                    Border(
+                        border = androidx.compose.foundation.BorderStroke(3.dp, LocalFocusOutlineColor.current),
+                        shape = coverShape,
+                    ),
+            ),
+    ) {
+        Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1.6f)
-                    .touchClickable(
-                        onClick = { if (!showActions) onClick() },
-                        onLongClick = { if (hasAnyAction) showActions = true },
-                    ).onFocusChanged { focusState ->
-                        if (!focusState.hasFocus) showActions = false
-                    },
-            shape = CardDefaults.shape(MaterialTheme.shapes.large),
-            border =
-                CardDefaults.border(
-                    focusedBorder =
-                        Border(
-                            border = androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.border),
-                            shape = MaterialTheme.shapes.large,
-                        ),
-                ),
+                    .aspectRatio(1.6f),
         ) {
             if (showActions) {
                 Row(
@@ -334,7 +358,7 @@ fun SmallVideoCard(
 /**
  * 卡片封面区域。
  *
- * 封面图片 + 底部渐变遮罩 + 播放数/弹幕数/时长统计。
+ * 封面图片 + 底部渐变遮罩 + 播放数/弹幕数统计 + 右下角时长角标。
  */
 @Composable
 private fun CardCover(
@@ -349,14 +373,14 @@ private fun CardCover(
         modifier =
             modifier
                 .fillMaxSize()
-                .clip(MaterialTheme.shapes.large),
+                .clip(coverShape),
         contentAlignment = Alignment.BottomCenter,
     ) {
         AsyncImage(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .clip(MaterialTheme.shapes.large),
+                    .clip(coverShape),
             model = cover,
             contentDescription = null,
             contentScale = ContentScale.Crop,
@@ -378,11 +402,13 @@ private fun CardCover(
                     ),
         )
 
+        // 底部信息行：统计与时长徽标同一 Row、同一垂直居中与内边距，保证两者中线对齐
         Row(
             modifier =
                 Modifier
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (play.isNotBlank()) {
@@ -390,12 +416,12 @@ private fun CardCover(
                     painter = painterResource(id = R.drawable.ic_play_count),
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                 )
                 Spacer(Modifier.width(2.dp))
                 Text(
                     text = play,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
                     maxLines = 1,
                 )
@@ -406,23 +432,30 @@ private fun CardCover(
                     painter = painterResource(id = R.drawable.ic_danmaku_count),
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                 )
                 Spacer(Modifier.width(2.dp))
                 Text(
                     text = danmaku,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
                     maxLines = 1,
                 )
             }
             Spacer(Modifier.weight(1f))
-            Text(
-                text = time,
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White,
-                maxLines = 1,
-            )
+            if (time.isNotBlank()) {
+                // 时长用半透明黑底角标表达（P1-2）：与统计数字分层，不依赖渐变衬底
+                Text(
+                    text = time,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    maxLines = 1,
+                    modifier =
+                        Modifier
+                            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
         }
 
         if (progress != null && progress > 0f) {
@@ -458,11 +491,14 @@ private fun CardInfo(
     pubTime: String?,
 ) {
     Column(
-        modifier = modifier.padding(vertical = 6.dp),
+        modifier = modifier.padding(vertical = 8.dp),
     ) {
+        // 标题恒占两行高度（minLines）：单行标题下方留白，
+        // 使 UP 名/时间行在不同卡片间保持水平对齐
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth(),
@@ -475,8 +511,8 @@ private fun CardInfo(
             Icon(
                 painter = painterResource(id = R.drawable.ic_up),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp),
             )
             Text(
                 modifier = Modifier.weight(1f),

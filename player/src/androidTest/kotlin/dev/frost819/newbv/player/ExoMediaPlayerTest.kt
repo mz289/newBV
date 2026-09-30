@@ -125,12 +125,6 @@ class ExoMediaPlayerTest {
     }
 
     @Test
-    fun tcpSpeed_returnsZero() {
-        val speed = runOnMain { player.tcpSpeed }
-        assertThat(speed).isEqualTo(0L)
-    }
-
-    @Test
     fun debugInfo_containsExpectedFields() {
         val info = runOnMain { player.debugInfo }
         assertThat(info).contains("player:")

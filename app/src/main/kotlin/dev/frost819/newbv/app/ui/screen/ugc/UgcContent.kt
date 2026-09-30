@@ -1,39 +1,27 @@
 package dev.frost819.newbv.app.ui.screen.ugc
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import dev.frost819.newbv.app.ui.component.FocusSaver
+import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
-import dev.frost819.newbv.app.ui.component.TopNav
-import dev.frost819.newbv.app.ui.component.TopNavItem
+import dev.frost819.newbv.app.ui.component.TabbedContent
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.VIDEO_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
@@ -42,9 +30,6 @@ import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.app.util.toWanString
 import dev.frost819.newbv.app.viewmodel.ugc.UgcViewModel
 import dev.frost819.newbv.biliapi.entity.ugc.UgcTypeV2
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import androidx.compose.material3.Scaffold as Material3Scaffold
 
 /**
  * UGC 分区顶部导航项。
@@ -55,8 +40,8 @@ import androidx.compose.material3.Scaffold as Material3Scaffold
  */
 enum class UgcTabItem(
     val ugcTypeV2: UgcTypeV2,
-    override val displayName: String,
-) : TopNavItem {
+    val displayName: String,
+) {
     Douga(UgcTypeV2.Douga, "动画"),
     Game(UgcTypeV2.Game, "游戏"),
     Kichiku(UgcTypeV2.Kichiku, "鬼畜"),
@@ -92,51 +77,19 @@ fun UgcContent(
     focusSaver: FocusSaver,
     viewModel: UgcViewModel = hiltViewModel(),
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf(UgcTabItem.Douga) }
-    var focusOnContent by remember { mutableStateOf(false) }
-    val uiState by viewModel.uiState.collectAsState()
-
-    Material3Scaffold(
-        topBar = {
-            TopNav(
-                modifier = Modifier.focusRequester(navFocusRequester),
-                items = UgcTabItem.entries.toList(),
-                selectedIndex = UgcTabItem.entries.indexOf(selectedTab),
-                isLargePadding = !focusOnContent,
-                onSelectedChanged = { nav ->
-                    val tab = nav as UgcTabItem
-                    if (tab != selectedTab) {
-                        selectedTab = tab
-                        viewModel.switchType(tab.ugcTypeV2)
-                    }
-                },
-                onClick = { nav ->
-                    val tab = nav as UgcTabItem
-                    viewModel.refresh()
-                },
-            )
-        },
-    ) { innerPadding ->
-        Box(
-            modifier =
-                Modifier
-                    .padding(innerPadding)
-                    .onFocusChanged { focusOnContent = it.hasFocus }
-                    .onPreviewKeyEvent { event ->
-                        if (event.key == Key.Menu && event.type == KeyEventType.KeyUp) {
-                            viewModel.refresh()
-                            navFocusRequester.requestFocus()
-                            return@onPreviewKeyEvent true
-                        }
-                        false
-                    },
-        ) {
-            UgcGrid(
-                viewModel = viewModel,
-                navController = navController,
-                focusSaver = focusSaver,
-            )
-        }
+    TabbedContent(
+        navFocusRequester = navFocusRequester,
+        tabs = UgcTabItem.entries.toList(),
+        initialTab = UgcTabItem.Douga,
+        displayName = { it.displayName },
+        onTabSelected = { viewModel.switchType(it.ugcTypeV2) },
+        onRefresh = { viewModel.refresh() },
+    ) { _ ->
+        UgcGrid(
+            viewModel = viewModel,
+            navController = navController,
+            focusSaver = focusSaver,
+        )
     }
 }
 
@@ -154,22 +107,15 @@ private fun UgcGrid(
     val state by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
 
-    LaunchedEffect(gridState) {
-        snapshotFlow {
-            gridState.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index
-        }.distinctUntilChanged()
-            .filter { index ->
-                index != null && index >= state.items.size - 20
-            }.collect {
-                viewModel.loadMore()
-            }
-    }
+    InfiniteScrollEffect(
+        state = gridState,
+        itemCount = { state.items.size },
+        onLoadMore = viewModel::loadMore,
+    )
 
     TvLazyVerticalGrid(
         state = gridState,
-        columns = GridCells.Fixed(4),
+        columns = GridCells.Adaptive(VIDEO_CARD_MIN_WIDTH),
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -210,6 +156,7 @@ private fun UgcGrid(
                 isError = state.error,
                 hasMore = state.hasMore,
                 itemsIsEmpty = state.items.isEmpty(),
+                onRetry = viewModel::refresh,
             )
         }
     }

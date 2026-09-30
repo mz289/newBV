@@ -1,7 +1,5 @@
 package dev.frost819.newbv.biliapi.entity
 
-import dev.frost819.newbv.biliapi.util.UrlUtil
-import dev.frost819.newbv.biliapi.util.toBv
 import io.ktor.http.Url
 
 data class CarouselData(
@@ -45,42 +43,6 @@ data class CarouselData(
                         ),
                     )
                 }
-            return CarouselData(result)
-        }
-
-        fun fromUgcRegionDynamicBanner(
-            data: dev.frost819.newbv.biliapi.http.entity.region.RegionDynamic.Banner,
-        ): CarouselData {
-            val result = mutableListOf<CarouselItem>()
-            data.top.forEach { top ->
-                if (!UrlUtil.isVideoUrl(top.uri)) return@forEach
-                val avid = UrlUtil.parseAidFromUrl(top.uri)
-                val bvid = avid.toBv()
-                result.add(
-                    CarouselItem(
-                        cover = top.image,
-                        title = top.title,
-                        avid = avid,
-                        bvid = bvid,
-                    ),
-                )
-            }
-            return CarouselData(result)
-        }
-
-        fun fromUgcRegionLocs(data: dev.frost819.newbv.biliapi.http.entity.region.RegionLocs): CarouselData {
-            val result = mutableListOf<CarouselItem>()
-            data.data.forEach { (_, value) ->
-                value?.filter { it.url.contains("/video/") }?.forEach { item ->
-                    result.add(
-                        CarouselItem(
-                            cover = item.pic,
-                            title = item.title,
-                            bvid = Url(item.url).rawSegments.last(),
-                        ),
-                    )
-                }
-            }
             return CarouselData(result)
         }
     }

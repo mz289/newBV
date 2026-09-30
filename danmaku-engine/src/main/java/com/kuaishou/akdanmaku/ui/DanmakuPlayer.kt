@@ -24,8 +24,6 @@
 package com.kuaishou.akdanmaku.ui
 
 import android.graphics.Canvas
-import android.graphics.Point
-import android.graphics.RectF
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -72,11 +70,6 @@ class DanmakuPlayer(
         private const val PLAYER_WIDTH = 682
         const val MIN_DANMAKU_DURATION: Long = 4000
         const val MAX_DANMAKU_DURATION_HIGH_DENSITY: Long = 9000
-
-        /**
-         * 是否手动控制 Step 流程
-         */
-        var isManualStep = false
     }
 
     private var danmakuView: WeakReference<DanmakuView>? = null
@@ -127,22 +120,17 @@ class DanmakuPlayer(
         Choreographer.getInstance().postFrameCallback(frameCallback)
     }
 
-    private fun updateFrame(deltaTimeSeconds: Float? = null) {
+    private fun updateFrame() {
         if (!started || isReleased) {
             return
         }
 
-        if (isManualStep) {
-            // Time goes one step for manual debug.
-            engine.step(deltaTimeSeconds)
-        } else {
-            // Prepare next frameCallback.
-            postFrameCallback()
-            // update entities before system update
-            engine.preAct()
-            // Wait for acquiring a permit.
-            drawSemaphore.acquire()
-        }
+        // Prepare next frameCallback.
+        postFrameCallback()
+        // update entities before system update
+        engine.preAct()
+        // Wait for acquiring a permit.
+        drawSemaphore.acquire()
         if (!started || isReleased) {
             return
         }
@@ -160,10 +148,8 @@ class DanmakuPlayer(
         if (isReleased) {
             return
         }
-        if (!isManualStep) {
-            // Time goes one step.
-            engine.step()
-        }
+        // Time goes one step.
+        engine.step()
         drawSemaphore.tryAcquire()
         if (!started) {
             releaseSemaphore()
@@ -178,15 +164,6 @@ class DanmakuPlayer(
         // Acquired or on the first draw(with init permit: 0).
         if (drawSemaphore.availablePermits() == 0) {
             drawSemaphore.release()
-        }
-    }
-
-    /**
-     * For debug use, step manually.
-     */
-    fun step(deltaTimeMs: Int) {
-        if (isManualStep) {
-            actionHandler.obtainMessage(MSG_FRAME_UPDATE, deltaTimeMs, 0).sendToTarget()
         }
     }
 
@@ -215,9 +192,7 @@ class DanmakuPlayer(
         engine.start()
         if (!started) {
             started = true
-            if (!isManualStep) {
-                actionHandler.post { postFrameCallback() }
-            }
+            actionHandler.post { postFrameCallback() }
         }
     }
 
@@ -318,16 +293,6 @@ class DanmakuPlayer(
 
     fun getConfig(): DanmakuConfig? = engine.getConfig()
 
-    fun getDanmakusAtPoint(point: Point): List<DanmakuItem>? =
-        engine.getSystem(RenderSystem::class.java)?.getDanmakus(point)
-
-    fun getDanmakusInRect(hitRect: RectF): List<DanmakuItem>? =
-        engine.getSystem(RenderSystem::class.java)?.getDanmakus(hitRect)
-
-    fun hold(item: DanmakuItem?) {
-        dataSystem?.hold(item)
-    }
-
     fun obtainItem(danmaku: DanmakuItemData): DanmakuItem = ObjectPool.obtainItem(danmaku, this)
 
     fun releaseItem(item: DanmakuItem) {
@@ -355,7 +320,6 @@ class DanmakuPlayer(
     ) {
         val displayer = engine.context.displayer
         updateViewportState(width, height, displayer.getViewportSizeFactor())
-        updateMaxDanmakuDuration()
         if (displayer.width != width || displayer.height != height) {
             Log.d(DanmakuEngine.TAG, "notifyDisplayerSizeChanged($width, $height)")
             displayer.width = width
@@ -392,23 +356,13 @@ class DanmakuPlayer(
         }
     }
 
-    private fun updateMaxDanmakuDuration() {
-        // FIXME distinguish differ danmaku type duration
-    }
-
     private inner class ActionHandler(
         looper: Looper,
     ) : Handler(looper) {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
                 MSG_FRAME_UPDATE -> {
-                    val deltaTimeSeconds =
-                        if (msg.arg1 > 0) {
-                            msg.arg1 / 1000.0f
-                        } else {
-                            null
-                        }
-                    updateFrame(deltaTimeSeconds)
+                    updateFrame()
                 }
                 NOTIFY_DISPLAYER_SIZE_CHANGE -> {
                     val newConfig = engine.context.config

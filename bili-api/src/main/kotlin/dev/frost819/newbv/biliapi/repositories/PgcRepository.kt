@@ -2,6 +2,8 @@ package dev.frost819.newbv.biliapi.repositories
 
 import dev.frost819.newbv.biliapi.entity.CarouselData
 import dev.frost819.newbv.biliapi.entity.pgc.PgcFeedData
+import dev.frost819.newbv.biliapi.entity.pgc.PgcPageTab
+import dev.frost819.newbv.biliapi.entity.pgc.PgcRankData
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
 import dev.frost819.newbv.biliapi.entity.pgc.index.Area
 import dev.frost819.newbv.biliapi.entity.pgc.index.Copyright
@@ -52,6 +54,45 @@ class PgcRepository {
             }
         return data
     }
+
+    /** 获取 PGC 热播榜（番剧/国创等分区的排行榜，免登录）。 */
+    suspend fun getPgcRankList(pgcType: PgcType): PgcRankData =
+        PgcRankData.fromPgcWebRankData(
+            BiliHttpApi
+                .getPgcRankList(seasonType = pgcType.rankSeasonTypeId)
+                .getResponseData(),
+        )
+
+    /**
+     * 获取番剧页模块化数据（免登录可用，登录后 follow/猜你喜欢个性化）。
+     *
+     * 页面按模块 style 数据驱动渲染；猜你喜欢翻页时把上一页的
+     * [PgcPageTab.nextCursor] 作为 [cursor] 传入。
+     *
+     * @param isRefresh 1 表示刷新推荐内容。
+     * @param cursor 翻页游标，首页传 "0"。
+     */
+    suspend fun getPgcPageTab(
+        cursor: String = "0",
+        isRefresh: Int = 0,
+    ): PgcPageTab =
+        PgcPageTab.fromPgcPageTabData(
+            BiliHttpApi
+                .getPgcPageTab(isRefresh = isRefresh, cursor = cursor)
+                .getResponseData(),
+        )
+
+    /** 各分区在 /pgc/web/rank/list 中的 season_type 参数。 */
+    private val PgcType.rankSeasonTypeId: Int
+        get() =
+            when (this) {
+                PgcType.Anime -> 1
+                PgcType.Movie -> 2
+                PgcType.Documentary -> 3
+                PgcType.GuoChuang -> 4
+                PgcType.Tv -> 5
+                PgcType.Variety -> 7
+            }
 
     suspend fun getPgcIndex(
         pgcType: PgcType,

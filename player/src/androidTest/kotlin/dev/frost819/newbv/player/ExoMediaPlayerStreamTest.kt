@@ -71,10 +71,6 @@ class ExoMediaPlayerStreamTest {
             override fun onBuffering() {}
 
             override fun onEnd() {}
-
-            override fun onSeekBack(seekBackIncrementMs: Long) {}
-
-            override fun onSeekForward(seekForwardIncrementMs: Long) {}
         }
 
     private fun awaitReady(

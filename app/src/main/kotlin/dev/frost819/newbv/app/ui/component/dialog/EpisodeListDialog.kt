@@ -224,7 +224,7 @@ fun <T> EpisodeListDialog(
                                     style = MaterialTheme.typography.labelMedium,
                                     color =
                                         if (selectedTab == index) {
-                                            MaterialTheme.colorScheme.border
+                                            MaterialTheme.colorScheme.primary
                                         } else {
                                             MaterialTheme.colorScheme.onSurfaceVariant
                                         },

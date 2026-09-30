@@ -16,7 +16,6 @@ class VideoListItemTest {
         val item = VideoListItem(aid = 1L, cid = 10L, title = "test")
 
         assertThat(item.epid).isNull()
-        assertThat(item.seasonId).isNull()
         assertThat(item.ugcPages).isNull()
     }
 
@@ -40,13 +39,11 @@ class VideoListItemTest {
                 aid = 1L,
                 cid = 10L,
                 epid = 100,
-                seasonId = 200,
                 title = "番剧分集",
                 ugcPages = pages,
             )
 
         assertThat(item.epid).isEqualTo(100)
-        assertThat(item.seasonId).isEqualTo(200)
         assertThat(item.ugcPages).hasSize(1)
         assertThat(item.ugcPages!![0].title).isEqualTo("P1")
     }
@@ -75,7 +72,6 @@ class VideoListItemTest {
                 aid = 1L,
                 cid = 10L,
                 epid = 100,
-                seasonId = 200,
                 title = "original",
             )
         val copied = original.copy(cid = 20L)
@@ -83,7 +79,6 @@ class VideoListItemTest {
         assertThat(copied.cid).isEqualTo(20L)
         assertThat(copied.aid).isEqualTo(original.aid)
         assertThat(copied.epid).isEqualTo(original.epid)
-        assertThat(copied.seasonId).isEqualTo(original.seasonId)
         assertThat(copied.title).isEqualTo(original.title)
     }
 

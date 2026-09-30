@@ -38,15 +38,6 @@ data class VideoPlayerRoute(
     val cover: String = "",
 )
 
-/** 番剧播放器页面。 */
-@Serializable
-data class SeasonPlayerRoute(
-    val epid: Long,
-    val sid: Long,
-    val title: String = "",
-    val cover: String = "",
-)
-
 // ── 搜索 ──────────────────────────────────────────────────────────────
 
 /** 搜索结果页。 */
@@ -100,6 +91,13 @@ data class FollowRoute(
 data class PgcFeatureRoute(
     val seasonId: Long = 0,
     val epid: Long? = null,
+)
+
+/** 番剧索引筛选页。 */
+@Serializable
+data class PgcIndexRoute(
+    val pgcTypeName: String = dev.frost819.newbv.biliapi.entity.pgc.PgcType.Anime.name,
+    val styleId: Int = -1,
 )
 
 // ── 设置 ──────────────────────────────────────────────────────────────

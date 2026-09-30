@@ -3,7 +3,6 @@ package dev.frost819.newbv.biliapi.repositories
 import bilibili.rpc.Status
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.biliapi.entity.ApiType
-import dev.frost819.newbv.biliapi.entity.video.HeartbeatVideoType
 import dev.frost819.newbv.biliapi.grpc.utils.getDetail
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import kotlinx.coroutines.runBlocking
@@ -149,58 +148,6 @@ class VideoPlayRepositoryTest {
     }
 
     @Test
-    fun `get pgc video with grpc`() =
-        runBlocking {
-            val result =
-                videoPlayRepository.getPgcPlayData(
-                    aid = 210680503,
-                    cid = 486114279,
-                    epid = 469110,
-                    preferApiType = ApiType.App,
-                )
-            assertPlayData(result, 210680503)
-        }
-
-    @Test
-    fun `get pgc video with http`() =
-        runBlocking {
-            val result =
-                videoPlayRepository.getPgcPlayData(
-                    aid = 210680503,
-                    cid = 486114279,
-                    epid = 469110,
-                    preferApiType = ApiType.Web,
-                )
-            assertPlayData(result, 210680503)
-        }
-
-    @Test
-    fun `get paid pgc video with grpc`() =
-        runBlocking {
-            val result =
-                videoPlayRepository.getPgcPlayData(
-                    aid = 741219885,
-                    cid = 1132332811,
-                    epid = 750015,
-                    preferApiType = ApiType.App,
-                )
-            assertPlayData(result, 741219885)
-        }
-
-    @Test
-    fun `get paid pgc video with http`() =
-        runBlocking {
-            val result =
-                videoPlayRepository.getPgcPlayData(
-                    aid = 741219885,
-                    cid = 1132332811,
-                    epid = 750015,
-                    preferApiType = ApiType.Web,
-                )
-            assertPlayData(result, 741219885)
-        }
-
-    @Test
     fun `get subtitle with web api`() =
         runBlocking {
             // 查询类：字幕可能为空（视频无字幕），断言接口正常返回结构
@@ -239,16 +186,6 @@ class VideoPlayRepositoryTest {
                 time = randomTime,
                 preferApiType = ApiType.Web,
             )
-            videoPlayRepository.sendHeartbeat(
-                aid = 476982015,
-                cid = 1107179650,
-                type = HeartbeatVideoType.Season,
-                subType = 4,
-                time = randomTime,
-                epid = 706666,
-                seasonId = 39707,
-                preferApiType = ApiType.Web,
-            )
         }
 
     @Test
@@ -260,16 +197,6 @@ class VideoPlayRepositoryTest {
                 aid = 170001,
                 cid = 280468,
                 time = randomTime,
-                preferApiType = ApiType.App,
-            )
-            videoPlayRepository.sendHeartbeat(
-                aid = 476982015,
-                cid = 1107179650,
-                type = HeartbeatVideoType.Season,
-                subType = 4,
-                time = randomTime,
-                epid = 706666,
-                seasonId = 39707,
                 preferApiType = ApiType.App,
             )
         }

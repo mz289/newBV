@@ -170,10 +170,6 @@ class LivePlayerViewModel
                     override fun onEnd() {
                         _uiState.update { it.copy(playerState = LivePlayerState.Ended) }
                     }
-
-                    override fun onSeekBack(seekBackIncrementMs: Long) {}
-
-                    override fun onSeekForward(seekForwardIncrementMs: Long) {}
                 },
             )
             videoPlayer?.initPlayer()

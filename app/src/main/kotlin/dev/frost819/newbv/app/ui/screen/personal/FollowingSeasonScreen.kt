@@ -15,13 +15,11 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -41,7 +39,9 @@ import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.FocusSaver
+import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
+import dev.frost819.newbv.app.ui.component.POSTER_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.videocard.SeasonCard
@@ -52,8 +52,6 @@ import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonStatus
 import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonType
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 
 /**
  * 追番页面。
@@ -88,18 +86,12 @@ fun FollowingSeasonScreen(
         return
     }
 
-    LaunchedEffect(gridState) {
-        snapshotFlow {
-            gridState.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index
-        }.distinctUntilChanged()
-            .filter { index ->
-                index != null && index >= state.followingSeasons.size - 30
-            }.collect {
-                viewModel.loadFollowingSeasons()
-            }
-    }
+    InfiniteScrollEffect(
+        state = gridState,
+        itemCount = { state.followingSeasons.size },
+        threshold = 30,
+        onLoadMore = { viewModel.loadFollowingSeasons() },
+    )
 
     Box(
         modifier =
@@ -115,7 +107,7 @@ fun FollowingSeasonScreen(
     ) {
         TvLazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Fixed(5),
+            columns = GridCells.Adaptive(POSTER_CARD_MIN_WIDTH),
             contentPadding = PaddingValues(24.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -177,6 +169,7 @@ fun FollowingSeasonScreen(
                     isError = state.followingError,
                     hasMore = state.followingHasMore,
                     itemsIsEmpty = state.followingSeasons.isEmpty(),
+                    onRetry = viewModel::loadFollowingSeasons,
                 )
             }
         }

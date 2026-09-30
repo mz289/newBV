@@ -5,6 +5,8 @@ import android.content.Context
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
+import android.util.DisplayMetrics
+import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -78,13 +80,18 @@ fun InfoSetting(
     val screenInfo =
         remember {
             runCatching {
-                val display = context.display ?: return@runCatching Triple(0, 0, 0f)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    val mode = display.mode
-                    Triple(mode.physicalWidth, mode.physicalHeight, mode.refreshRate)
-                } else {
-                    Triple(0, 0, 0f)
-                }
+                // Context.display 为 API 30+，低版本走 deprecated 的 defaultDisplay
+                val display =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        context.display
+                    } else {
+                        @Suppress("DEPRECATION")
+                        (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+                    }
+                val metrics = DisplayMetrics()
+                @Suppress("DEPRECATION")
+                display.getRealMetrics(metrics)
+                Triple(metrics.widthPixels, metrics.heightPixels, display.refreshRate)
             }.getOrDefault(Triple(0, 0, 0f))
         }
 

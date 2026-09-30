@@ -104,6 +104,7 @@ import dev.frost819.newbv.biliapi.entity.video.season.Episode
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
+import dev.frost819.newbv.core.theme.LocalFocusOutlineColor
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -149,9 +150,6 @@ private fun VideoDetailScreen(
             when (effect) {
                 is VideoDetailUiEffect.ShowToast -> {
                     ToastUtils.show(context, effect.message)
-                }
-                is VideoDetailUiEffect.NavigateToSeason -> {
-                    // TODO(实现 PGC 番剧详情页跳转)
                 }
             }
         }
@@ -600,11 +598,13 @@ private fun VideoInfoHeader(
                             border =
                                 androidx.compose.foundation.BorderStroke(
                                     3.dp,
-                                    MaterialTheme.colorScheme.border,
+                                    LocalFocusOutlineColor.current,
                                 ),
                             shape = MaterialTheme.shapes.large,
                         ),
                 ),
+            // 禁用焦点缩放：默认放大 1.1 倍会溢出布局压住右侧标题（与本页其它可聚焦元素一致）
+            scale = CardDefaults.scale(focusedScale = 1f),
         ) {
             AsyncImage(
                 modifier = Modifier.fillMaxSize(),

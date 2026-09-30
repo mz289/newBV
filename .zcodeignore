@@ -1,0 +1,91 @@
+# ========================================
+# Build outputs
+# ========================================
+/build/
+/*/build/
+**/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+/app/release/
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# ========================================
+# IDE
+# ========================================
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# ========================================
+# OS
+# ========================================
+.DS_Store
+Thumbs.db
+
+# ========================================
+# Credentials & secrets (do not commit)
+# ========================================
+# B 站测试凭证 / SDK 路径
+local.properties
+/local.properties
+# 签名配置（含密钥库密码）
+signing.properties
+/.signing/
+*.keystore
+*.jks
+# 崩溃上报端点配置
+crash-report.properties
+
+# ========================================
+# Logs
+# ========================================
+*.log
+logs/
+
+# ========================================
+# Read-only reference (原版 BV 源码，不纳入版本控制)
+# ========================================
+/bv/
+.playwright-mcp/
+
+# B 站 API 参考文档（第三方，不纳入版本控制）
+/docs
+/.zcode
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+node_modules/
+bower_components/
+jspm_packages/
+__pycache__/
+site-packages/
+venv/
+coverage/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+cdk.out/
+*.egg-info/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）

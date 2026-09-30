@@ -88,5 +88,4 @@ private fun checkCollisionAtTime(
 // return current * (w2 - w1) + d1.position * (width + w1) - d2.position * (width + w2) - w1 * duration <= 0
 }
 
-const val RETAINER_BILIBILI = 0
 const val RETAINER_AKDANMAKU = 1

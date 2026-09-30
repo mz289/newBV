@@ -3,14 +3,14 @@ package dev.frost819.newbv.app.viewmodel.pgc
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.CarouselData
 import dev.frost819.newbv.biliapi.entity.pgc.PgcFeedData
 import dev.frost819.newbv.biliapi.entity.pgc.PgcItem
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
 import dev.frost819.newbv.biliapi.repositories.PgcRepository
 import dev.frost819.newbv.core.log.Loggers
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,15 +19,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
-private const val LOAD_TIMEOUT_MS = 10_000L
-
 /**
  * PGC 影视分区 UI 状态。
  *
  * @property carouselItems 轮播图数据。
  * @property items 当前分区的番剧/影视列表。
  * @property loading 是否正在加载 Feed 数据。
- * @property carouselLoading 是否正在加载轮播图。
  * @property hasMore 是否还有更多数据。
  * @property error Feed 加载是否失败。
  */
@@ -35,7 +32,6 @@ data class PgcUiState(
     val carouselItems: List<CarouselData.CarouselItem> = emptyList(),
     val items: List<PgcItem> = emptyList(),
     val loading: Boolean = false,
-    val carouselLoading: Boolean = false,
     val hasMore: Boolean = true,
     val error: Boolean = false,
 )
@@ -66,9 +62,18 @@ class PgcViewModel
         /** 当前分区的分页游标。 */
         private var cursor: Int = 0
 
-        init {
-            loadCarousel()
-            loadMore()
+        /**
+         * 首次展示对应分区时懒加载；已加载或正在加载则跳过。
+         *
+         * 番剧 Tab 由 [AnimeHomeViewModel] 负责，本 VM 只服务其余 5 个分区。
+         */
+        fun loadIfNeeded() {
+            val current = _uiState.value
+            if (current.loading) return
+            if (current.items.isEmpty() && current.hasMore) {
+                loadCarousel()
+                loadMore()
+            }
         }
 
         /**
@@ -92,8 +97,6 @@ class PgcViewModel
          */
         fun loadCarousel() {
             viewModelScope.launch {
-                _uiState.update { it.copy(carouselLoading = true) }
-
                 runCatching {
                     withTimeout(LOAD_TIMEOUT_MS) {
                         val carouselData = pgcRepository.getCarousel(currentType)
@@ -102,13 +105,9 @@ class PgcViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load PGC carousel: $currentType" }
                 }
-
-                _uiState.update { it.copy(carouselLoading = false) }
             }
         }
 
@@ -140,9 +139,7 @@ class PgcViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load PGC feed: $currentType" }
                     _uiState.update { it.copy(error = true) }
                 }
