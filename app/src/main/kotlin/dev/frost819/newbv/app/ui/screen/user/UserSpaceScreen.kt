@@ -38,6 +38,8 @@ import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.app.ui.component.videoCardGridCells
+import dev.frost819.newbv.app.ui.component.videoGridHSpacing
+import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
@@ -110,8 +112,8 @@ private fun UserSpaceScreen(
         state = gridState,
         columns = videoCardGridCells(),
         contentPadding = PaddingValues(24.dp),
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(videoGridHSpacing()),
+        verticalArrangement = Arrangement.spacedBy(videoGridVSpacing()),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             UserSpaceHeader(state = state)

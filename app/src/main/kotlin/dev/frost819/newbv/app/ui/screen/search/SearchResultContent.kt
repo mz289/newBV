@@ -50,6 +50,8 @@ import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TopNav
 import dev.frost819.newbv.app.ui.component.focusSaverItem
+import dev.frost819.newbv.app.ui.component.videoGridHSpacing
+import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
@@ -220,8 +222,8 @@ fun SearchResultContent(
                 state = gridState,
                 columns = GridCells.Adaptive(cardMinWidth),
                 contentPadding = PaddingValues(24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(videoGridVSpacing()),
+                horizontalArrangement = Arrangement.spacedBy(videoGridHSpacing()),
             ) {
                 items(activeResult.items, key = { item ->
                     when (item) {
