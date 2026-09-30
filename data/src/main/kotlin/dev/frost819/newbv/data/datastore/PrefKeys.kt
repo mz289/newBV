@@ -72,6 +72,7 @@ internal object PrefKeys {
 
     // ===== 应用界面 =====
     val density = floatPreferencesKey("density")
+    val videoColumns = intPreferencesKey("video_columns")
     val homeLeftNavItem = intPreferencesKey("home_left_nav")
     val firstHomeTopNavItem = intPreferencesKey("first_home_top_nav")
     val firstPersonalTopNavItem = intPreferencesKey("first_personal_top_nav")

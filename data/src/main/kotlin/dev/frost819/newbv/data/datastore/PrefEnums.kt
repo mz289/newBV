@@ -237,3 +237,27 @@ enum class PersonalTopNavItem {
         fun fromOrdinal(ordinal: Int): PersonalTopNavItem = entries.getOrElse(ordinal) { ToView }
     }
 }
+
+/**
+ * 视频卡片网格列数。
+ *
+ * [Auto] 按屏宽自适应分档（4K 6 列、2K/1080p 5 列），其余为固定列数。
+ * 通过 [code] 持久化，反序列化时未知 code 回退到 [Auto]。
+ *
+ * @property code 列数标识（0 = 自动，其余为固定列数）。
+ */
+enum class VideoColumnCount(
+    val code: Int,
+) {
+    Auto(0),
+    Fixed4(4),
+    Fixed5(5),
+    Fixed6(6),
+    Fixed7(7),
+    ;
+
+    companion object {
+        /** 从 code 安全解析，未知 code 返回 [Auto]。 */
+        fun fromCode(code: Int): VideoColumnCount = entries.find { it.code == code } ?: Auto
+    }
+}

@@ -375,6 +375,14 @@ object Prefs {
     /** 界面缩放密度（默认 2f，app 层 init 时按屏幕宽度重新计算）。 */
     var density by pref(PrefKeys.density, 2f)
 
+    /** 视频卡片网格列数（Auto 按屏宽自适应分档，其余固定列数）。 */
+    var videoColumns by pref(
+        PrefKeys.videoColumns,
+        VideoColumnCount.Auto,
+        save = { it.code },
+        restore = { VideoColumnCount.fromCode(it) },
+    )
+
     /** 启动页（左侧导航项）。 */
     var homeLeftNavItem by pref(
         PrefKeys.homeLeftNavItem,
@@ -454,6 +462,15 @@ object Prefs {
                 ?.map { it as? Float ?: 2f }
                 ?.stateIn(scope, SharingStarted.Eagerly, 2f)
                 ?: MutableStateFlow(2f)
+
+    /** 视频卡片列数 Flow（实时响应设置变更）。 */
+    val videoColumnsFlow: StateFlow<VideoColumnCount>
+        get() =
+            (delegateMap[PrefKeys.videoColumns] as? PrefDelegate<VideoColumnCount, Int>)
+                ?.flow
+                ?.map { VideoColumnCount.fromCode(it as? Int ?: 0) }
+                ?.stateIn(scope, SharingStarted.Eagerly, VideoColumnCount.Auto)
+                ?: MutableStateFlow(VideoColumnCount.Auto)
 
     // ===== 初始化 =====
 
