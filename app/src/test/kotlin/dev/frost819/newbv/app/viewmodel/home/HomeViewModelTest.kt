@@ -1,11 +1,11 @@
 package dev.frost819.newbv.app.viewmodel.home
 
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.app.data.AccountRepositoryImpl
 import dev.frost819.newbv.app.data.AccountUiState
+import dev.frost819.newbv.app.testutil.InMemoryPreferencesDataStore
 import dev.frost819.newbv.biliapi.entity.home.RecommendData
 import dev.frost819.newbv.biliapi.entity.home.RecommendPage
 import dev.frost819.newbv.biliapi.entity.rank.PopularVideoData
@@ -20,9 +20,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -36,7 +34,6 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import java.io.File
 import java.io.IOException
 
 /**
@@ -62,14 +59,7 @@ class HomeViewModelTest {
         @BeforeAll
         fun initPrefs() {
             Prefs.resetForTesting()
-            val scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
-            val file = File.createTempFile("test_home_vm", ".preferences_pb")
-            file.deleteOnExit()
-            testDataStore =
-                PreferenceDataStoreFactory.create(
-                    scope = scope,
-                    produceFile = { file },
-                )
+            testDataStore = InMemoryPreferencesDataStore()
             Prefs.init(testDataStore)
         }
 

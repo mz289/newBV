@@ -10,10 +10,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -27,24 +25,24 @@ import androidx.navigation.toRoute
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.VIDEO_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
-import dev.frost819.newbv.app.ui.component.livecard.formatOnlineCount
+import dev.frost819.newbv.app.ui.component.livecard.toCardData
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.navigation.LiveAreaRoute
 import dev.frost819.newbv.app.ui.navigation.LivePlayerRoute
-import dev.frost819.newbv.biliapi.http.entity.live.LiveRoomItem
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.repositories.LiveRepository
 import dev.frost819.newbv.core.log.Loggers
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -58,7 +56,6 @@ class LiveAreaListViewModel
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         companion object {
-            private const val LOAD_TIMEOUT_MS = 10_000L
         }
 
         private val route = savedStateHandle.toRoute<LiveAreaRoute>()
@@ -111,31 +108,13 @@ class LiveAreaListViewModel
                     }
                     currentPage = page + 1
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.warn(error) { "Failed to load area live list" }
                     _uiState.update { it.copy(isLoading = false, isError = true) }
                 }
             }
         }
     }
-
-private fun LiveRoomItem.toCardData(): LiveRoomCardData {
-    val coverUrl = cover.ifBlank { keyframe.ifBlank { userCover } }
-    return LiveRoomCardData(
-        roomId = roomId.toLong(),
-        title = title,
-        uname = uname,
-        uid = uid,
-        cover = coverUrl,
-        face = face,
-        areaV2Name = areaV2Name,
-        areaV2ParentName = areaV2ParentName,
-        onlineString = formatOnlineCount(online),
-        watchedString = watchedShow?.textSmall ?: "",
-    )
-}
 
 data class LiveAreaListUiState(
     val items: List<LiveRoomCardData> = emptyList(),
@@ -168,18 +147,16 @@ private fun LiveAreaListScreen(
 
     focusSaver.RestoreFocus()
 
-    LaunchedEffect(gridState) {
-        snapshotFlow {
-            gridState.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index
-        }.distinctUntilChanged()
-            .collect { index ->
-                if (index != null && index >= state.items.size - 5 && state.hasMore && !state.isLoading) {
-                    viewModel.loadMore()
-                }
+    InfiniteScrollEffect(
+        state = gridState,
+        itemCount = { state.items.size },
+        threshold = 5,
+        onLoadMore = {
+            if (state.hasMore && !state.isLoading) {
+                viewModel.loadMore()
             }
-    }
+        },
+    )
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
@@ -192,7 +169,7 @@ private fun LiveAreaListScreen(
         TvLazyVerticalGrid(
             modifier = Modifier.weight(1f),
             state = gridState,
-            columns = GridCells.Fixed(4),
+            columns = GridCells.Adaptive(VIDEO_CARD_MIN_WIDTH),
             contentPadding = PaddingValues(24.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -222,6 +199,7 @@ private fun LiveAreaListScreen(
                     isError = state.isError,
                     hasMore = state.hasMore,
                     itemsIsEmpty = state.items.isEmpty(),
+                    onRetry = viewModel::loadFirstPage,
                 )
             }
         }

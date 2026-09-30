@@ -15,6 +15,7 @@ import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.user.FollowAction
 import dev.frost819.newbv.biliapi.http.entity.user.FollowActionSource
 import dev.frost819.newbv.biliapi.http.entity.user.RelationType
+import dev.frost819.newbv.biliapi.util.BiliLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -77,7 +78,7 @@ class UserRepository(
                 RelationType.BothFollowed,
             ).contains(response.relation.attribute)
         }.onFailure {
-            it.printStackTrace()
+            BiliLogger.error(it) { "checkIsFollowing failed" }
         }.getOrNull()
     }
 
@@ -99,7 +100,7 @@ class UserRepository(
                 }.getResponseData()
             response.following
         }.onFailure {
-            it.printStackTrace()
+            BiliLogger.error(it) { "getFollowingUpCount failed" }
         }.getOrNull() ?: 0
     }
 

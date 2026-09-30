@@ -15,9 +15,12 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import dev.frost819.newbv.app.ui.navigation.AppNavHost
 import dev.frost819.newbv.app.ui.navigation.HomeRoute
+import dev.frost819.newbv.core.focus.DpadDirection
+import dev.frost819.newbv.core.focus.FocusShakeController
 import dev.frost819.newbv.core.interaction.InteractionTracker
 import dev.frost819.newbv.core.interaction.LocalInteractionTracker
 import dev.frost819.newbv.core.log.Loggers
+import dev.frost819.newbv.core.theme.AccentColor
 import dev.frost819.newbv.core.theme.BVTheme
 import dev.frost819.newbv.core.theme.SystemBarsEffect
 import dev.frost819.newbv.core.theme.ThemeMode
@@ -31,7 +34,7 @@ import javax.inject.Inject
  * - SplashScreen 显示
  * - 交互模式追踪（触屏/遥控器）
  * - Navigation 宿主（[AppNavHost]）
- * - 主题模式 + density 从 Prefs 实时读取
+ * - 主题模式 + 强调色 + density 从 Prefs 实时读取
  *
  * 所有页面通过 Navigation-Compose 导航，不启动新 Activity。
  */
@@ -49,8 +52,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by Prefs.themeModeFlow.collectAsState(initial = ThemeMode.Dark)
             val density by Prefs.densityFlow.collectAsState(initial = 2.0f)
+            val accentColor by Prefs.accentColorFlow.collectAsState(initial = AccentColor.Brand)
 
-            BVTheme(themeMode = themeMode, density = density) {
+            BVTheme(themeMode = themeMode, density = density, accentColor = accentColor) {
                 SystemBarsEffect()
                 CompositionLocalProvider(
                     LocalInteractionTracker provides interactionTracker,
@@ -74,6 +78,26 @@ class MainActivity : ComponentActivity() {
             interactionTracker.onDpadKey()
             logger.info { "[INPUT] keyDown keyCode=${KeyEvent.keyCodeToString(event.keyCode)}" }
         }
-        return super.dispatchKeyEvent(event)
+        val consumed = super.dispatchKeyEvent(event)
+        // 撞墙抖动：方向键未被 Compose 焦点系统与任何节点消费（super 返回 false），
+        // 说明焦点已到可聚焦区域边界，广播一次抖动；长按连发不重复抖动。
+        // 播放器 / 输入框等场景的方向键均在内部被消费，不会误触发。
+        if (!consumed &&
+            event.action == KeyEvent.ACTION_DOWN &&
+            event.repeatCount == 0
+        ) {
+            val direction =
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_DPAD_LEFT -> DpadDirection.Left
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> DpadDirection.Right
+                    KeyEvent.KEYCODE_DPAD_UP -> DpadDirection.Up
+                    KeyEvent.KEYCODE_DPAD_DOWN -> DpadDirection.Down
+                    else -> null
+                }
+            if (direction != null) {
+                FocusShakeController.bump(direction)
+            }
+        }
+        return consumed
     }
 }

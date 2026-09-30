@@ -16,9 +16,6 @@ abstract class AbstractVideoPlayer {
     /** 初始化播放器实例 */
     abstract fun initPlayer()
 
-    /** 设置请求头 */
-    abstract fun setHeader(headers: Map<String, String>)
-
     /**
      * 设置播放地址。
      *
@@ -45,9 +42,6 @@ abstract class AbstractVideoPlayer {
     /** 停止播放 */
     abstract fun stop()
 
-    /** 重置播放器状态 */
-    abstract fun reset()
-
     /** 是否正在播放 */
     abstract val isPlaying: Boolean
 
@@ -71,9 +65,6 @@ abstract class AbstractVideoPlayer {
 
     /** 播放速度（1.0 = 正常速度） */
     abstract var speed: Float
-
-    /** 当前缓冲的网速（字节/秒），部分实现可能返回 0 */
-    abstract val tcpSpeed: Long
 
     /** 调试信息字符串 */
     abstract val debugInfo: String

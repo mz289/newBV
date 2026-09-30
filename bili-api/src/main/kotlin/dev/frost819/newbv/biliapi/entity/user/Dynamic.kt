@@ -171,7 +171,7 @@ private fun convertStringPlayCountToNumberPlayCount(play: String): Int {
                 .toFloat()
         return (if (play.contains("万")) number * 10000 else number).toInt()
     }.onFailure {
-        println("convert play count [$play] failed: ${it.stackTraceToString()}")
+        BiliLogger.warn(it) { "convert play count [$play] failed" }
     }
     return -1
 }

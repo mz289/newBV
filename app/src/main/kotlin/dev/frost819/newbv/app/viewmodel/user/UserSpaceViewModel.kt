@@ -3,14 +3,14 @@ package dev.frost819.newbv.app.viewmodel.user
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideo
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,8 +18,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-
-private const val LOAD_TIMEOUT_MS = 10_000L
 
 /**
  * 用户空间页 UiState。
@@ -117,9 +115,7 @@ class UserSpaceViewModel
                     }
                     videoPage = data.page
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load space videos" }
                     _uiState.update { it.copy(loading = false, error = true) }
                 }

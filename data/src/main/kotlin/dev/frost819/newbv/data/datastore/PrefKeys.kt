@@ -10,13 +10,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 /**
  * DataStore 偏好设置键定义。
  *
- * 集中管理所有偏好项的 [Preferences.Key]，键名沿用原版 BV 的缩写以保持兼容。
- * 键名规则：基本类型用语义缩写，历史遗留键名不变。
+ * 集中管理所有偏好项的 [Preferences.Key]。
  *
- * 已删除（相对原版）：
- * - 代理相关：`enable_proxy`、`proxy_http_server`、`proxy_grpc_server`、`prefer_official_cdn`
- * - 播放器类型：`pt`（仅 Media3，无需选择）
- * - FPS 显示：`sf`（调试用，非用户功能）
+ * 键名沿用自原版 BV 的缩写（如 `dds2`、`prefer_enable_webmark`），应用包名不同、
+ * 无跨应用兼容需求，但键名已随 v1.0.0 发布，不可再改名（会丢用户设置）。
  */
 internal object PrefKeys {
     // ===== 账号 & 认证 =====
@@ -80,6 +77,7 @@ internal object PrefKeys {
     val firstPersonalTopNavItem = intPreferencesKey("first_personal_top_nav")
     val showHotword = booleanPreferencesKey("shw")
     val themeMode = intPreferencesKey("theme_mode")
+    val accentColor = stringPreferencesKey("accent_color")
 
     // ===== 存储设置 =====
     val cacheThreshold = intPreferencesKey("cache_threshold")

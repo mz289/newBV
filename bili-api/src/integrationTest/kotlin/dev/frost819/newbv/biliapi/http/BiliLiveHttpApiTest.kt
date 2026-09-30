@@ -65,17 +65,6 @@ class BiliLiveHttpApiTest {
     }
 
     @Test
-    fun `get live room info`() {
-        Assertions.assertDoesNotThrow {
-            runBlocking {
-                val response = BiliLiveHttpApi.getLiveRoomPlayInfo(roomId = ROOM_ID)
-                Assertions.assertEquals(0, response.code)
-                Assertions.assertEquals(ROOM_ID, response.data?.roomId)
-            }
-        }
-    }
-
-    @Test
     fun `room init resolves the configured room`() {
         runBlocking {
             val response = BiliLiveHttpApi.getRoomInit(ROOM_ID)

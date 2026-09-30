@@ -12,7 +12,7 @@ import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.SuggestionChipDefaults
 
-/** 全应用操作控件的焦点样式：2dp 外描边、内缘紧贴控件边缘，聚焦时保留普通与选中底色。 */
+/** 全应用操作控件的焦点样式：2dp 外描边、内缘紧贴控件边缘，聚焦时保留普通与选中底色；列表类控件例外，聚焦改用底色填充。 */
 @OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class)
 object ControlFocusDefaults {
     /** 标准按钮、图标按钮和标签共用的圆角。 */
@@ -54,24 +54,29 @@ object ControlFocusDefaults {
             focusedDisabledBorder = Border.None,
         )
 
-    /** 设置列表项的焦点边框，选中与未选中项使用相同描边。 */
+    /** 列表项焦点由底色填充表达，所有状态不再绘制描边（覆盖组件默认边框）。 */
     @Composable
     fun listBorder() =
         ListItemDefaults.border(
-            focusedBorder = outerFocusBorder(),
-            focusedSelectedBorder = outerFocusBorder(),
-            pressedSelectedBorder = outerFocusBorder(),
+            border = Border.None,
+            focusedBorder = Border.None,
+            focusedSelectedBorder = Border.None,
+            pressedSelectedBorder = Border.None,
             focusedDisabledBorder = Border.None,
         )
 
-    /** 列表项聚焦后保留选中状态，避免白色反色覆盖选中底色。 */
+    /**
+     * 列表项配色：聚焦与按下使用选中态的底色填充表达焦点，文字随之切换。
+     *
+     * 设置列表等场景的焦点不用描边，而是与左侧导航一致的改变背景方式。
+     */
     @Composable
     fun listColors() =
         ListItemDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            focusedContentColor = MaterialTheme.colorScheme.onSurface,
-            pressedContainerColor = Color.Transparent,
-            pressedContentColor = MaterialTheme.colorScheme.onSurface,
+            focusedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            focusedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            pressedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            pressedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
             selectedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             focusedSelectedContainerColor = MaterialTheme.colorScheme.primaryContainer,

@@ -57,9 +57,6 @@ object PlayerConstants {
     /** 进度条更新间隔（毫秒）。 */
     const val SEEKER_UPDATE_INTERVAL_MS = 100L
 
-    /** 时钟更新间隔（毫秒）。 */
-    const val CLOCK_UPDATE_INTERVAL_MS = 1_000L
-
     /** 倒计时默认时长（毫秒）：回到开头、跳下集、试看提示。 */
     const val COUNTDOWN_DURATION_MS = 5_000L
 

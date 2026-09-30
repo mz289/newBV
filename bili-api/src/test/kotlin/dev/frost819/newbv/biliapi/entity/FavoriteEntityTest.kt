@@ -3,7 +3,6 @@ package dev.frost819.newbv.biliapi.entity
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteFolderInfo
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteFolderInfoListData
-import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteItemId
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.UserFavoriteFoldersData
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -39,34 +38,6 @@ class FavoriteEntityTest {
         assertThat(FavoriteItemType.Audio.value).isEqualTo(12)
         assertThat(FavoriteItemType.VideoCollection.value).isEqualTo(21)
     }
-
-    // ------------------------------------------------------------------
-    // FavoriteFolderItemId.fromFavoriteItemId
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `FavoriteFolderItemId fromFavoriteItemId maps all fields`() {
-        val httpItemId = FavoriteItemId(id = 12345L, type = 2, bvid = "BV1xx411c7mD")
-
-        val result = FavoriteFolderItemId.fromFavoriteItemId(httpItemId)
-
-        assertThat(result.id).isEqualTo(12345L)
-        assertThat(result.type).isEqualTo(FavoriteItemType.Video)
-        assertThat(result.bvid).isEqualTo("BV1xx411c7mD")
-    }
-
-    @Test
-    fun `FavoriteFolderItemId fromFavoriteItemId maps audio type`() {
-        val httpItemId = FavoriteItemId(id = 99L, type = 12, bvid = "")
-
-        val result = FavoriteFolderItemId.fromFavoriteItemId(httpItemId)
-
-        assertThat(result.type).isEqualTo(FavoriteItemType.Audio)
-    }
-
-    // ------------------------------------------------------------------
-    // FavoriteFolderMetadata.fromHttpFavoriteFolderInfo
-    // ------------------------------------------------------------------
 
     @Test
     fun `fromHttpFavoriteFolderInfo maps all fields correctly`() {

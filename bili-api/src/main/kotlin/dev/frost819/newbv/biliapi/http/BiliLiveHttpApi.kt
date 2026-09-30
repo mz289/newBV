@@ -10,7 +10,6 @@ import dev.frost819.newbv.biliapi.http.entity.live.LiveRecommendResponse
 import dev.frost819.newbv.biliapi.http.entity.live.LiveRoomItem
 import dev.frost819.newbv.biliapi.http.entity.live.RoomInfoData
 import dev.frost819.newbv.biliapi.http.entity.live.RoomInitData
-import dev.frost819.newbv.biliapi.http.entity.live.RoomPlayInfoData
 import dev.frost819.newbv.biliapi.http.entity.live.RoomPlayInfoV2Data
 import dev.frost819.newbv.biliapi.http.entity.live.SimplePlayUrlData
 import dev.frost819.newbv.biliapi.http.plugins.BiliUserAgent
@@ -82,15 +81,6 @@ object BiliLiveHttpApi {
                 parameter("id", roomId)
                 parameter("type", 0)
                 parameter("web_location", "444.8")
-            }.body()
-
-    /**
-     * 获取直播间[roomId]的信息
-     */
-    suspend fun getLiveRoomPlayInfo(roomId: Int): BiliResponse<RoomPlayInfoData> =
-        client
-            .get("/xlive/web-room/v1/index/getRoomPlayInfo") {
-                parameter("room_id", roomId)
             }.body()
 
     /**

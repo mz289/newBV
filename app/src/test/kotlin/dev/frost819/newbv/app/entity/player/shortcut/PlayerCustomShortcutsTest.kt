@@ -168,30 +168,20 @@ class PlayerCustomShortcutsTest {
             .isEqualTo("媒体快进")
     }
 
-    // ── 历史格式与遗留动作兼容 ────────────────────────────────────────
-
-    @Test
-    fun `parse old array format still works`() {
-        val oldFormat = """[{"k":19,"a":"toggle_danmaku","p":{}}]"""
-        val parsed = PlayerCustomShortcutsCodec.parse(oldFormat)
-
-        assertThat(parsed).hasSize(1)
-        assertThat(parsed[0].keyCode).isEqualTo(19)
-        assertThat(parsed[0].action).isEqualTo(PlayerCustomShortcutAction.ToggleDanmaku)
-    }
+    // ── 遗留动作兼容 ─────────────────────────────────────────────────
 
     @Test
     fun `parse drops legacy removed actions`() {
         val legacy =
             """
-            [
+            {"v":1,"items":[
                 {"k":20,"a":"show_info","p":{}},
                 {"k":21,"a":"open_video_list","p":{}},
                 {"k":22,"a":"toggle_play_pause","p":{}},
                 {"k":23,"a":"set_resolution","p":{"quality_id":80}},
                 {"k":24,"a":"set_danmaku_mask_enabled","p":{"enabled":true}},
                 {"k":25,"a":"set_subtitle_font_size","p":{"sp":24}}
-            ]
+            ]}
             """.trimIndent()
 
         assertThat(PlayerCustomShortcutsCodec.parse(legacy)).isEmpty()
@@ -201,10 +191,10 @@ class PlayerCustomShortcutsTest {
     fun `parse keeps valid entries mixed with legacy removed ones`() {
         val mixed =
             """
-            [
+            {"v":1,"items":[
                 {"k":20,"a":"set_danmaku_mask_enabled","p":{"enabled":true}},
                 {"k":21,"a":"toggle_danmaku_mask","p":{}}
-            ]
+            ]}
             """.trimIndent()
         val parsed = PlayerCustomShortcutsCodec.parse(mixed)
 
@@ -215,16 +205,16 @@ class PlayerCustomShortcutsTest {
 
     @Test
     fun `parse returns empty for unknown action name`() {
-        val oldFormat = """[{"k":20,"a":"unknown_action","p":{}}]"""
-        val parsed = PlayerCustomShortcutsCodec.parse(oldFormat)
+        val raw = """{"v":1,"items":[{"k":20,"a":"unknown_action","p":{}}]}"""
+        val parsed = PlayerCustomShortcutsCodec.parse(raw)
 
         assertThat(parsed).isEmpty()
     }
 
     @Test
     fun `parse returns empty for missing required params`() {
-        val oldFormat = """[{"k":20,"a":"set_playback_speed","p":{}}]"""
-        val parsed = PlayerCustomShortcutsCodec.parse(oldFormat)
+        val raw = """{"v":1,"items":[{"k":20,"a":"set_playback_speed","p":{}}]}"""
+        val parsed = PlayerCustomShortcutsCodec.parse(raw)
 
         assertThat(parsed).isEmpty()
     }

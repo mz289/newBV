@@ -15,6 +15,13 @@ import androidx.compose.material.icons.filled.OndemandVideo
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LiveTv
+import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.OndemandVideo
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.runtime.Composable
@@ -160,7 +167,7 @@ fun LeftNaviContent(
                 val indicatorColor by animateColorAsState(
                     targetValue =
                         if (item == selectedItem) {
-                            MaterialTheme.colorScheme.border
+                            MaterialTheme.colorScheme.primary
                         } else {
                             Color.Transparent
                         },
@@ -171,7 +178,7 @@ fun LeftNaviContent(
                     selected = isFocused,
                     icon = {
                         Icon(
-                            imageVector = item.displayIcon,
+                            imageVector = item.displayIcon(selected = item == selectedItem),
                             contentDescription = null,
                         )
                     },
@@ -183,7 +190,7 @@ fun LeftNaviContent(
                     colors =
                         androidx.compose.material3.NavigationRailItemDefaults.colors(
                             indicatorColor = Color.Transparent,
-                            selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
                             unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         ),
                 )
@@ -196,7 +203,7 @@ fun LeftNaviContent(
             selected = settingsIsFocused,
             icon = {
                 Icon(
-                    imageVector = Icons.Default.Settings,
+                    imageVector = Icons.Outlined.Settings,
                     contentDescription = null,
                 )
             },
@@ -216,17 +223,21 @@ fun LeftNaviContent(
     }
 }
 
-/** 左侧导航项的图标与显示名称扩展。 */
-val LeftNaviItem.displayIcon: ImageVector
-    get() =
-        when (this) {
-            LeftNaviItem.Search -> Icons.Default.Search
-            LeftNaviItem.Personal -> Icons.Default.Person
-            LeftNaviItem.Home -> Icons.Default.Home
-            LeftNaviItem.UGC -> Icons.Default.OndemandVideo
-            LeftNaviItem.PGC -> Icons.Default.Movie
-            LeftNaviItem.Live -> Icons.Default.LiveTv
-        }
+/**
+ * 左侧导航项的图标扩展。
+ *
+ * 线性图标为常态（P2-2 图标体系统一），选中态切换为填充版本，
+ * 颜色语义（品牌色/灰色）由调用方的 colors 控制。
+ */
+fun LeftNaviItem.displayIcon(selected: Boolean): ImageVector =
+    when (this) {
+        LeftNaviItem.Search -> if (selected) Icons.Filled.Search else Icons.Outlined.Search
+        LeftNaviItem.Personal -> if (selected) Icons.Filled.Person else Icons.Outlined.Person
+        LeftNaviItem.Home -> if (selected) Icons.Filled.Home else Icons.Outlined.Home
+        LeftNaviItem.UGC -> if (selected) Icons.Filled.OndemandVideo else Icons.Outlined.OndemandVideo
+        LeftNaviItem.PGC -> if (selected) Icons.Filled.Movie else Icons.Outlined.Movie
+        LeftNaviItem.Live -> if (selected) Icons.Filled.LiveTv else Icons.Outlined.LiveTv
+    }
 
 /** 左侧导航项的显示名称扩展。 */
 val LeftNaviItem.displayName: String

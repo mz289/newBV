@@ -4,13 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
-import dev.frost819.newbv.app.ui.component.livecard.formatOnlineCount
-import dev.frost819.newbv.biliapi.http.entity.live.FollowLiveRoom
+import dev.frost819.newbv.app.ui.component.livecard.toCardData
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.http.entity.live.LiveAreaParent
-import dev.frost819.newbv.biliapi.http.entity.live.LiveRoomItem
 import dev.frost819.newbv.biliapi.repositories.LiveRepository
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,7 +29,6 @@ class LiveHomeViewModel
         private val liveRepository: LiveRepository,
     ) : ViewModel() {
         companion object {
-            private const val LOAD_TIMEOUT_MS = 10_000L
         }
 
         private val _uiState = MutableStateFlow(LiveHomeUiState())
@@ -70,9 +67,7 @@ class LiveHomeViewModel
                         )
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     _uiState.update {
                         it.copy(
                             followLoading = false,
@@ -105,9 +100,7 @@ class LiveHomeViewModel
                         )
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     _uiState.update {
                         it.copy(
                             areaLoading = false,
@@ -147,9 +140,7 @@ class LiveHomeViewModel
                         )
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     _uiState.update {
                         it.copy(
                             recommendLoading = false,
@@ -202,9 +193,7 @@ class LiveHomeViewModel
                         )
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     _uiState.update {
                         it.copy(
                             recommendLoading = false,
@@ -215,38 +204,6 @@ class LiveHomeViewModel
             }
         }
     }
-
-private fun FollowLiveRoom.toCardData(): LiveRoomCardData {
-    val coverUrl = coverFromUser.ifBlank { keyframe }
-    return LiveRoomCardData(
-        roomId = roomId,
-        title = title,
-        uname = uname.ifBlank { nickname },
-        uid = uid,
-        cover = coverUrl,
-        face = face,
-        areaV2Name = areaV2Name,
-        areaV2ParentName = areaV2ParentName,
-        onlineString = formatOnlineCount(online),
-        watchedString = "",
-    )
-}
-
-private fun LiveRoomItem.toCardData(): LiveRoomCardData {
-    val coverUrl = cover.ifBlank { keyframe.ifBlank { userCover } }
-    return LiveRoomCardData(
-        roomId = roomId.toLong(),
-        title = title,
-        uname = uname,
-        uid = uid,
-        cover = coverUrl,
-        face = face,
-        areaV2Name = areaV2Name,
-        areaV2ParentName = areaV2ParentName,
-        onlineString = formatOnlineCount(online),
-        watchedString = watchedShow?.textSmall ?: "",
-    )
-}
 
 data class LiveHomeUiState(
     val followItems: List<LiveRoomCardData> = emptyList(),

@@ -542,6 +542,5 @@ class SeasonDetailViewModelTest {
             assertThat(slot.captured).hasSize(2)
             assertThat(slot.captured[1].cid).isEqualTo(20002L)
             assertThat(slot.captured[1].epid).isEqualTo(1002)
-            assertThat(slot.captured[1].seasonId).isEqualTo(100)
         }
 }

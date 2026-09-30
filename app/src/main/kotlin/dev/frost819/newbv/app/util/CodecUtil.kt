@@ -142,10 +142,8 @@ enum class CodecMode {
             }
             if (info.isAudioCodec()) return Software
             val name = info.name
-            if (name.contains("omx.brcm.video", true) && name.contains("hw", true)) return Hardware
-            if (name.startsWith("omx.marvell.video.hw", true)) return Hardware
-            if (name.startsWith("omx.intel.hw_vd", true)) return Hardware
-            if (name.startsWith("omx.qcom", true) && name.endsWith("hw")) return Hardware
+            // ARC（ChromeOS 容器）不以 omx./c2. 开头，需显式归类为 Hardware，
+            // 否则会被 isSoftwareCodec 的 unknownVendor 启发式误判为 Software
             if (name.startsWith("c2.vda.arc", true) || name.startsWith("arc.")) return Hardware
             return if (isSoftwareCodec(name)) Software else Hardware
         }

@@ -184,7 +184,7 @@ enum class PlaySpeed(
  * 通过 ordinal 持久化，反序列化时越界回退到 [Home]。
  * 相对原版新增 [Live] 项（PRD 7.2）。
  */
-enum class LeftNaviItem : java.io.Serializable {
+enum class LeftNaviItem {
     Search,
     Personal,
     Home,

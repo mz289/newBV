@@ -9,19 +9,19 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import dev.frost819.newbv.app.ui.component.FocusSaver
+import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.VIDEO_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
@@ -31,8 +31,6 @@ import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.app.viewmodel.common.CollectWatchLaterEffects
 import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
 import dev.frost819.newbv.app.viewmodel.personal.PersonalViewModel
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 
 /**
  * 历史记录页面。
@@ -70,23 +68,16 @@ fun HistoryScreen(
         return
     }
 
-    LaunchedEffect(gridState) {
-        snapshotFlow {
-            gridState.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index
-        }.distinctUntilChanged()
-            .filter { index ->
-                index != null && index >= state.historyItems.size - 20
-            }.collect {
-                viewModel.loadHistory()
-            }
-    }
+    InfiniteScrollEffect(
+        state = gridState,
+        itemCount = { state.historyItems.size },
+        onLoadMore = { viewModel.loadHistory() },
+    )
 
     TvLazyVerticalGrid(
         modifier = modifier,
         state = gridState,
-        columns = GridCells.Fixed(4),
+        columns = GridCells.Adaptive(VIDEO_CARD_MIN_WIDTH),
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -152,6 +143,7 @@ fun HistoryScreen(
                 isError = state.historyError,
                 hasMore = state.historyHasMore,
                 itemsIsEmpty = state.historyItems.isEmpty(),
+                onRetry = viewModel::loadHistory,
             )
         }
     }

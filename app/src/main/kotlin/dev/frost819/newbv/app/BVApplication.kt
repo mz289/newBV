@@ -105,9 +105,6 @@ class BVApplication : Application() {
             }
         }
 
-        @Suppress("UNUSED_EXPRESSION")
-        crashHandler
-
         // 根据用户设置启用崩溃上传，并尝试上传上次崩溃未发送的日志
         crashUploader.enabled = Prefs.crashReportEnabled
         if (crashUploader.canUpload()) {

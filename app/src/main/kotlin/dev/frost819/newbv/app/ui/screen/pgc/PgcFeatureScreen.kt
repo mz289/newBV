@@ -79,6 +79,7 @@ import dev.frost819.newbv.biliapi.entity.video.season.SeasonDetail
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
+import dev.frost819.newbv.core.theme.LocalFocusOutlineColor
 
 /**
  * 番剧详情页路由注册。
@@ -563,7 +564,7 @@ private fun EpisodeCard(
                 CardDefaults.border(
                     focusedBorder =
                         Border(
-                            BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+                            BorderStroke(2.dp, LocalFocusOutlineColor.current),
                             shape = RoundedCornerShape(8.dp),
                         ),
                 ),
@@ -610,7 +611,7 @@ private fun EpisodeCard(
                                     .fillMaxWidth(
                                         progress,
                                     ).height(3.dp)
-                                    .background(MaterialTheme.colorScheme.border),
+                                    .background(MaterialTheme.colorScheme.secondary),
                             )
                         }
                     }
@@ -645,7 +646,8 @@ private fun SeasonSwitcherRow(
     LazyRow(
         modifier = Modifier.fillMaxWidth().focusRestorer(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        // 左侧不预留内边距以对齐下方按钮；右侧保留 8dp 供滚动到底时聚焦描边绘制
+        contentPadding = PaddingValues(start = 0.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
     ) {
         items(detail.seasons, key = { it.seasonId }) { season ->
             val current = season.seasonId == detail.seasonId

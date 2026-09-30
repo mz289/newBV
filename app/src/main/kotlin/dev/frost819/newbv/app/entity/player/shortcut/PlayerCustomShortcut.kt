@@ -73,9 +73,7 @@ object PlayerCustomShortcutKeys {
 /**
  * 快捷键序列化/反序列化编解码器。
  *
- * 支持两种 JSON 格式：
- * - 数组格式（旧版兼容）：`[{"k":19,"a":"toggle_danmaku","p":{}}]`
- * - 版本化格式：`{"v":1,"items":[...]}`
+ * JSON 格式：`{"v":1,"items":[...]}`
  *
  * [normalize] 确保：键码去重、动作参数范围合法、禁用键过滤。
  * 已移除的历史动作（如 set_resolution）在解析时被静默丢弃。
@@ -94,12 +92,7 @@ object PlayerCustomShortcutsCodec {
         if (raw.isBlank()) return emptyList()
 
         return runCatching {
-            val items =
-                if (raw.trimStart().startsWith("[")) {
-                    json.decodeFromString<List<PlayerCustomShortcutDto>>(raw)
-                } else {
-                    json.decodeFromString<PlayerCustomShortcutsPayload>(raw).items
-                }
+            val items = json.decodeFromString<PlayerCustomShortcutsPayload>(raw).items
             normalize(items.mapNotNull { it.toShortcutOrNull() })
         }.getOrDefault(emptyList())
     }

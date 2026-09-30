@@ -6,6 +6,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import dev.frost819.newbv.biliapi.entity.ApiType
+import dev.frost819.newbv.core.theme.AccentColor
 import dev.frost819.newbv.core.theme.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -371,7 +372,7 @@ object Prefs {
 
     // --- 应用界面（PRD 7.2） ---
 
-    /** 界面缩放密度（默认 1f，app 层 init 时按屏幕宽度重新计算）。 */
+    /** 界面缩放密度（默认 2f，app 层 init 时按屏幕宽度重新计算）。 */
     var density by pref(PrefKeys.density, 2f)
 
     /** 启动页（左侧导航项）。 */
@@ -409,6 +410,14 @@ object Prefs {
         restore = { ThemeMode.entries.getOrElse(it) { ThemeMode.FollowSystem } },
     )
 
+    /** 强调色预设（默认品牌蓝紫）。 */
+    var accentColor by pref(
+        PrefKeys.accentColor,
+        AccentColor.Brand,
+        save = { it.name },
+        restore = { AccentColor.fromName(it) },
+    )
+
     // --- 存储设置（PRD 7.6） ---
 
     /** 缓存阈值（MB，0 = 无限制，默认无限制）。 */
@@ -427,6 +436,15 @@ object Prefs {
                 ?.map { ThemeMode.fromOrdinal(it as? Int ?: 0) }
                 ?.stateIn(scope, SharingStarted.Eagerly, ThemeMode.FollowSystem)
                 ?: MutableStateFlow(ThemeMode.FollowSystem)
+
+    /** 强调色 Flow（实时响应设置变更）。 */
+    val accentColorFlow: StateFlow<AccentColor>
+        get() =
+            (delegateMap[PrefKeys.accentColor] as? PrefDelegate<AccentColor, String>)
+                ?.flow
+                ?.map { AccentColor.fromName(it as? String) }
+                ?.stateIn(scope, SharingStarted.Eagerly, AccentColor.Brand)
+                ?: MutableStateFlow(AccentColor.Brand)
 
     /** Density Flow（实时响应设置变更）。 */
     val densityFlow: StateFlow<Float>

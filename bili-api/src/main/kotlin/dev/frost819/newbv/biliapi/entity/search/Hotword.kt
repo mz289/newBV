@@ -13,14 +13,6 @@ data class Hotword(
                 icon = hotword.icon,
             )
 
-        fun fromHttpAppSquareDataItem(
-            squareDataItem: dev.frost819.newbv.biliapi.http.entity.search.AppSearchSquareData.SquareData.SquareDataItem,
-        ) = Hotword(
-            keyword = squareDataItem.keyword ?: "",
-            showName = squareDataItem.showName ?: "",
-            icon = squareDataItem.icon,
-        )
-
         fun fromHttpAppSearchTrendingHotword(
             hotword: dev.frost819.newbv.biliapi.http.entity.search.SearchTendingData.Hotword,
         ) = Hotword(

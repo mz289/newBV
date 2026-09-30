@@ -4,13 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.state.search.SearchInputUiState
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.repositories.SearchRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.repository.SearchHistoryRepository
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -37,7 +37,6 @@ class SearchInputViewModel
         private val logger = Loggers.get("SearchInputViewModel")
 
         companion object {
-            private const val LOAD_TIMEOUT_MS = 10_000L
         }
 
         private val _uiState = MutableStateFlow(SearchInputUiState())
@@ -111,9 +110,7 @@ class SearchInputViewModel
                     _uiState.update { it.copy(hotwords = hotwords) }
                     logger.info { "Loaded hotwords: ${hotwords.size}" }
                 }.onFailure { e ->
-                    if (e is CancellationException && e !is TimeoutCancellationException) {
-                        throw e
-                    }
+                    e.rethrowUnlessTimeout()
                     logger.warn { "Failed to load hotwords: $e" }
                 }
             }
@@ -131,9 +128,7 @@ class SearchInputViewModel
                 }.onSuccess { suggests ->
                     _uiState.update { it.copy(suggests = suggests) }
                 }.onFailure { e ->
-                    if (e is CancellationException && e !is TimeoutCancellationException) {
-                        throw e
-                    }
+                    e.rethrowUnlessTimeout()
                     logger.warn { "Failed to load suggests: $e" }
                     _uiState.update { it.copy(suggests = emptyList()) }
                 }

@@ -1,24 +1,8 @@
 package dev.frost819.newbv.biliapi.entity
 
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteFolderInfoListData
-import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteItemId
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.UserFavoriteFoldersData
 import kotlinx.serialization.Serializable
-
-data class FavoriteFolderItemId(
-    val id: Long,
-    val type: FavoriteItemType,
-    val bvid: String,
-) {
-    companion object {
-        fun fromFavoriteItemId(favoriteItemId: FavoriteItemId): FavoriteFolderItemId =
-            FavoriteFolderItemId(
-                id = favoriteItemId.id,
-                type = FavoriteItemType.fromValue(favoriteItemId.type),
-                bvid = favoriteItemId.bvid,
-            )
-    }
-}
 
 enum class FavoriteItemType(
     val value: Int,

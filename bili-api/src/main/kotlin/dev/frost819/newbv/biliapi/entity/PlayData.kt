@@ -313,9 +313,6 @@ data class PlayData(
                 needPay = isPreview,
             )
         }
-
-        fun fromPlayUrlV2Data(playUrlV2Data: dev.frost819.newbv.biliapi.http.entity.video.PlayUrlV2Data): PlayData =
-            fromPlayUrlData(playUrlV2Data.videoInfo)
     }
 
     operator fun plus(other: PlayData): PlayData =

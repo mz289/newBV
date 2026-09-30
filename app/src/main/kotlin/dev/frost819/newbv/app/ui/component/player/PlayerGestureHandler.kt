@@ -36,7 +36,6 @@ enum class GestureTipType {
     None,
     Brightness,
     Volume,
-    Speed,
     Seek,
 }
 
@@ -46,7 +45,6 @@ enum class GestureTipType {
  * @param onSingleTap 单击：显示/隐藏控制器。
  * @param onDoubleTap 双击：播放/暂停。
  * @param onSeekDelta 水平拖拽 seek：正值快进、负值快退（毫秒增量）。
- * @param onSeekCommit seek 提交（手指松开时调用）。
  * @param onBrightnessChange 亮度变化：deltaY > 0 增加亮度，< 0 降低亮度。
  * @param onVolumeChange 音量变化：deltaY > 0 增加音量，< 0 降低音量。
  */
@@ -54,7 +52,6 @@ data class PlayerGestureCallbacks(
     val onSingleTap: () -> Unit,
     val onDoubleTap: () -> Unit,
     val onSeekDelta: (deltaMs: Long) -> Unit,
-    val onSeekCommit: () -> Unit,
     val onBrightnessChange: (deltaY: Float) -> Unit,
     val onVolumeChange: (deltaY: Float) -> Unit,
 )
@@ -105,7 +102,6 @@ fun Modifier.playerGestures(
 
         awaitEachGesture {
             val firstDown = awaitFirstDown(requireUnconsumed = false)
-            val startTime = System.currentTimeMillis()
             val startX = firstDown.position.x
             val startY = firstDown.position.y
             val width = this.size.width.toFloat()
@@ -123,15 +119,10 @@ fun Modifier.playerGestures(
 
                 if (!change.pressed) {
                     // 手指抬起
-                    val duration = System.currentTimeMillis() - startTime
-
                     // 如果事件已被子组件消费（如按钮点击），跳过手势处理
                     if (change.isConsumed) break
 
                     if (isDragging) {
-                        if (isHorizontalDrag == true) {
-                            callbacks.onSeekCommit()
-                        }
                         gestureTipState.value = GestureTipState(isActive = false)
                     } else {
                         // 判断是否为 tap

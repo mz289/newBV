@@ -69,6 +69,7 @@ import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.biliapi.entity.video.VideoShot
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.theme.BVTheme
+import dev.frost819.newbv.core.theme.LocalFocusOutlineColor
 import kotlinx.coroutines.delay
 
 /**
@@ -83,7 +84,6 @@ import kotlinx.coroutines.delay
  * @param goTime seek 预览位置（毫秒）
  * @param seekerState 进度条状态
  * @param title 视频标题
- * @param clock 时钟（hour, minute）
  * @param onlineWatching 同时观看人数文案（空串时不显示）
  * @param videoShot 缩略图数据（为 null 时不显示预览）
  * @param videoShotCache 缩略图缓存
@@ -113,7 +113,6 @@ fun ControllerVideoInfo(
     goTime: Long,
     seekerState: SeekerState,
     title: String,
-    clock: Pair<Int, Int>,
     onlineWatching: String,
     videoShot: VideoShot?,
     videoShotCache: VideoShotImageCache,
@@ -146,7 +145,6 @@ fun ControllerVideoInfo(
             ControllerVideoInfoTop(
                 modifier = Modifier.align(Alignment.TopCenter),
                 title = title,
-                clock = clock,
                 onlineWatching = onlineWatching,
             )
         }
@@ -195,9 +193,10 @@ fun ControllerVideoInfo(
 fun ControllerVideoInfoTop(
     modifier: Modifier = Modifier,
     title: String,
-    clock: Pair<Int, Int>,
     onlineWatching: String,
 ) {
+    val currentClock = rememberClock()
+
     Column(
         modifier =
             modifier
@@ -237,7 +236,7 @@ fun ControllerVideoInfoTop(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Clock(hour = clock.first, minute = clock.second)
+            Clock(hour = currentClock.first, minute = currentClock.second)
         }
         if (onlineWatching.isNotEmpty()) {
             // 同时观看人数 meta 行（标题下方小字，参考 Web 端样式）
@@ -345,7 +344,7 @@ fun ControllerVideoInfoBottom(
                     .border(
                         width = 1.dp,
                         color =
-                            MaterialTheme.colorScheme.border.copy(
+                            LocalFocusOutlineColor.current.copy(
                                 alpha = if (isSeekFocused) 1f else 0f,
                             ),
                         shape =
@@ -591,7 +590,6 @@ private fun ControllerVideoInfoPreview() {
                     bufferedPercentage = 50,
                 ),
             title = "示例视频标题",
-            clock = Pair(14, 30),
             onlineWatching = "9.4万+",
             videoShot = null,
             videoShotCache = VideoShotImageCache(),

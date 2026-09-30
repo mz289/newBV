@@ -2,6 +2,8 @@ package dev.frost819.newbv.app.ui.component.videocard
 
 import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.app.util.toWanString
+import dev.frost819.newbv.biliapi.entity.ugc.UgcItem
+import dev.frost819.newbv.biliapi.entity.user.DynamicVideo
 import dev.frost819.newbv.biliapi.entity.video.RelatedVideo
 
 /**
@@ -57,6 +59,38 @@ data class VideoCardData(
                 playString = related.view.toWanString(),
                 danmakuString = related.danmaku.toWanString(),
                 timeString = (related.duration * 1000L).formatHourMinSec(),
+            )
+
+        /** 由首页推荐/热门条目 [UgcItem] 转换。 */
+        fun fromUgcItem(item: UgcItem): VideoCardData =
+            VideoCardData(
+                avid = item.aid,
+                bvid = item.bvid,
+                title = item.title,
+                cover = item.cover,
+                playString = item.play.takeIf { it != -1 }.toWanString(),
+                danmakuString = item.danmaku.takeIf { it != -1 }.toWanString(),
+                timeString = (item.duration * 1000L).formatHourMinSec(),
+                upName = item.author,
+                upMid = item.authorMid,
+                pubTime = item.pubTime,
+            )
+
+        /** 由动态视频条目 [DynamicVideo] 转换。 */
+        fun fromDynamicVideo(item: DynamicVideo): VideoCardData =
+            VideoCardData(
+                avid = item.aid,
+                bvid = item.bvid ?: "",
+                cid = item.cid,
+                epid = item.epid,
+                title = item.title,
+                cover = item.cover,
+                playString = item.play.takeIf { it != -1 }.toWanString(),
+                danmakuString = item.danmaku.takeIf { it != -1 }.toWanString(),
+                timeString = (item.duration * 1000L).formatHourMinSec(),
+                upName = item.author,
+                upMid = item.authorMid,
+                pubTime = item.pubTime,
             )
     }
 }

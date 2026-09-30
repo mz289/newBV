@@ -26,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -47,9 +46,9 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TopNav
-import dev.frost819.newbv.app.ui.component.TopNavItem
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
@@ -75,8 +74,6 @@ import dev.frost819.newbv.app.viewmodel.search.SearchResultViewModel
 import dev.frost819.newbv.biliapi.repositories.SearchType
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 
 private val searchTypeLabels =
     mapOf(
@@ -87,13 +84,14 @@ private val searchTypeLabels =
         SearchType.LiveRoom to "直播间",
     )
 
-private val searchTypeColumns =
+// 各搜索类型的卡片最小宽度（P1-1）：列数随可用宽度自适应
+private val searchTypeCardMinWidth =
     mapOf(
-        SearchType.Video to 4,
-        SearchType.MediaBangumi to 6,
-        SearchType.MediaFt to 6,
-        SearchType.BiliUser to 5,
-        SearchType.LiveRoom to 4,
+        SearchType.Video to 280.dp,
+        SearchType.MediaBangumi to 260.dp,
+        SearchType.MediaFt to 260.dp,
+        SearchType.BiliUser to 320.dp,
+        SearchType.LiveRoom to 320.dp,
     )
 
 /**
@@ -122,7 +120,7 @@ fun SearchResultContent(
     focusSaver.RestoreFocus()
 
     val activeResult = uiState.results[uiState.activeType] ?: TypedSearchResult(uiState.activeType)
-    val columnCount = searchTypeColumns[uiState.activeType] ?: 4
+    val cardMinWidth = searchTypeCardMinWidth[uiState.activeType] ?: 170.dp
 
     val isVideoSearchViaWebApi =
         remember {
@@ -143,21 +141,13 @@ fun SearchResultContent(
         }
     }
 
-    LaunchedEffect(gridState) {
-        snapshotFlow {
-            val lastIndex =
-                gridState.layoutInfo.visibleItemsInfo
-                    .lastOrNull()
-                    ?.index ?: -1
-            val current = viewModel.uiState.value
-            val count = current.results[current.activeType]?.count ?: 0
-            lastIndex to count
-        }.distinctUntilChanged()
-            .filter { (index, count) -> index >= 0 && index >= count - 20 }
-            .collect {
-                viewModel.loadMore(viewModel.uiState.value.activeType)
-            }
-    }
+    InfiniteScrollEffect(
+        state = gridState,
+        itemCount = {
+            viewModel.uiState.value.let { it.results[it.activeType]?.count ?: 0 }
+        },
+        onLoadMore = { viewModel.loadMore(viewModel.uiState.value.activeType) },
+    )
 
     Box(
         modifier =
@@ -199,11 +189,10 @@ fun SearchResultContent(
             // 5 类 Tab 导航
             TopNav(
                 modifier = Modifier.focusRequester(tabRowFocusRequester),
-                items = SearchType.entries.map { SearchTypeNavItem(it) },
+                items = SearchType.entries.toList(),
+                displayName = { searchTypeLabels[it] ?: it.name },
                 isLargePadding = !focusOnContent,
-                onSelectedChanged = { item ->
-                    viewModel.switchType((item as SearchTypeNavItem).type)
-                },
+                onSelectedChanged = viewModel::switchType,
             )
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -229,7 +218,7 @@ fun SearchResultContent(
                             focusOnContent = it.hasFocus
                         },
                 state = gridState,
-                columns = GridCells.Fixed(columnCount),
+                columns = GridCells.Adaptive(cardMinWidth),
                 contentPadding = PaddingValues(24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -336,13 +325,14 @@ fun SearchResultContent(
                 // 底部加载/错误/没有更多
                 item(span = {
                     androidx.compose.foundation.lazy.grid
-                        .GridItemSpan(columnCount)
+                        .GridItemSpan(maxLineSpan)
                 }) {
                     ListFooterTip(
                         isLoading = activeResult.isLoading,
                         isError = activeResult.error,
                         hasMore = activeResult.hasMore,
                         itemsIsEmpty = activeResult.items.isEmpty(),
+                        onRetry = { viewModel.loadMore(uiState.activeType) },
                     )
                 }
             }
@@ -385,10 +375,4 @@ fun SearchResultContent(
             )
         }
     }
-}
-
-private data class SearchTypeNavItem(
-    val type: SearchType,
-) : TopNavItem {
-    override val displayName: String = searchTypeLabels[type] ?: type.name
 }

@@ -28,6 +28,7 @@ fun BvVideoPlayer(
         AndroidView(
             modifier = modifier.fillMaxSize(),
             factory = { ctx ->
+                // 保留 PlayerView 默认的 SurfaceView 视频输出。
                 PlayerView(ctx).apply {
                     player = videoPlayer.mPlayer
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL

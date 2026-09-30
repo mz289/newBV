@@ -2,21 +2,25 @@ package dev.frost819.newbv.biliapi.entity.pgc.index
 
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
 
-interface PgcIndexParam
+interface PgcIndexParam {
+    /** 中文显示名（UI 筛选项共用）。 */
+    val label: String
+}
 
 /**
  * 排序
  */
 enum class IndexOrder(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    UpdateTime(0), // 更新时间
-    DanmakuCount(1), // 弹幕数量
-    PlayCount(2), // 播放数量
-    FollowCount(3), // 追番人数
-    Score(4), // 最高评分
-    StartTime(5), // 开播时间
-    PublishTime(6), // 上映时间
+    UpdateTime("更新时间", 0),
+    DanmakuCount("弹幕数量", 1),
+    PlayCount("播放数量", 2),
+    FollowCount("追番人数", 3),
+    Score("最高评分", 4),
+    StartTime("开播时间", 5),
+    PublishTime("上映时间", 6),
     ;
 
     companion object {
@@ -33,22 +37,24 @@ enum class IndexOrder(
 }
 
 enum class IndexOrderType(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    Desc(0), // 降序
-    Asc(1), // 升序
+    Desc("降序", 0),
+    Asc("升序", 1),
 }
 
 /**
  * 类型
  */
 enum class SeasonVersion(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    All(-1), // 全部
-    FeatureFilm(1), // 正片
-    Movies(2), // 电影
-    Other(3), // 其他
+    All("全部", -1),
+    FeatureFilm("正片", 1),
+    Movies("电影", 2),
+    Other("其他", 3),
     ;
 
     companion object {
@@ -64,11 +70,12 @@ enum class SeasonVersion(
  * 配音
  */
 enum class SpokenLanguage(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    All(-1), // 全部
-    OriginalSoundtrack(1), // 原声
-    ChineseDubbing(2), // 中文配音
+    All("全部", -1),
+    OriginalSoundtrack("原声", 1),
+    ChineseDubbing("中文配音", 2),
     ;
 
     companion object {
@@ -84,21 +91,22 @@ enum class SpokenLanguage(
  * 地区
  */
 enum class Area(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    All(-1), // 全部
-    MainlandChina(1), // 中国大陆
-    Japan(2), // 日本
-    America(3), // 美国
-    Britain(4), // 英国
-    Other(5), // 其他
-    ChinaHongKongTaiwan(6), // 中国港台 6,7
-    Korea(8), // 韩国
-    France(9), // 法国
-    Thailand(10), // 泰国
-    Spain(13), // 西班牙
-    Germany(15), // 德国
-    Italy(35), // 意大利
+    All("全部", -1),
+    MainlandChina("中国大陆", 1),
+    Japan("日本", 2),
+    America("美国", 3),
+    Britain("英国", 4),
+    Other("其他", 5),
+    ChinaHongKongTaiwan("中国港台", 6), // 6,7
+    Korea("韩国", 8),
+    France("法国", 9),
+    Thailand("泰国", 10),
+    Spain("西班牙", 13),
+    Germany("德国", 15),
+    Italy("意大利", 35),
     ;
 
     companion object {
@@ -132,11 +140,12 @@ enum class Area(
  * 状态（完结状态）
  */
 enum class IsFinish(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    All(-1), // 全部
-    Finished(1), // 完结
-    Serialization(0), // 连载
+    All("全部", -1),
+    Finished("完结", 1),
+    Serialization("连载", 0),
     ;
 
     companion object {
@@ -152,11 +161,12 @@ enum class IsFinish(
  * 版权
  */
 enum class Copyright(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    All(-1), // 全部
-    Exclusive(3), // 独家
-    Other(1), // 其他 1,2,4
+    All("全部", -1),
+    Exclusive("独家", 3),
+    Other("其他", 1), // 1,2,4
     ;
 
     companion object {
@@ -172,12 +182,13 @@ enum class Copyright(
  * 付费（付费状态）
  */
 enum class SeasonStatus(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    All(-1), // 全部
-    Free(1), // 免费
-    Paid(2), // 付费 2,6
-    Prime(4), // 大会员 4,6
+    All("全部", -1),
+    Free("免费", 1),
+    Paid("付费", 2), // 2,6
+    Prime("大会员", 4), // 4,6
     ;
 
     companion object {
@@ -193,13 +204,14 @@ enum class SeasonStatus(
  * 季度
  */
 enum class SeasonMonth(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    All(-1), // 全部
-    January(1), // 1月
-    April(4), // 4月
-    July(7), // 7月
-    October(10), // 10月
+    All("全部", -1),
+    January("1月", 1),
+    April("4月", 4),
+    July("7月", 7),
+    October("10月", 10),
     ;
 
     companion object {
@@ -215,29 +227,30 @@ enum class SeasonMonth(
  * 出品（方）
  */
 enum class Producer(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    All(-1), // 全部
-    BBC(1), // BBC
-    NHK(2), // NHK
-    SKY(3), // SKY
-    CCTV(4), // 央视
-    ITV(5), // ITV
-    HistoryChannel(6), // 历史频道
-    DiscoveryChannel(7), // 探索频道
-    SatelliteTV(8), // 卫视
-    SelfMade(9), // 自制
-    ZDF(10), // ZDF
-    Cooperation(11), // 合作机构
-    DomesticOther(12), // 国内其他
-    ForeignOther(13), // 国外其他
-    NationalGeographic(14), // 国家地理
-    Sony(15), // 索尼
-    Universal(16), // 环球
-    Paramount(17), // 派拉蒙
-    Warner(18), // 华纳
-    Disney(19), // 迪士尼
-    HBO(20), // HBO
+    All("全部", -1),
+    BBC("BBC", 1),
+    NHK("NHK", 2),
+    SKY("SKY", 3),
+    CCTV("央视", 4),
+    ITV("ITV", 5),
+    HistoryChannel("历史频道", 6),
+    DiscoveryChannel("探索频道", 7),
+    SatelliteTV("卫视", 8),
+    SelfMade("自制", 9),
+    ZDF("ZDF", 10),
+    Cooperation("合作机构", 11),
+    DomesticOther("国内其他", 12),
+    ForeignOther("国外其他", 13),
+    NationalGeographic("国家地理", 14),
+    Sony("索尼", 15),
+    Universal("环球", 16),
+    Paramount("派拉蒙", 17),
+    Warner("华纳", 18),
+    Disney("迪士尼", 19),
+    HBO("HBO", 20),
     ;
 
     companion object {
@@ -278,27 +291,28 @@ enum class Producer(
  */
 @Suppress("EnumEntryName")
 enum class Year(
+    override val label: String,
     val str: String,
 ) : PgcIndexParam {
-    All("-1"), // 全部
-    Year2026("[2026,2027)"), // 2026
-    Year2025("[2025,2026)"), // 2025
-    Year2024("[2024,2025)"), // 2024
-    Year2023("[2023,2024)"), // 2023
-    Year2022("[2022,2023)"), // 2022
-    Year2021("[2021,2022)"), // 2021
-    Year2020("[2020,2021)"), // 2020
-    Year2019("[2019,2020)"), // 2019
-    Year2018("[2018,2019)"), // 2018
-    Year2017("[2017,2018)"), // 2017
-    Year2016("[2016,2017)"), // 2016
-    Year2015("[2015,2016)"), // 2015
-    Year2014_2010("[2010,2015)"), // 2014-2010
-    Year2009_2005("[2005,2010)"), // 2009-2005
-    Year2004_2000("[2000,2005)"), // 2004-2000
-    Year199x("[1990,2000)"), // 90年代
-    Year198x("[1980,1990)"), // 80年代
-    Earlier("[,1980)"), // 更早
+    All("全部", "-1"),
+    Year2026("2026", "[2026,2027)"),
+    Year2025("2025", "[2025,2026)"),
+    Year2024("2024", "[2024,2025)"),
+    Year2023("2023", "[2023,2024)"),
+    Year2022("2022", "[2022,2023)"),
+    Year2021("2021", "[2021,2022)"),
+    Year2020("2020", "[2020,2021)"),
+    Year2019("2019", "[2019,2020)"),
+    Year2018("2018", "[2018,2019)"),
+    Year2017("2017", "[2017,2018)"),
+    Year2016("2016", "[2016,2017)"),
+    Year2015("2015", "[2015,2016)"),
+    Year2014_2010("2014-2010", "[2010,2015)"),
+    Year2009_2005("2009-2005", "[2005,2010)"),
+    Year2004_2000("2004-2000", "[2000,2005)"),
+    Year199x("90年代", "[1990,2000)"),
+    Year198x("80年代", "[1980,1990)"),
+    Earlier("更早", "[,1980)"),
     ;
 
     companion object {
@@ -337,26 +351,28 @@ enum class Year(
  */
 @Suppress("EnumEntryName")
 enum class ReleaseDate(
+    override val label: String,
     val str: String,
 ) : PgcIndexParam {
-    All("-1"), // 全部
-    Year2026("[2026-01-01 00:00:00,2027-01-01 00:00:00)"), // 2026
-    Year2025("[2025-01-01 00:00:00,2026-01-01 00:00:00)"), // 2025
-    Year2024("[2024-01-01 00:00:00,2025-01-01 00:00:00)"), // 2024
-    Year2023("[2023-01-01 00:00:00,2024-01-01 00:00:00)"), // 2023
-    Year2022("[2022-01-01 00:00:00,2023-01-01 00:00:00)"), // 2022
-    Year2021("[2021-01-01 00:00:00,2022-01-01 00:00:00)"), // 2021
-    Year2020("[2020-01-01 00:00:00,2021-01-01 00:00:00)"), // 2020
-    Year2019("[2019-01-01 00:00:00,2020-01-01 00:00:00)"), // 2019
-    Year2018("[2018-01-01 00:00:00,2019-01-01 00:00:00)"), // 2018
-    Year2017("[2017-01-01 00:00:00,2018-01-01 00:00:00)"), // 2017
-    Year2016("[2016-01-01 00:00:00,2017-01-01 00:00:00)"), // 2016
-    Year2015_2010("[2010-01-01 00:00:00,2015-01-01 00:00:00)"), // 2015-2010
-    Year2009_2005("[2005-01-01 00:00:00,2010-01-01 00:00:00)"), // 2009-2005
-    Year2004_2000("[2000-01-01 00:00:00,2005-01-01 00:00:00)"), // 2004-2000
-    Year199x("[1990-01-01 00:00:00,2000-01-01 00:00:00)"), // 90年代
-    Year198x("[1980-01-01 00:00:00,1990-01-01 00:00:00)"), // 80年代
-    Earlier("[,1980-01-01 00:00:00)"), // 更早
+    All("全部", "-1"),
+    Year2026("2026", "[2026-01-01 00:00:00,2027-01-01 00:00:00)"),
+    Year2025("2025", "[2025-01-01 00:00:00,2026-01-01 00:00:00)"),
+    Year2024("2024", "[2024-01-01 00:00:00,2025-01-01 00:00:00)"),
+    Year2023("2023", "[2023-01-01 00:00:00,2024-01-01 00:00:00)"),
+    Year2022("2022", "[2022-01-01 00:00:00,2023-01-01 00:00:00)"),
+    Year2021("2021", "[2021-01-01 00:00:00,2022-01-01 00:00:00)"),
+    Year2020("2020", "[2020-01-01 00:00:00,2021-01-01 00:00:00)"),
+    Year2019("2019", "[2019-01-01 00:00:00,2020-01-01 00:00:00)"),
+    Year2018("2018", "[2018-01-01 00:00:00,2019-01-01 00:00:00)"),
+    Year2017("2017", "[2017-01-01 00:00:00,2018-01-01 00:00:00)"),
+    Year2016("2016", "[2016-01-01 00:00:00,2017-01-01 00:00:00)"),
+    Year2015("2015", "[2015-01-01 00:00:00,2016-01-01 00:00:00)"),
+    Year2015_2010("2015-2010", "[2010-01-01 00:00:00,2015-01-01 00:00:00)"),
+    Year2009_2005("2009-2005", "[2005-01-01 00:00:00,2010-01-01 00:00:00)"),
+    Year2004_2000("2004-2000", "[2000-01-01 00:00:00,2005-01-01 00:00:00)"),
+    Year199x("90年代", "[1990-01-01 00:00:00,2000-01-01 00:00:00)"),
+    Year198x("80年代", "[1980-01-01 00:00:00,1990-01-01 00:00:00)"),
+    Earlier("更早", "[,1980-01-01 00:00:00)"),
     ;
 
     companion object {
@@ -376,6 +392,7 @@ enum class ReleaseDate(
                         Year2018,
                         Year2017,
                         Year2016,
+                        Year2015,
                         Year2015_2010,
                         Year2009_2005,
                         Year2004_2000,
@@ -393,117 +410,118 @@ enum class ReleaseDate(
  * 风格
  */
 enum class Style(
+    override val label: String,
     val id: Int,
 ) : PgcIndexParam {
-    All(-1), // 全部
-    Movie(-10), // 电影
+    All("全部", -1),
+    Movie("电影", -10),
 
-    Original(10010), // 原创
-    Comic(10011), // 漫画改
-    Novel(10012), // 小说改
-    Game(10013), // 游戏改
-    Animation(10014), // 动态漫
-    Puppetry(10015), // 布袋戏
-    HotBlood(10016), // 热血
-    TimeTravel(10017), // 穿越
-    Fantasy(10018), // 奇幻
-    XuanHuan(10019), // 玄幻
+    Original("原创", 10010),
+    Comic("漫画改", 10011),
+    Novel("小说改", 10012),
+    Game("游戏改", 10013),
+    Animation("动态漫", 10014),
+    Puppetry("布袋戏", 10015),
+    HotBlood("热血", 10016),
+    TimeTravel("穿越", 10017),
+    Fantasy("奇幻", 10018),
+    XuanHuan("玄幻", 10019),
 
-    Fight(10020), // 战斗
-    Funny(10021), // 搞笑
-    Daily(10022), // 日常
-    ScienceFiction(10023), // 科幻
-    Moe(10024), // 萌系
-    Healing(10025), // 治愈
-    School(10026), // 校园
-    Children(10027), // 少儿
-    InstantNoodles(10028), // 泡面
-    InLove(10029), // 恋爱
+    Fight("战斗", 10020),
+    Funny("搞笑", 10021),
+    Daily("日常", 10022),
+    ScienceFiction("科幻", 10023),
+    Moe("萌系", 10024),
+    Healing("治愈", 10025),
+    School("校园", 10026),
+    Children("少儿", 10027),
+    InstantNoodles("泡面", 10028),
+    InLove("恋爱", 10029),
 
-    Girl(10030), // 少女
-    Magic(10031), // 魔法
-    Adventure(10032), // 冒险
-    History(10033), // 历史
-    Fiction(10034), // 架空
-    Mecha(10035), // 机战
-    GodDemon(10036), // 神魔
-    VoiceControl(10037), // 声控
-    Sports(10038), // 运动
-    Inspirational(10039), // 励志
+    Girl("少女", 10030),
+    Magic("魔法", 10031),
+    Adventure("冒险", 10032),
+    History("历史", 10033),
+    Fiction("架空", 10034),
+    Mecha("机战", 10035),
+    GodDemon("神魔", 10036),
+    VoiceControl("声控", 10037),
+    Sports("运动", 10038),
+    Inspirational("励志", 10039),
 
-    Music(10040), // 音乐
-    Reasoning(10041), // 推理
-    Club(10042), // 社团
-    WisdomFight(10043), // 智斗
-    Tearjerker(10044), // 催泪
-    Food(10045), // 美食
-    Idol(10046), // 偶像
-    Maiden(10047), // 乙女
-    Workplace(10048), // 职场
-    AncientStyle(10049), // 古风
+    Music("音乐", 10040),
+    Reasoning("推理", 10041),
+    Club("社团", 10042),
+    WisdomFight("智斗", 10043),
+    Tearjerker("催泪", 10044),
+    Food("美食", 10045),
+    Idol("偶像", 10046),
+    Maiden("乙女", 10047),
+    Workplace("职场", 10048),
+    AncientStyle("古风", 10049),
 
-    Plot(10050), // 剧情
-    Comedy(10051), // 喜剧
-    Love(10052), // 爱情
-    Action(10053), // 动作
-    Terror(10054), // 恐怖
-    Offense(10055), // 犯罪
-    Thriller(10056), // 惊悚
-    Suspense(10057), // 悬疑
-    War(10058), // 战争
+    Plot("剧情", 10050),
+    Comedy("喜剧", 10051),
+    Love("爱情", 10052),
+    Action("动作", 10053),
+    Terror("恐怖", 10054),
+    Offense("犯罪", 10055),
+    Thriller("惊悚", 10056),
+    Suspense("悬疑", 10057),
+    War("战争", 10058),
     // 10059
 
-    Biography(10060), // 传记
-    Family(10061), // 家庭
-    Opera(10062), // 歌剧
-    Documentary(10063), // 纪实
-    Disaster(10064), // 灾难
-    Humanities(10065), // 人文
-    Technology(10066), // 科技
-    Explore(10067), // 探险
-    Universal(10068), // 通用
-    CutePet(10069), // 萌宠
+    Biography("传记", 10060),
+    Family("家庭", 10061),
+    Opera("歌剧", 10062),
+    Documentary("纪实", 10063),
+    Disaster("灾难", 10064),
+    Humanities("人文", 10065),
+    Technology("科技", 10066),
+    Explore("探险", 10067),
+    Universal("通用", 10068),
+    CutePet("萌宠", 10069),
 
-    Social(10070), // 社会
-    Animal(10071), // 动物
-    Nature(10072), // 自然
-    Medical(10073), // 医疗
-    Military(10074), // 军事
-    Crime(10075), // 罪案
-    Mystery(10076), // 神秘
-    Travel(10077), // 旅行
-    MartialArts(10078), // 武侠
-    Youth(10079), // 青春
+    Social("社会", 10070),
+    Animal("动物", 10071),
+    Nature("自然", 10072),
+    Medical("医疗", 10073),
+    Military("军事", 10074),
+    Crime("罪案", 10075),
+    Mystery("神秘", 10076),
+    Travel("旅行", 10077),
+    MartialArts("武侠", 10078),
+    Youth("青春", 10079),
 
-    City(10080), // 都市
-    AncientCostume(10081), // 古装
-    SpyWar(10082), // 谍战
-    Classic(10083), // 经典
-    Emotion(10084), // 情感
-    Myth(10085), // 神话
-    Age(10086), // 年代
-    Rural(10087), // 农村
-    CriminalInvestigation(10088), // 刑侦
-    MilitaryLife(10089), // 军旅
+    City("都市", 10080),
+    AncientCostume("古装", 10081),
+    SpyWar("谍战", 10082),
+    Classic("经典", 10083),
+    Emotion("情感", 10084),
+    Myth("神话", 10085),
+    Age("年代", 10086),
+    Rural("农村", 10087),
+    CriminalInvestigation("刑侦", 10088),
+    MilitaryLife("军旅", 10089),
 
-    Interview(10090), // 访谈
-    TalkShow(10091), // 脱口秀
-    RealityShow(10092), // 真人秀
+    Interview("访谈", 10090),
+    TalkShow("脱口秀", 10091),
+    RealityShow("真人秀", 10092),
 
     // 10093
-    Selection(10094), // 选秀
-    Tourism(10095), // 旅游
-    Concert(10096), // 演唱会
-    ParentChild(10097), // 亲子
-    EveningParty(10098), // 晚会
-    Cultivate(10099), // 养成
+    Selection("选秀", 10094),
+    Tourism("旅游", 10095),
+    Concert("演唱会", 10096),
+    ParentChild("亲子", 10097),
+    EveningParty("晚会", 10098),
+    Cultivate("养成", 10099),
 
-    Culture(10100), // 文化
+    Culture("文化", 10100),
 
     // 10101
-    SpecialEffects(10102), // 特摄
-    ShortPlay(10103), // 短剧
-    ShortFilm(10104), // 短片
+    SpecialEffects("特摄", 10102),
+    ShortPlay("短剧", 10103),
+    ShortFilm("短片", 10104),
     ;
 
     companion object {

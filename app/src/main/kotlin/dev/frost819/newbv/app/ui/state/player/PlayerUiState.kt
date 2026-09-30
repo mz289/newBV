@@ -1,13 +1,7 @@
 package dev.frost819.newbv.app.ui.state.player
 
 import dev.frost819.newbv.app.entity.player.VideoAspectRatio
-import dev.frost819.newbv.app.entity.player.VideoListItem
-import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
-import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMask
-import dev.frost819.newbv.biliapi.entity.video.Subtitle
 import dev.frost819.newbv.biliapi.entity.video.VideoShot
-import dev.frost819.newbv.bilisubtitle.entity.SubtitleItem
-import dev.frost819.newbv.danmaku.config.DanmakuState
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.VideoCodec
 
@@ -25,7 +19,6 @@ data class PlayerUiState(
     val aid: Long = 0,
     val cid: Long = 0,
     val epid: Int? = null,
-    val seasonId: Int = 0,
     val authorMid: Long = 0,
     val authorName: String = "",
     val title: String = "",
@@ -33,18 +26,16 @@ data class PlayerUiState(
     val videoHeight: Int = 0,
     val videoWidth: Int = 0,
     val lastPlayed: Int = 0,
-    val fromSeason: Boolean = false,
-    val subType: Int = 0,
     // 播放状态
     val playerState: PlayerState = PlayerState.Ready,
     val isBuffering: Boolean = false,
     val videoShot: VideoShot? = null,
-    val clock: Pair<Int, Int> = Pair(0, 0),
     // 提示
     val showSkipToNextEp: Boolean = false,
     val showBackToStart: Boolean = false,
     val showPreviewTip: Boolean = false,
     val shortcutTipText: String? = null,
+    val shortcutTipKey: String? = null,
     // 可用资源
     val availableQuality: Map<Int, String> = emptyMap(),
     val availableVideoCodec: List<VideoCodec> = emptyList(),
@@ -54,24 +45,12 @@ data class PlayerUiState(
     val playSpeed: Float = 1f,
     val aspectRatio: VideoAspectRatio = VideoAspectRatio.Default,
     val isLooping: Boolean = false,
-    // 弹幕
-    val danmakuState: DanmakuState = DanmakuState(),
-    val danmakuMask: DanmakuMask? = null,
-    // 字幕
-    val subtitleState: SubtitleState = SubtitleState(),
-    val subtitleId: Long = -1L,
-    val subtitleData: List<SubtitleItem> = emptyList(),
-    val subtitleList: List<Subtitle> = emptyList(),
-    // 列表
-    val videoList: List<VideoListItem> = emptyList(),
-    val relatedVideos: List<VideoCardData> = emptyList(),
 ) {
     /**
      * 是否为番剧（PGC）播放内容。
      *
      * 由 [epid] 推导：有有效 EP ID 即视为番剧。UI 层据此隐藏
      * “视频信息 / up主页 / 相关视频”等仅 UGC 适用的入口。
-     * 与播放侧 [fromSeason]（走 PGC 播放接口/心跳）相互独立。
      */
     val isPgc: Boolean get() = (epid ?: 0) != 0
 }

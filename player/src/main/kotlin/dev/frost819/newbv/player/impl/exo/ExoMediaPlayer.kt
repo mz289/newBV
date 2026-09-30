@@ -87,11 +87,7 @@ class ExoMediaPlayer(
 
     override fun initPlayer() {
         val renderersFactory =
-            object : DefaultRenderersFactory(context) {
-                private val codecAdapterFactory = EmulatorCodecAdapterFactory(context)
-
-                override fun getCodecAdapterFactory() = codecAdapterFactory
-            }.apply {
+            DefaultRenderersFactory(context).apply {
                 setExtensionRendererMode(
                     when (options.enableFfmpegAudioRenderer) {
                         true -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
@@ -122,15 +118,9 @@ class ExoMediaPlayer(
             ExoPlayer
                 .Builder(context)
                 .setRenderersFactory(renderersFactory)
-                .setSeekForwardIncrementMs(1000 * 10)
-                .setSeekBackIncrementMs(1000 * 5)
                 .build()
 
         mPlayer?.addListener(this)
-    }
-
-    override fun setHeader(headers: Map<String, String>) {
-        // ExoPlayer 通过 dataSourceFactory 设置默认请求头，此方法预留
     }
 
     override fun playUrl(
@@ -218,10 +208,6 @@ class ExoMediaPlayer(
         mPlayer?.stop()
     }
 
-    override fun reset() {
-        TODO("Not yet implemented")
-    }
-
     override val isPlaying: Boolean
         get() = mPlayer?.isPlaying == true
 
@@ -250,9 +236,6 @@ class ExoMediaPlayer(
             mPlayer?.setPlaybackSpeed(value)
         }
 
-    override val tcpSpeed: Long
-        get() = 0L
-
     override fun onPlaybackStateChanged(playbackState: Int) {
         when (playbackState) {
             Player.STATE_IDLE -> {}
@@ -268,14 +251,6 @@ class ExoMediaPlayer(
         } else {
             mPlayerEventListener?.onPause()
         }
-    }
-
-    override fun onSeekBackIncrementChanged(seekBackIncrementMs: Long) {
-        mPlayerEventListener?.onSeekBack(seekBackIncrementMs)
-    }
-
-    override fun onSeekForwardIncrementChanged(seekForwardIncrementMs: Long) {
-        mPlayerEventListener?.onSeekForward(seekForwardIncrementMs)
     }
 
     override val debugInfo: String

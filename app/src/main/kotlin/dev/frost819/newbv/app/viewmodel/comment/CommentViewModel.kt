@@ -3,13 +3,13 @@ package dev.frost819.newbv.app.viewmodel.comment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.comment.Comment
 import dev.frost819.newbv.biliapi.repositories.CommentRepository
 import dev.frost819.newbv.core.log.Loggers
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -20,8 +20,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-
-private const val COMMENT_LOAD_TIMEOUT_MS = 10_000L
 
 /*
  * 评论区数据层级：
@@ -258,7 +256,7 @@ class CommentViewModel
                     updateCommentList(sort) { it.copy(loadingMore = true, loadMoreError = false) }
                     try {
                         val page =
-                            withTimeout(COMMENT_LOAD_TIMEOUT_MS) {
+                            withTimeout(LOAD_TIMEOUT_MS) {
                                 commentRepository.getComments(
                                     aid = aid,
                                     sort = sort.apiValue,
@@ -396,7 +394,7 @@ class CommentViewModel
                     updateCommentList(sort) { it.copy(initialLoading = true, initialError = false) }
                     try {
                         val page =
-                            withTimeout(COMMENT_LOAD_TIMEOUT_MS) {
+                            withTimeout(LOAD_TIMEOUT_MS) {
                                 commentRepository.getComments(
                                     aid = aid,
                                     sort = sort.apiValue,
@@ -451,7 +449,7 @@ class CommentViewModel
                     }
                     try {
                         val result =
-                            withTimeout(COMMENT_LOAD_TIMEOUT_MS) {
+                            withTimeout(LOAD_TIMEOUT_MS) {
                                 commentRepository.getReplies(
                                     aid = aid,
                                     rootRpid = rootRpid,
@@ -566,7 +564,7 @@ class CommentViewModel
         }
 
         private fun rethrowCancellation(error: Throwable) {
-            if (error is CancellationException && error !is TimeoutCancellationException) throw error
+            error.rethrowUnlessTimeout()
         }
     }
 

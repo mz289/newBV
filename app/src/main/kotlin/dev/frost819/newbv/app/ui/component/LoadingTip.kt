@@ -2,9 +2,13 @@ package dev.frost819.newbv.app.ui.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
@@ -14,9 +18,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.R
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 
 /**
  * 加载中提示组件。
@@ -50,7 +57,7 @@ fun ErrorTip(modifier: Modifier = Modifier) {
     Text(
         modifier = modifier,
         text = stringResource(id = R.string.load_failed),
-        color = MaterialTheme.colorScheme.onSurface,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
@@ -61,13 +68,15 @@ fun ErrorTip(modifier: Modifier = Modifier) {
  *
  * 状态优先级：loading > error > noMore。
  * - [isLoading] 为 true 时显示 [LoadingTip]。
- * - [isError] 为 true 时显示 [ErrorTip]。
- * - [hasMore] 为 false 且列表非空时显示 "没有更多了捏"。
+ * - [isError] 为 true 时显示 [ErrorTip]；提供 [onRetry] 时附带重试按钮（P0-5），
+ *   不自动抢焦点——TV 上焦点仍留在内容区，由用户下移到重试键。
+ * - [hasMore] 为 false 且列表非空时显示 "没有更多了"。
  *
  * @param isLoading 是否正在加载。
  * @param isError 是否加载失败（超时或报错）。
  * @param hasMore 是否还有更多数据。
  * @param itemsIsEmpty 列表是否为空（空列表时不显示"没有更多"）。
+ * @param onRetry 重试回调，null 时不显示重试按钮。
  */
 @Composable
 fun ListFooterTip(
@@ -76,6 +85,7 @@ fun ListFooterTip(
     hasMore: Boolean,
     itemsIsEmpty: Boolean,
     modifier: Modifier = Modifier,
+    onRetry: (() -> Unit)? = null,
 ) {
     when {
         isLoading -> {
@@ -88,11 +98,24 @@ fun ListFooterTip(
         }
 
         isError -> {
-            Box(
+            Column(
                 modifier = modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
                 ErrorTip()
+                if (onRetry != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = onRetry,
+                        colors = ControlFocusDefaults.buttonColors(),
+                        border = ControlFocusDefaults.buttonBorder(),
+                        scale = ButtonDefaults.scale(focusedScale = 1f, pressedScale = 1f),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                    ) {
+                        Text(text = stringResource(id = R.string.login_retry))
+                    }
+                }
             }
         }
 
@@ -100,8 +123,9 @@ fun ListFooterTip(
             Text(
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
-                text = "没有更多了捏",
-                color = MaterialTheme.colorScheme.onSurface,
+                text = "没有更多了",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

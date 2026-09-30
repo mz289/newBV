@@ -24,8 +24,11 @@ import java.io.IOException
 /**
  * [PgcViewModel] 的单元测试。
  *
- * 验证分区数据加载、轮播图加载、切换分区、刷新、超时/错误处理。
+ * 验证分区数据懒加载、轮播图加载、切换分区、刷新、超时/错误处理。
  * 使用 MockK mock [PgcRepository]，用 answers + callCount 区分多次调用。
+ *
+ * 注：番剧 Tab 由 [AnimeHomeViewModel] 负责，本 VM 改为 [PgcViewModel.loadIfNeeded]
+ * 懒加载（不再于 init 自动加载），测试统一以 loadIfNeeded 触发首次加载。
  */
 class PgcViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -79,13 +82,14 @@ class PgcViewModelTest {
         )
 
     @Test
-    fun `init loads first page with carousel`() =
+    fun `loadIfNeeded loads first page with carousel`() =
         runTest(testDispatcher) {
             val items = listOf(fakePgcItem(1), fakePgcItem(2))
             coEvery { pgcRepository.getFeed(any(), any()) } returns
                 fakeFeedData(items, hasNext = true, cursor = 1)
             coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
             viewModel = PgcViewModel(pgcRepository)
+            viewModel.loadIfNeeded()
 
             advanceUntilIdle()
 
@@ -94,7 +98,22 @@ class PgcViewModelTest {
             assertThat(viewModel.uiState.value.hasMore).isTrue()
             assertThat(viewModel.uiState.value.error).isFalse()
             assertThat(viewModel.uiState.value.carouselItems).hasSize(1)
-            assertThat(viewModel.uiState.value.carouselLoading).isFalse()
+        }
+
+    @Test
+    fun `loadIfNeeded is no-op when items already loaded`() =
+        runTest(testDispatcher) {
+            coEvery { pgcRepository.getFeed(any(), any()) } returns
+                fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
+            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
+            viewModel = PgcViewModel(pgcRepository)
+            viewModel.loadIfNeeded()
+            advanceUntilIdle()
+
+            viewModel.loadIfNeeded()
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { pgcRepository.getFeed(any(), any()) }
         }
 
     @Test
@@ -111,7 +130,7 @@ class PgcViewModelTest {
             }
             coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
             viewModel = PgcViewModel(pgcRepository)
-
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
             viewModel.loadMore()
             advanceUntilIdle()
@@ -131,7 +150,7 @@ class PgcViewModelTest {
             } returns fakeFeedData(listOf(fakePgcItem(100)), hasNext = false, cursor = 1)
             coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
             viewModel = PgcViewModel(pgcRepository)
-
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
             viewModel.switchType(PgcType.Movie)
             advanceUntilIdle()
@@ -158,7 +177,7 @@ class PgcViewModelTest {
             }
             coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
             viewModel = PgcViewModel(pgcRepository)
-
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
             assertThat(viewModel.uiState.value.items).hasSize(1)
 
@@ -184,7 +203,7 @@ class PgcViewModelTest {
             }
             coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
             viewModel = PgcViewModel(pgcRepository)
-
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
             assertThat(viewModel.uiState.value.items).hasSize(1)
             assertThat(
@@ -212,7 +231,7 @@ class PgcViewModelTest {
             }
             coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
             viewModel = PgcViewModel(pgcRepository)
-
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
             assertThat(viewModel.uiState.value.items).hasSize(1)
             assertThat(viewModel.uiState.value.hasMore).isFalse()
@@ -231,12 +250,11 @@ class PgcViewModelTest {
                 fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
             coEvery { pgcRepository.getCarousel(any()) } throws IOException("carousel error")
             viewModel = PgcViewModel(pgcRepository)
-
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
 
             assertThat(viewModel.uiState.value.items).hasSize(1)
             assertThat(viewModel.uiState.value.carouselItems).isEmpty()
-            assertThat(viewModel.uiState.value.carouselLoading).isFalse()
         }
 
     @Test
@@ -246,6 +264,7 @@ class PgcViewModelTest {
                 fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
             coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
             viewModel = PgcViewModel(pgcRepository)
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
 
             viewModel.switchType(PgcType.Anime)
@@ -255,11 +274,12 @@ class PgcViewModelTest {
         }
 
     @Test
-    fun `init error on first load sets error with empty items`() =
+    fun `loadIfNeeded error on first load sets error with empty items`() =
         runTest(testDispatcher) {
             coEvery { pgcRepository.getFeed(any(), any()) } throws IOException("init error")
             coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
             viewModel = PgcViewModel(pgcRepository)
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
 
             assertThat(viewModel.uiState.value.items).isEmpty()
@@ -285,6 +305,7 @@ class PgcViewModelTest {
                 fakeCarouselData()
             }
             viewModel = PgcViewModel(pgcRepository)
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
 
             viewModel.refresh()
@@ -312,6 +333,7 @@ class PgcViewModelTest {
             }
             coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
             viewModel = PgcViewModel(pgcRepository)
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
 
             viewModel.loadMore()
@@ -339,6 +361,7 @@ class PgcViewModelTest {
                 )
             coEvery { pgcRepository.getCarousel(any()) } returns carouselData
             viewModel = PgcViewModel(pgcRepository)
+            viewModel.loadIfNeeded()
             advanceUntilIdle()
 
             assertThat(viewModel.uiState.value.carouselItems).hasSize(2)

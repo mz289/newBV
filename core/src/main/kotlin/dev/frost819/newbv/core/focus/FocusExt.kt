@@ -33,9 +33,9 @@ import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Border
-import androidx.tv.material3.MaterialTheme
 import dev.frost819.newbv.core.interaction.InputMethod
 import dev.frost819.newbv.core.interaction.LocalInteractionTracker
+import dev.frost819.newbv.core.theme.LocalFocusOutlineColor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -47,13 +47,15 @@ import kotlinx.coroutines.launch
  * TV Border 的正 inset 向外扩展；描边中心外移 1dp 后，其内缘与控件边缘重合，外沿最多伸出 2dp。
  * 调用方需预留至少 2dp 绘制空间，避免 Lazy 容器裁切。
  *
+ * 颜色取自 [LocalFocusOutlineColor]（与品牌色解耦的中性高对比色）。
+ *
  * @param cornerRadius 控件自身的圆角半径，描边圆角同步向外扩展。
  */
 @Composable
 @ReadOnlyComposable
 fun outerFocusBorder(cornerRadius: Dp = 8.dp): Border =
     Border(
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+        border = BorderStroke(2.dp, LocalFocusOutlineColor.current),
         inset = 1.dp,
         shape = RoundedCornerShape(cornerRadius + 1.dp),
     )
@@ -62,19 +64,45 @@ fun outerFocusBorder(cornerRadius: Dp = 8.dp): Border =
  * 为不提供 TV Border 参数的导航控件显示统一外框：2dp 描边内缘紧贴控件边缘。
  * modifier 自带 6dp padding 作绘制余量兼布局间距；应放在背景裁切修饰符之前；
  * 不会添加点击或焦点节点，沿用原控件的语义和导航。
+ *
+ * 聚焦时描边带辉光（两层低透明度外扩描边）并 ~150ms 渐入，
+ * 颜色取自 [LocalFocusOutlineColor]；同时挂载撞墙抖动（[focusShakeTarget]）。
  */
 fun Modifier.controlFocusOutline(): Modifier =
     composed {
         var focused by remember { mutableStateOf(false) }
-        val color = MaterialTheme.colorScheme.border
-        padding(6.dp).onFocusChanged { focused = it.hasFocus }.drawWithContent {
-            drawContent()
-            if (focused) {
-                inset(-1.dp.toPx()) {
-                    drawRoundRect(color, cornerRadius = CornerRadius(9.dp.toPx()), style = Stroke(2.dp.toPx()))
+        val color = LocalFocusOutlineColor.current
+        val outlineAlpha by animateFloatAsState(
+            targetValue = if (focused) 1f else 0f,
+            animationSpec = tween(durationMillis = 150),
+            label = "control-focus-outline-alpha",
+        )
+        focusShakeTarget()
+            .padding(6.dp)
+            .onFocusChanged { focused = it.hasFocus }
+            .drawWithContent {
+                drawContent()
+                if (outlineAlpha > 0f) {
+                    inset(-1.dp.toPx()) {
+                        // 辉光：两层低透明度描边向外扩展，叠出柔和光晕
+                        drawRoundRect(
+                            color.copy(alpha = 0.10f * outlineAlpha),
+                            cornerRadius = CornerRadius(13.dp.toPx()),
+                            style = Stroke(6.dp.toPx()),
+                        )
+                        drawRoundRect(
+                            color.copy(alpha = 0.22f * outlineAlpha),
+                            cornerRadius = CornerRadius(11.dp.toPx()),
+                            style = Stroke(4.dp.toPx()),
+                        )
+                        drawRoundRect(
+                            color.copy(alpha = outlineAlpha),
+                            cornerRadius = CornerRadius(9.dp.toPx()),
+                            style = Stroke(2.dp.toPx()),
+                        )
+                    }
                 }
             }
-        }
     }
 
 /**
@@ -87,7 +115,7 @@ fun Modifier.controlFocusOutline(): Modifier =
  *
  * @param shape 边框形状，默认 [ShapeDefaults.Large]。
  * @param animate 是否启用呼吸动画。
- * @param color 边框颜色，默认使用当前主题的边框色。
+ * @param color 边框颜色，默认使用焦点描边色（[LocalFocusOutlineColor]，与品牌色解耦）。
  * @param width 边框宽度，默认 3dp。
  */
 fun Modifier.focusedBorder(
@@ -98,7 +126,7 @@ fun Modifier.focusedBorder(
 ): Modifier =
     composed {
         val tracker = LocalInteractionTracker.current
-        val resolvedColor = color ?: MaterialTheme.colorScheme.border
+        val resolvedColor = color ?: LocalFocusOutlineColor.current
         var hasFocus by remember { mutableStateOf(false) }
 
         val showBorder =

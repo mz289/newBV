@@ -60,7 +60,6 @@ import kotlinx.coroutines.launch
  * @param title 直播间标题
  * @param areaName 分区名
  * @param onlineCount 人气值
- * @param clock 时钟（hour, minute）
  * @param danmakuEnabled 弹幕是否开启
  * @param danmakuState 弹幕配置状态
  * @param availableQualities 可用画质列表（qn, desc）
@@ -88,7 +87,6 @@ fun LivePlayerController(
     title: String,
     areaName: String,
     onlineCount: String,
-    clock: Pair<Int, Int>,
     danmakuEnabled: Boolean,
     danmakuState: DanmakuState,
     availableQualities: List<Pair<Int, String>>,
@@ -232,7 +230,6 @@ fun LivePlayerController(
                             },
                             onDoubleTap = { onPlayPause() },
                             onSeekDelta = { },
-                            onSeekCommit = { },
                             onBrightnessChange = { deltaY ->
                                 val activity = context as? android.app.Activity
                                 if (activity != null) {
@@ -310,7 +307,6 @@ fun LivePlayerController(
                 title = title,
                 areaName = areaName,
                 onlineCount = onlineCount,
-                clock = clock,
                 isPlaying = isPlaying,
                 danmakuEnabled = danmakuEnabled,
                 onPlayPause = {

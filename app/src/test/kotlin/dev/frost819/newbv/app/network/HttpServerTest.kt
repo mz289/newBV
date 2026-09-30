@@ -27,8 +27,8 @@ class HttpServerTest {
         logFiles = mutableListOf()
 
         // 创建测试日志文件
-        logFiles.add(createLog("logs_manual_2026-01-01_10:00:00.log", "manual log content"))
-        logFiles.add(createLog("logs_crash_2026-01-02_11:30:00.log", "crash log content"))
+        logFiles.add(createLog("logs_manual_2026-01-01_10-00-00.log", "manual log content"))
+        logFiles.add(createLog("logs_crash_2026-01-02_11-30-00.log", "crash log content"))
 
         server =
             HttpServer(
@@ -41,7 +41,7 @@ class HttpServerTest {
                 },
                 logFileProvider = { logFiles.toList() },
                 manualLogCreator = {
-                    val file = File(tempDir, "logs_manual_2026-01-03_12:00:00.log")
+                    val file = File(tempDir, "logs_manual_2026-01-03_12-00-00.log")
                     file.writeText("generated manual log")
                     logFiles.add(file)
                     file
@@ -176,14 +176,14 @@ class HttpServerTest {
 
     @Test
     fun `GET api logs filename downloads existing log file`() {
-        val (status, body) = httpGet("/api/logs/logs_manual_2026-01-01_10:00:00.log")
+        val (status, body) = httpGet("/api/logs/logs_manual_2026-01-01_10-00-00.log")
         assertThat(status).isEqualTo(200)
         assertThat(body).contains("manual log content")
     }
 
     @Test
     fun `GET api logs filename returns 404 for non-existent file`() {
-        val (status, _) = httpGet("/api/logs/logs_manual_9999-01-01_00:00:00.log")
+        val (status, _) = httpGet("/api/logs/logs_manual_9999-01-01_00-00-00.log")
         assertThat(status).isEqualTo(404)
     }
 

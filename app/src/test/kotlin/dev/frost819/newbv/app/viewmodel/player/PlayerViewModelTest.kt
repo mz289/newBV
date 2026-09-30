@@ -190,9 +190,6 @@ class PlayerViewModelTest {
             epid = 300,
             title = "Test Video",
             lastPlayed = 60,
-            fromSeason = false,
-            subType = 0,
-            seasonId = 0,
             authorMid = 999L,
             authorName = "TestUP",
         )
@@ -203,7 +200,6 @@ class PlayerViewModelTest {
         assertThat(state.epid).isEqualTo(300)
         assertThat(state.title).isEqualTo("Test Video")
         assertThat(state.lastPlayed).isEqualTo(60)
-        assertThat(state.fromSeason).isFalse()
         assertThat(state.authorMid).isEqualTo(999L)
         assertThat(state.authorName).isEqualTo("TestUP")
     }
@@ -216,9 +212,6 @@ class PlayerViewModelTest {
             epid = 0,
             title = "Test",
             lastPlayed = 0,
-            fromSeason = false,
-            subType = 0,
-            seasonId = 0,
             authorName = "UP",
         )
 
@@ -233,9 +226,6 @@ class PlayerViewModelTest {
             epid = null,
             title = "Test",
             lastPlayed = 0,
-            fromSeason = false,
-            subType = 0,
-            seasonId = 0,
             authorName = "UP",
         )
 
@@ -368,9 +358,6 @@ class PlayerViewModelTest {
             epid = null,
             title = "Video",
             lastPlayed = 0,
-            fromSeason = false,
-            subType = 0,
-            seasonId = 0,
             authorMid = 1L,
             authorName = "UP",
         )
@@ -1075,9 +1062,6 @@ class PlayerViewModelTest {
             epid = null,
             title = "t",
             lastPlayed = 0,
-            fromSeason = false,
-            subType = 0,
-            seasonId = 0,
             authorName = "",
         )
 

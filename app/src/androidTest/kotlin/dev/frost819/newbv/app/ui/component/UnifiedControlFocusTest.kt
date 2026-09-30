@@ -44,13 +44,14 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
-/** 跨页面实际控件的外框像素、遥控器点击和选中状态回归，不依赖网络。 */
+/** 跨页面实际控件的外框/底色像素、遥控器点击和选中状态回归，不依赖网络。 */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class UnifiedControlFocusTest {
     @get:Rule
     val rule = createComposeRule()
     private var borderColor = Color.Transparent
+    private var fillColor = Color.Transparent
 
     private fun show(
         theme: ThemeMode = ThemeMode.Dark,
@@ -59,6 +60,7 @@ class UnifiedControlFocusTest {
         rule.setContent {
             BVTheme(themeMode = theme, density = 2f) {
                 borderColor = androidx.tv.material3.MaterialTheme.colorScheme.border
+                fillColor = androidx.tv.material3.MaterialTheme.colorScheme.primaryContainer
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) { content() }
             }
         }
@@ -95,7 +97,7 @@ class UnifiedControlFocusTest {
     }
 
     @Test
-    fun settings_and_selected_options_keep_outer_ring_in_light_theme() {
+    fun settings_and_selected_options_use_background_fill_for_focus() {
         var clicks = 0
         show(ThemeMode.Light) {
             SettingListItem(Modifier.width(350.dp), "画面设置", "默认画质", onClick = { clicks++ })
@@ -103,11 +105,11 @@ class UnifiedControlFocusTest {
         }
         val setting = rule.onNodeWithText("画面设置")
         focus(setting)
-        assertRing(setting)
+        assertFill(setting)
         setting.performKeyInput { pressKey(Key.DirectionCenter) }
         val option = rule.onNodeWithText("自动")
         focus(option)
-        assertRing(option)
+        assertFill(option)
         option.performKeyInput { pressKey(Key.DirectionCenter) }
         rule.runOnIdle { assertThat(clicks).isEqualTo(2) }
         screenshot("global-focus-settings.png")
@@ -137,7 +139,7 @@ class UnifiedControlFocusTest {
             pressKey(Key.DirectionCenter)
         }
         rule.onNodeWithText("热门").assertIsFocused()
-        assertRing(rule.onNodeWithText("热门"), expected = false)
+        assertRing(rule.onNodeWithText("热门"))
         rule.runOnIdle {
             assertThat(selected).isEqualTo("热门")
             assertThat(activated).isEqualTo("热门")
@@ -198,6 +200,42 @@ class UnifiedControlFocusTest {
         node.assertIsFocused()
     }
 
+    /**
+     * 断言列表项节点左缘内侧存在（或不存在）焦点底色填充。
+     *
+     * 列表类控件聚焦改用背景填充而非描边；在节点中线高度沿左缘向右扫描一段，
+     * 命中主题填充色即视为生效。扫描窗避开了纵向圆角与深层内容。
+     */
+    private fun assertFill(
+        node: SemanticsNodeInteraction,
+        expected: Boolean = true,
+    ) {
+        val image = rule.onRoot().captureToImage().toPixelMap()
+        val bounds = node.fetchSemanticsNode().boundsInRoot
+        val y =
+            bounds.center.y
+                .toInt()
+                .coerceIn(0, image.height - 1)
+        val hasFill =
+            ((bounds.left.toInt() + 2)..(bounds.left.toInt() + bounds.width.toInt() / 6)).any { x ->
+                x in 0 until image.width &&
+                    run {
+                        val pixel = image[x, y]
+                        kotlin.math.abs(pixel.red - fillColor.red) +
+                            kotlin.math.abs(pixel.green - fillColor.green) +
+                            kotlin.math.abs(pixel.blue - fillColor.blue) < 0.04f
+                    }
+            }
+        if (expected) assertThat(hasFill).isTrue() else assertThat(hasFill).isFalse()
+    }
+
+    /**
+     * 断言控件外缘存在（或不存在）焦点描边。
+     *
+     * 描边只有 2dp 宽：TV Border 画在控件外缘，[controlFocusOutline] 画进节点自带的
+     * 间距内，固定采样点会因密度与控件内边距差异落空，故沿节点中线整列扫描，
+     * 命中主题描边色即视为存在外框。
+     */
     private fun assertRing(
         node: SemanticsNodeInteraction,
         dialog: Boolean = false,
@@ -206,11 +244,21 @@ class UnifiedControlFocusTest {
         val root = if (dialog) rule.onNode(isDialog()) else rule.onRoot()
         val bounds = node.fetchSemanticsNode().boundsInRoot
         val image = root.captureToImage().toPixelMap()
-        val pixel = image[bounds.center.x.toInt(), bounds.top.toInt() - 10]
-        val distance =
-            kotlin.math.abs(pixel.red - borderColor.red) + kotlin.math.abs(pixel.green - borderColor.green) +
-                kotlin.math.abs(pixel.blue - borderColor.blue)
-        if (expected) assertThat(distance).isLessThan(0.04f) else assertThat(distance).isGreaterThan(0.1f)
+        val x =
+            bounds.center.x
+                .toInt()
+                .coerceIn(0, image.width - 1)
+        val hasRing =
+            (bounds.top.toInt() - 12..bounds.bottom.toInt() + 12).any { y ->
+                y in 0 until image.height &&
+                    run {
+                        val pixel = image[x, y]
+                        kotlin.math.abs(pixel.red - borderColor.red) +
+                            kotlin.math.abs(pixel.green - borderColor.green) +
+                            kotlin.math.abs(pixel.blue - borderColor.blue) < 0.04f
+                    }
+            }
+        if (expected) assertThat(hasRing).isTrue() else assertThat(hasRing).isFalse()
     }
 
     private fun screenshot(

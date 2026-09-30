@@ -51,44 +51,6 @@ class HotwordTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun `fromHttpAppSquareDataItem maps non-null fields correctly`() {
-        val item =
-            dev.frost819.newbv.biliapi.http.entity.search.AppSearchSquareData.SquareData.SquareDataItem(
-                keyword = "app-kw",
-                showName = "App关键词",
-                icon = "http://app-icon.test",
-                position = 1,
-            )
-
-        val result = Hotword.fromHttpAppSquareDataItem(item)
-
-        assertThat(result.keyword).isEqualTo("app-kw")
-        assertThat(result.showName).isEqualTo("App关键词")
-        assertThat(result.icon).isEqualTo("http://app-icon.test")
-    }
-
-    @Test
-    fun `fromHttpAppSquareDataItem converts null keyword and showName to empty strings`() {
-        val item =
-            dev.frost819.newbv.biliapi.http.entity.search.AppSearchSquareData.SquareData.SquareDataItem(
-                keyword = null,
-                showName = null,
-                icon = null,
-                position = 5,
-            )
-
-        val result = Hotword.fromHttpAppSquareDataItem(item)
-
-        assertThat(result.keyword).isEmpty()
-        assertThat(result.showName).isEmpty()
-        assertThat(result.icon).isNull()
-    }
-
-    // ------------------------------------------------------------------
-    // fromHttpAppSearchTrendingHotword
-    // ------------------------------------------------------------------
-
-    @Test
     fun `fromHttpAppSearchTrendingHotword maps all fields correctly`() {
         val httpHotword =
             dev.frost819.newbv.biliapi.http.entity.search.SearchTendingData.Hotword(

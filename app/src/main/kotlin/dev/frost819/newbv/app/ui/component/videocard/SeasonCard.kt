@@ -3,10 +3,12 @@ package dev.frost819.newbv.app.ui.component.videocard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,8 +28,12 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.focusShakeTarget
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
+
+/** 封面圆角：与视频卡统一的 8dp。 */
+private val coverShape = RoundedCornerShape(8.dp)
 
 /**
  * 番剧/影视卡片。
@@ -48,14 +54,18 @@ fun SeasonCard(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.touchClickable(onClick = onClick),
+        modifier =
+            modifier
+                .focusShakeTarget()
+                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .touchClickable(onClick = onClick),
         onClick = onClick,
         colors =
             ControlFocusDefaults.surfaceColors(
                 containerColor = MaterialTheme.colorScheme.surface,
             ),
-        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.large),
-        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(16.dp)),
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Column {
@@ -63,7 +73,7 @@ fun SeasonCard(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clip(MaterialTheme.shapes.large),
+                        .clip(coverShape),
                 contentAlignment = Alignment.BottomCenter,
             ) {
                 AsyncImage(
@@ -71,7 +81,7 @@ fun SeasonCard(
                         Modifier
                             .fillMaxWidth()
                             .aspectRatio(0.75f)
-                            .clip(MaterialTheme.shapes.large),
+                            .clip(coverShape),
                     model = data.cover,
                     contentDescription = null,
                     contentScale = ContentScale.FillBounds,
@@ -109,7 +119,7 @@ fun SeasonCard(
             }
 
             Column(
-                modifier = Modifier.padding(8.dp),
+                modifier = Modifier.padding(vertical = 8.dp),
             ) {
                 Text(
                     text = data.title,
@@ -118,12 +128,13 @@ fun SeasonCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (!data.subTitle.isNullOrEmpty()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         text = data.subTitle,
+                        style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

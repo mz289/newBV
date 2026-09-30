@@ -31,5 +31,3 @@ internal const val ENTITY_POOL_INITIAL_SIZE = 200
 internal const val ENTITY_POOL_MAX_SIZE = 1000
 internal const val COMPONENT_POOL_INITIAL_SIZE = 200
 internal const val COMPONENT_POOL_MAX_SIZE = 1500
-
-var inDebugMode = false

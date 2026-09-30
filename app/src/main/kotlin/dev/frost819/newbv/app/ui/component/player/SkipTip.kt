@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +52,7 @@ import dev.frost819.newbv.core.theme.BVTheme
  * @param showSkipToNextEp 是否显示"跳下集"提示
  * @param showPreviewTip 是否显示"试看"提示
  * @param shortcutTipText 最近一次快捷键提示文本，为 null 时不显示
+ * @param shortcutTipKey 触发按键的显示名，非空时以键帽图标呈现（P2-4）
  */
 @Composable
 fun SkipTips(
@@ -59,6 +61,7 @@ fun SkipTips(
     showSkipToNextEp: Boolean,
     showPreviewTip: Boolean,
     shortcutTipText: String? = null,
+    shortcutTipKey: String? = null,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -87,6 +90,7 @@ fun SkipTips(
                 show = shortcutTipText != null,
                 text = shortcutTipText.orEmpty(),
                 icon = Icons.Outlined.SettingsRemote,
+                keyCap = shortcutTipKey,
             )
         }
     }
@@ -105,12 +109,14 @@ fun SkipTips(
  * @param show 是否可见
  * @param text 提示文本
  * @param icon 提示图标
+ * @param keyCap 键帽文本（触发按键名），非空时在文本前渲染键帽图标
  */
 @Composable
 fun PlayerTip(
     show: Boolean,
     text: String,
     icon: ImageVector,
+    keyCap: String? = null,
 ) {
     AnimatedVisibility(
         visible = show,
@@ -143,6 +149,27 @@ fun PlayerTip(
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
                 )
+                keyCap?.let { key ->
+                    // 键帽图标（P2-4）：描边小圆角块呈现触发按键，替代纯文字说明
+                    Box(
+                        modifier =
+                            Modifier
+                                .border(
+                                    1.dp,
+                                    Color.White.copy(alpha = 0.55f),
+                                    RoundedCornerShape(6.dp),
+                                ).background(
+                                    Color.White.copy(alpha = 0.12f),
+                                    RoundedCornerShape(6.dp),
+                                ).padding(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = key,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                        )
+                    }
+                }
                 Text(
                     text = text,
                     style = MaterialTheme.typography.titleLarge,

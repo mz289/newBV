@@ -41,6 +41,7 @@ import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
 import dev.frost819.newbv.app.ui.action.player.MediaProfileSettingAction
 import dev.frost819.newbv.app.ui.action.player.SubtitleSettingAction
 import dev.frost819.newbv.app.ui.component.player.menu.MenuController
+import dev.frost819.newbv.app.ui.state.player.PlayerOverlayState
 import dev.frost819.newbv.app.ui.state.player.PlayerState
 import dev.frost819.newbv.app.ui.state.player.PlayerUiState
 import dev.frost819.newbv.app.ui.state.player.SeekerState
@@ -78,6 +79,7 @@ fun VideoPlayerController(
     isLooping: Boolean,
     videoShotCache: VideoShotImageCache,
     uiState: PlayerUiState,
+    overlayState: PlayerOverlayState,
     seekerState: State<SeekerState>,
     onPlay: () -> Unit,
     onPause: () -> Unit,
@@ -102,7 +104,7 @@ fun VideoPlayerController(
     onSubtitleSettingChange: (SubtitleSettingAction) -> Unit,
     onRelatedVideoClicked: (dev.frost819.newbv.app.ui.component.videocard.VideoCardData) -> Unit,
     onToggleDanmaku: () -> Unit,
-    onShowShortcutTip: (String) -> Unit,
+    onShowShortcutTip: (keyName: String?, text: String) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -229,20 +231,25 @@ fun VideoPlayerController(
      * 快捷键提示始终显示，新的提示会覆盖旧提示。
      *
      * 对于开关类/参数类动作，[status] 会追加在动作名称后面（如"字幕：开"）。
+     * [keyName] 为触发按键的显示名，非空时提示条以键帽图标呈现（P2-4）。
      */
     fun showShortcutTip(
         action: PlayerCustomShortcutAction,
         status: String? = null,
+        keyName: String? = null,
     ) {
         val name = PlayerCustomShortcutCatalog.getActionDisplayName(action)
         val tip = if (status != null) "$name：$status" else name
-        onShowShortcutTip(tip)
+        onShowShortcutTip(keyName, tip)
     }
 
-    fun executeCustomShortcut(action: PlayerCustomShortcutAction) {
+    fun executeCustomShortcut(
+        action: PlayerCustomShortcutAction,
+        keyName: String? = null,
+    ) {
         // PGC 默认走详情页且无 UP/相关视频，对应的路由类快捷键直接禁用并提示
         if (isPgc && action in pgcUnsupportedShortcutActions) {
-            showShortcutTip(action, "番剧不支持")
+            showShortcutTip(action, "番剧不支持", keyName)
             return
         }
         var status: String? = null
@@ -260,11 +267,11 @@ fun VideoPlayerController(
                 onToggleLoop()
             }
             PlayerCustomShortcutAction.ToggleDanmaku -> {
-                status = if (uiState.danmakuState.enabledTypes.isEmpty()) "开" else "关"
+                status = if (overlayState.danmakuState.enabledTypes.isEmpty()) "开" else "关"
                 onToggleDanmaku()
             }
             PlayerCustomShortcutAction.ToggleSubtitle -> {
-                status = if (uiState.subtitleId == -1L) "开" else "关"
+                status = if (overlayState.subtitleId == -1L) "开" else "关"
                 onToggleSubtitle()
             }
             PlayerCustomShortcutAction.TogglePersistentBottomProgress -> {
@@ -280,14 +287,14 @@ fun VideoPlayerController(
             }
 
             is PlayerCustomShortcutAction.ToggleDanmakuMask -> {
-                val newMaskEnabled = !uiState.danmakuState.maskEnabled
+                val newMaskEnabled = !overlayState.danmakuState.maskEnabled
                 status = if (newMaskEnabled) "开" else "关"
                 onDanmakuSettingChange(
                     DanmakuSettingAction.SetMaskEnabled(newMaskEnabled),
                 )
             }
         }
-        showShortcutTip(action, status)
+        showShortcutTip(action, status, keyName)
     }
 
     fun handleCustomShortcut(event: KeyEvent): Boolean {
@@ -298,9 +305,98 @@ fun VideoPlayerController(
         if (event.type == KeyEventType.KeyUp) return true
         if (event.type != KeyEventType.KeyDown) return false
         if (event.nativeKeyEvent.repeatCount != 0) return true
-        executeCustomShortcut(shortcut.action)
+        executeCustomShortcut(shortcut.action, PlayerCustomShortcutKeys.getDisplayName(keyCode))
         return true
     }
+
+    /** 始终生效的媒体/系统键。 */
+    fun handleSystemKeys(
+        event: KeyEvent,
+        confirmKeys: List<Key>,
+    ): Boolean =
+        when (event.key) {
+            Key.Back -> {
+                if (showClickableControllers) {
+                    closeAllControllers()
+                } else {
+                    onExit()
+                }
+                true
+            }
+
+            Key.Menu, Key(763) -> {
+                showInfoSeekController = false
+                showMenuController = !showMenuController
+                true
+            }
+
+            Key.MediaPlayPause -> {
+                onPlay()
+                true
+            }
+
+            Key.MediaPlay -> {
+                if (uiState.playerState != PlayerState.Playing) onPlay()
+                true
+            }
+
+            Key.MediaPause -> {
+                if (uiState.playerState == PlayerState.Playing) onPause()
+                true
+            }
+
+            else -> false
+        }
+
+    /** 覆盖层未打开时生效的方向/确认键（KeyUp 已被顶层过滤，此处均为 KeyDown）。 */
+    fun handleNavigationKeys(
+        event: KeyEvent,
+        confirmKeys: List<Key>,
+    ): Boolean =
+        when (event.key) {
+            in confirmKeys -> {
+                if (event.type == KeyEventType.KeyDown) {
+                    if (event.nativeKeyEvent.isLongPress) {
+                        showMenuController = true
+                    }
+                } else {
+                    if (uiState.showBackToStart) {
+                        onBackToStart()
+                    } else {
+                        onPlay()
+                    }
+                }
+                true
+            }
+
+            Key.DirectionUp -> {
+                showListController = true
+                true
+            }
+
+            Key.DirectionDown -> {
+                showInfoSeekController = true
+                true
+            }
+
+            Key.DirectionLeft, Key.MediaRewind -> {
+                if (uiState.showSkipToNextEp) {
+                    onCancelSkipToNextEp()
+                } else {
+                    showInfoSeekController = true
+                    onDirectionLeft()
+                }
+                true
+            }
+
+            Key.DirectionRight, Key.MediaFastForward -> {
+                showInfoSeekController = true
+                onDirectionRight()
+                true
+            }
+
+            else -> false
+        }
 
     fun handleKeyEvent(event: KeyEvent): Boolean {
         val confirmKeys = listOf(Key.DirectionCenter, Key.Enter, Key.Spacebar)
@@ -313,85 +409,11 @@ fun VideoPlayerController(
         // 自定义快捷键
         if (handleCustomShortcut(event)) return true
 
-        // 始终生效的按键（KeyUp 已被顶层过滤，此处均为 KeyDown）
-        when (event.key) {
-            Key.Back -> {
-                if (showClickableControllers) {
-                    closeAllControllers()
-                    return true
-                }
-                onExit()
-                return true
-            }
+        // 媒体/系统键（KeyUp 已被顶层过滤，此处均为 KeyDown）
+        if (handleSystemKeys(event, confirmKeys)) return true
 
-            Key.Menu, Key(763) -> {
-                showInfoSeekController = false
-                showMenuController = !showMenuController
-                return true
-            }
-
-            Key.MediaPlayPause -> {
-                onPlay()
-                return true
-            }
-
-            Key.MediaPlay -> {
-                if (uiState.playerState != PlayerState.Playing) onPlay()
-                return true
-            }
-
-            Key.MediaPause -> {
-                if (uiState.playerState == PlayerState.Playing) onPause()
-                return true
-            }
-        }
-
-        // 覆盖层未打开时的按键（KeyUp 已被顶层过滤，此处均为 KeyDown）
-        if (!showClickableControllers) {
-            when (event.key) {
-                in confirmKeys -> {
-                    if (event.type == KeyEventType.KeyDown) {
-                        if (event.nativeKeyEvent.isLongPress) {
-                            showMenuController = true
-                        }
-                        return true
-                    } else {
-                        if (uiState.showBackToStart) {
-                            onBackToStart()
-                        } else {
-                            onPlay()
-                        }
-                        return true
-                    }
-                }
-
-                Key.DirectionUp -> {
-                    showListController = true
-                    return true
-                }
-
-                Key.DirectionDown -> {
-                    showInfoSeekController = true
-                    return true
-                }
-
-                Key.DirectionLeft, Key.MediaRewind -> {
-                    if (uiState.showSkipToNextEp) {
-                        onCancelSkipToNextEp()
-                        return true
-                    }
-                    showInfoSeekController = true
-                    onDirectionLeft()
-                    return true
-                }
-
-                Key.DirectionRight, Key.MediaFastForward -> {
-                    showInfoSeekController = true
-                    onDirectionRight()
-                    return true
-                }
-            }
-        }
+        // 覆盖层未打开时的方向/确认键
+        if (!showClickableControllers && handleNavigationKeys(event, confirmKeys)) return true
 
         return false
     }
@@ -425,7 +447,6 @@ fun VideoPlayerController(
                                 showInfoSeekController = true
                                 startSeekCountdown()
                             },
-                            onSeekCommit = { },
                             onBrightnessChange = { deltaY ->
                                 val activity = context as? android.app.Activity
                                 if (activity != null) {
@@ -499,19 +520,19 @@ fun VideoPlayerController(
             }
 
             // 字幕
-            if (uiState.subtitleId != -1L) {
+            if (overlayState.subtitleId != -1L) {
                 BottomSubtitle(
-                    subtitleData = uiState.subtitleData,
+                    subtitleData = overlayState.subtitleData,
                     currentTime = seekerState.value.currentTime,
                     fontSize =
                         androidx.compose.ui.unit.TextUnit(
-                            uiState.subtitleState.fontSize.toFloat(),
+                            overlayState.subtitleState.fontSize.toFloat(),
                             androidx.compose.ui.unit.TextUnitType.Sp,
                         ),
-                    opacity = uiState.subtitleState.opacity,
+                    opacity = overlayState.subtitleState.opacity,
                     padding =
                         androidx.compose.ui.unit
-                            .Dp(uiState.subtitleState.bottomPadding.toFloat()),
+                            .Dp(overlayState.subtitleState.bottomPadding.toFloat()),
                 )
             }
 
@@ -521,6 +542,7 @@ fun VideoPlayerController(
                 showSkipToNextEp = uiState.showSkipToNextEp,
                 showPreviewTip = uiState.showPreviewTip,
                 shortcutTipText = uiState.shortcutTipText,
+                shortcutTipKey = uiState.shortcutTipKey,
             )
 
             // 播放状态提示
@@ -540,7 +562,7 @@ fun VideoPlayerController(
             // 相关视频
             RelatedVideosController(
                 show = showRelatedVideosController,
-                relatedVideos = uiState.relatedVideos,
+                relatedVideos = overlayState.relatedVideos,
                 onVideoClicked = onRelatedVideoClicked,
             )
 
@@ -552,12 +574,11 @@ fun VideoPlayerController(
                 goTime = goTime,
                 seekerState = seekerState.value,
                 title = uiState.title,
-                clock = uiState.clock,
                 onlineWatching = uiState.onlineWatching,
                 videoShot = uiState.videoShot,
                 videoShotCache = videoShotCache,
                 isPgc = isPgc,
-                danmakuEnabled = uiState.danmakuState.enabledTypes.isNotEmpty(),
+                danmakuEnabled = overlayState.danmakuState.enabledTypes.isNotEmpty(),
                 isLooping = isLooping,
                 isPlaying = uiState.playerState == PlayerState.Playing,
                 onDirectionLeft = ::onDirectionLeft,
@@ -588,7 +609,7 @@ fun VideoPlayerController(
             VideoListController(
                 show = showListController,
                 currentCid = uiState.cid,
-                videoList = uiState.videoList,
+                videoList = overlayState.videoList,
                 onPlayNewVideo = { item ->
                     onPlayNewVideo(item)
                     showListController = false
@@ -599,6 +620,7 @@ fun VideoPlayerController(
             MenuController(
                 show = showMenuController,
                 uiState = uiState,
+                overlayState = overlayState,
                 onResolutionChange = { onMediaProfileSettingChange(MediaProfileSettingAction.SetQuality(it)) },
                 onCodecChange = { onMediaProfileSettingChange(MediaProfileSettingAction.SetVideoCodec(it)) },
                 onAspectRatioChange = onAspectRatioChange,

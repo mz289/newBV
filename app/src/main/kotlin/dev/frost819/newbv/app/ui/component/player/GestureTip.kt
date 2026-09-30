@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.BrightnessHigh
 import androidx.compose.material.icons.rounded.FastForward
-import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +59,6 @@ fun GestureTip(
                     when (state.type) {
                         GestureTipType.Brightness -> Icons.Rounded.BrightnessHigh
                         GestureTipType.Volume -> Icons.AutoMirrored.Rounded.VolumeUp
-                        GestureTipType.Speed -> Icons.Rounded.Speed
                         GestureTipType.Seek -> Icons.Rounded.FastForward
                         GestureTipType.None -> null
                     }
@@ -68,7 +66,6 @@ fun GestureTip(
                     when (state.type) {
                         GestureTipType.Brightness -> "${(state.value * 100).toInt()}%"
                         GestureTipType.Volume -> "${state.value.toInt()}%"
-                        GestureTipType.Speed -> "${state.value}x"
                         GestureTipType.Seek -> "快进/快退"
                         GestureTipType.None -> ""
                     }

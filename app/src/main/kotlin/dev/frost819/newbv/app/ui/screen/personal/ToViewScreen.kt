@@ -22,6 +22,7 @@ import androidx.navigation.NavController
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.VIDEO_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
@@ -84,7 +85,7 @@ fun ToViewScreen(
     TvLazyVerticalGrid(
         modifier = modifier,
         state = gridState,
-        columns = GridCells.Fixed(4),
+        columns = GridCells.Adaptive(VIDEO_CARD_MIN_WIDTH),
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -193,6 +194,7 @@ fun ToViewScreen(
                 isError = state.toViewError,
                 hasMore = false,
                 itemsIsEmpty = viewModel.toViewItems.isEmpty(),
+                onRetry = viewModel::loadToView,
             )
         }
     }

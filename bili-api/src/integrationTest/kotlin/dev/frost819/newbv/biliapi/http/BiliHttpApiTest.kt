@@ -6,8 +6,6 @@ import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonStatus
 import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonType
 import dev.frost819.newbv.biliapi.http.entity.user.FollowAction
 import dev.frost819.newbv.biliapi.http.entity.user.FollowActionSource
-import dev.frost819.newbv.biliapi.http.entity.user.garb.EquipPart
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -168,49 +166,6 @@ internal class BiliHttpApiTest {
     }
 
     @Test
-    fun `get pgc video play url`() {
-        runBlocking {
-            val response =
-                BiliHttpApi.getPgcVideoPlayUrl(
-                    av = 672676070,
-                    cid = 331748015,
-                    fnval = 4048,
-                    qn = 127,
-                )
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.getResponseData().quality).isGreaterThan(0)
-        }
-    }
-
-    @Test
-    fun `get pgc video play url v2`() {
-        runBlocking {
-            val response =
-                BiliHttpApi.getPgcVideoPlayUrlV2(
-                    av = 672676070,
-                    cid = 331748015,
-                    fnval = 4048,
-                    qn = 127,
-                )
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.getResponseData().videoInfo.quality).isGreaterThan(0)
-        }
-    }
-
-    @Test
-    fun `get video danmaku from xml`() {
-        assertDoesNotThrow {
-            runBlocking {
-                val response = BiliHttpApi.getDanmakuXml(cid = 903675075)
-                println(response)
-                assertThat(response.data).isNotEmpty()
-            }
-        }
-    }
-
-    @Test
     fun `get dynamic list with type all`() {
         assertDoesNotThrow {
             runBlocking {
@@ -238,27 +193,6 @@ internal class BiliHttpApiTest {
                 assertThat(response.code).isEqualTo(0)
                 assertThat(response.data).isNotNull()
                 assertThat(response.data!!.mid).isEqualTo(163637592)
-            }
-        }
-    }
-
-    @Test
-    fun `get user card info from Mr_He`() {
-        assertDoesNotThrow {
-            runBlocking {
-                val response =
-                    BiliHttpApi.getUserCardInfo(
-                        uid = 163637592,
-                        photo = true,
-                    )
-                println(response)
-                assertThat(response.code).isEqualTo(0)
-                assertThat(response.data).isNotNull()
-                assertThat(
-                    response.data!!
-                        .card.mid
-                        .toLong(),
-                ).isEqualTo(163637592L)
             }
         }
     }
@@ -294,35 +228,6 @@ internal class BiliHttpApiTest {
     }
 
     @Test
-    fun `get related vidoes`() {
-        assertDoesNotThrow {
-            runBlocking {
-                val response =
-                    BiliHttpApi.getRelatedVideos(
-                        avid = 170001,
-                    )
-                println(response)
-                assertThat(response.code).isEqualTo(0)
-                assertThat(response.data).isNotEmpty()
-            }
-        }
-    }
-
-    @Test
-    fun `get favorite folder metadata from id 2333`() {
-        runBlocking {
-            val response =
-                BiliHttpApi.getFavoriteFolderInfo(
-                    mediaId = 2333,
-                )
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.data).isNotNull()
-            assertThat(response.data!!.id).isEqualTo(2333L)
-        }
-    }
-
-    @Test
     fun `get all favorite folders metadata`() {
         runBlocking {
             val response =
@@ -331,19 +236,6 @@ internal class BiliHttpApiTest {
                 )
             println(response)
             assertThat(response.code).isEqualTo(0)
-        }
-    }
-
-    @Test
-    fun `get all favorite item ids`() {
-        runBlocking {
-            val response =
-                BiliHttpApi.getFavoriteIdList(
-                    mediaId = 2333,
-                )
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.data).isNotNull()
         }
     }
 
@@ -567,64 +459,6 @@ internal class BiliHttpApiTest {
     }
 
     @Test
-    fun `get user season status data`() {
-        runBlocking {
-            val response =
-                BiliHttpApi.getSeasonUserStatus(
-                    seasonId = 44152,
-                )
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.getResponseData()).isNotNull()
-        }
-    }
-
-    @Test
-    fun `get video tags`() {
-        runBlocking {
-            val response =
-                BiliHttpApi.getVideoTags(
-                    avid = 170001,
-                )
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.data).isNotNull()
-            assertThat(response.data!!).isNotEmpty()
-        }
-    }
-
-    @Test
-    fun `get tag detail`() {
-        runBlocking {
-            val response =
-                BiliHttpApi.getTagDetail(
-                    tagId = 6020278,
-                    pageNumber = 1,
-                    pageSize = 20,
-                )
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.data).isNotNull()
-            assertThat(response.data!!.info.tagId).isEqualTo(6020278)
-        }
-    }
-
-    @Test
-    fun `get tag popular videos`() {
-        runBlocking {
-            val response =
-                BiliHttpApi.getTagTopVideos(
-                    tagId = 6020278,
-                    pageNumber = 1,
-                    pageSize = 20,
-                )
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.data).isNotEmpty()
-        }
-    }
-
-    @Test
     fun `get web timeline`() {
         runBlocking {
             val result =
@@ -730,17 +564,6 @@ internal class BiliHttpApiTest {
             assertThat(result.code).isEqualTo(0)
             assertThat(result.data).isNotNull()
             assertThat(result.data!!.trending.list).isNotEmpty()
-        }
-    }
-
-    @Test
-    fun `get app search hot words`() {
-        runBlocking {
-            val result = BiliHttpApi.getAppSearchSquare()
-            println(result)
-            assertThat(result.code).isEqualTo(0)
-            assertThat(result.data).isNotNull()
-            assertThat(result.data!!).isNotEmpty()
         }
     }
 
@@ -1008,133 +831,6 @@ internal class BiliHttpApiTest {
     }
 
     @Test
-    fun `get app region dynamic`() {
-        runBlocking {
-            val rids =
-                listOf(
-                    1,
-                    13,
-                    167,
-                    3,
-                    129,
-                    4,
-                    36,
-                    188,
-                    234,
-                    223,
-                    160,
-                    211,
-                    217,
-                    119,
-                    155,
-                    202,
-                    5,
-                    181,
-                    177,
-                    23,
-                    11,
-                )
-            rids
-                .shuffled()
-                .forEach { rid ->
-                    println("rid $rid:")
-                    val result =
-                        BiliHttpApi.getRegionDynamic(
-                            rid = rid,
-                            accessKey = ACCESS_TOKEN,
-                        )
-                    println(result)
-                    assertThat(result.code).isEqualTo(0)
-                    assertThat(result.data).isNotNull()
-                    assertThat(result.data!!.new).isNotEmpty()
-                    delay((800L..2000L).random())
-                }
-        }
-    }
-
-    @Test
-    fun `get app region dynamic list`() {
-        runBlocking {
-            val rids =
-                listOf(
-                    1,
-                    13,
-                    167,
-                    3,
-                    129,
-                    4,
-                    36,
-                    188,
-                    234,
-                    223,
-                    160,
-                    211,
-                    217,
-                    119,
-                    155,
-                    202,
-                    5,
-                    181,
-                    177,
-                    23,
-                    11,
-                )
-            rids
-                .shuffled()
-                .forEach { rid ->
-                    println("rid $rid:")
-                    val result =
-                        BiliHttpApi.getRegionDynamicList(
-                            rid = rid,
-                            accessKey = ACCESS_TOKEN,
-                        )
-                    println(result)
-                    assertThat(result.code).isEqualTo(0)
-                    assertThat(result.data).isNotNull()
-                    assertThat(result.data!!.new).isNotEmpty()
-                    delay((800L..2000L).random())
-                }
-        }
-    }
-
-    @Test
-    fun `get locs`() {
-        runBlocking {
-            val locIds =
-                listOf(
-                    4973,
-                    4991,
-                    5004,
-                    4979,
-                    4985,
-                    5008,
-                    5007,
-                    4997,
-                    4998,
-                    5005,
-                    5002,
-                    5001,
-                    5000,
-                    5006,
-                    4999,
-                    5003,
-                )
-
-            locIds.chunked(3).forEach { locs ->
-                println("${locs.joinToString(",")}:")
-                val result =
-                    BiliHttpApi.getLocs(
-                        ids = locs,
-                    )
-                println(result)
-                assertThat(result.code).isEqualTo(0)
-                assertThat(result.data).isNotEmpty()
-                delay((800L..2000L).random())
-            }
-        }
-    }
-
-    @Test
     fun `add to watch later`() =
         runBlocking {
             val result =
@@ -1293,15 +989,6 @@ internal class BiliHttpApiTest {
     }
 
     // ===== 杂项接口 =====
-
-    @Test
-    fun `get user equipped garb`() =
-        runBlocking {
-            val response = BiliHttpApi.getUserEquippedGarb(part = EquipPart.CardBg)
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.data).isNotNull()
-        }
 
     @Test
     fun `get web interface nav`() =

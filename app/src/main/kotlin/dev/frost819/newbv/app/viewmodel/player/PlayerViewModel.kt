@@ -26,10 +26,9 @@ import dev.frost819.newbv.app.util.findTrack
 import dev.frost819.newbv.app.util.orderQualities
 import dev.frost819.newbv.app.util.pickDecodableProfile
 import dev.frost819.newbv.app.util.trackMatchesCodec
-import dev.frost819.newbv.biliapi.entity.ApiType
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.DashVideo
 import dev.frost819.newbv.biliapi.entity.PlayData
-import dev.frost819.newbv.biliapi.entity.video.HeartbeatVideoType
 import dev.frost819.newbv.biliapi.entity.video.VideoPage
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
 import dev.frost819.newbv.biliapi.repositories.CoinRepository
@@ -52,7 +51,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -68,7 +66,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import java.util.Calendar
 import javax.inject.Inject
 
 private const val PLAYER_ACTION_TIMEOUT_MS = 10_000L
@@ -101,7 +98,7 @@ class PlayerViewModel
     @Inject
     constructor(
         private val videoPlayRepository: VideoPlayRepository,
-        private val videoInfoRepository: VideoInfoRepository,
+        val videoInfoRepository: VideoInfoRepository,
         private val authRepository: AuthRepository,
         private val exoPlayerFactory: ExoPlayerFactory,
         private val videoCapabilityProvider: VideoCapabilityProvider,
@@ -156,7 +153,6 @@ class PlayerViewModel
 
         private var seekerUpdateJob: Job? = null
         private var debugInfoUpdateJob: Job? = null
-        private var clockUpdateJob: Job? = null
         private var heartbeatJob: Job? = null
         private var loadVideoJob: Job? = null
         private var backToStartCountdownJob: Job? = null
@@ -232,10 +228,6 @@ class PlayerViewModel
                     _uiState.update { it.copy(playerState = PlayerState.Ended) }
                     viewModelScope.launch { _uiEffect.emit(PlayerUiEffect.PlayEnded) }
                 }
-
-                override fun onSeekBack(seekBackIncrementMs: Long) {}
-
-                override fun onSeekForward(seekForwardIncrementMs: Long) {}
             }
 
         /**
@@ -246,9 +238,6 @@ class PlayerViewModel
          * @param epid 番剧分集 ID（UGC 为 null）
          * @param title 视频标题
          * @param lastPlayed 上次播放位置（秒）
-         * @param fromSeason 是否为番剧播放
-         * @param subType 番剧子类型
-         * @param seasonId 番剧 season ID
          * @param authorMid UP 主 mid
          * @param authorName UP 主名称
          */
@@ -258,9 +247,6 @@ class PlayerViewModel
             epid: Int?,
             title: String,
             lastPlayed: Int,
-            fromSeason: Boolean,
-            subType: Int,
-            seasonId: Int,
             authorMid: Long = 0,
             authorName: String,
         ) {
@@ -269,11 +255,8 @@ class PlayerViewModel
                     aid = aid,
                     cid = cid,
                     epid = epid.takeIf { it != null && it != 0 },
-                    seasonId = seasonId,
                     title = title,
                     lastPlayed = lastPlayed,
-                    fromSeason = fromSeason,
-                    subType = subType,
                     authorMid = authorMid,
                     authorName = authorName,
                     // 按用户偏好重置媒体格式，避免沿用上一个视频的画质/编码
@@ -286,7 +269,6 @@ class PlayerViewModel
                 )
             }
 
-            startClockUpdater()
             // 同时观看人数观察者：监听 cid 变化即时拉取，就绪后周期刷新
             startOnlineWatchingObserver()
         }
@@ -374,7 +356,7 @@ class PlayerViewModel
             }.onSuccess { text ->
                 if (text != null) _uiState.update { it.copy(onlineWatching = text) }
             }.onFailure { error ->
-                if (error is CancellationException && error !is TimeoutCancellationException) throw error
+                error.rethrowUnlessTimeout()
                 logger.error(error) { "Failed to fetch online watching count" }
             }
         }
@@ -424,7 +406,6 @@ class PlayerViewModel
             stopSeekerUpdater()
             stopDebugInfoUpdater()
             stopOnlineWatchingPolling()
-            clockUpdateJob?.cancel()
         }
 
         /** 播放/暂停切换。 */
@@ -462,7 +443,7 @@ class PlayerViewModel
                 }.onSuccess {
                     videoInfoRepository.updateVideoActionState(aid = aid, liked = !current)
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) throw error
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to toggle video like: aid=$aid" }
                     _uiEffect.emit(PlayerUiEffect.ShowToast("点赞失败: ${error.message ?: "未知错误"}"))
                 }
@@ -480,7 +461,7 @@ class PlayerViewModel
                 }.onSuccess {
                     videoInfoRepository.updateVideoActionState(aid = aid, coined = true)
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) throw error
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to send video coin: aid=$aid" }
                     _uiEffect.emit(PlayerUiEffect.ShowToast("投币失败: ${error.message ?: "未知错误"}"))
                 }
@@ -524,7 +505,7 @@ class PlayerViewModel
                 }.onSuccess {
                     videoInfoRepository.updateVideoActionState(aid = aid, favorited = !current)
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) throw error
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to toggle video favorite: aid=$aid" }
                     _uiEffect.emit(PlayerUiEffect.ShowToast("收藏失败: ${error.message ?: "未知错误"}"))
                 }
@@ -555,7 +536,7 @@ class PlayerViewModel
                     }
                     _uiEffect.emit(PlayerUiEffect.ShowToast("一键三连"))
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) throw error
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to send one-click triple action: aid=$aid" }
                     _uiEffect.emit(PlayerUiEffect.ShowToast("一键三连失败: ${error.message ?: "未知错误"}"))
                 }
@@ -599,14 +580,21 @@ class PlayerViewModel
             }
         }
 
-        /** 显示快捷键提示；新的提示会覆盖旧提示并重新计时。 */
-        fun showShortcutTip(text: String) {
+        /**
+         * 显示快捷键提示；新的提示会覆盖旧提示并重新计时。
+         *
+         * @param key 触发按键的显示名（如 "A"、"MENU"），为 null 时仅显示文本。
+         */
+        fun showShortcutTip(
+            text: String,
+            key: String? = null,
+        ) {
             shortcutTipJob?.cancel()
-            _uiState.update { it.copy(shortcutTipText = text) }
+            _uiState.update { it.copy(shortcutTipText = text, shortcutTipKey = key) }
             shortcutTipJob =
                 viewModelScope.launch {
                     delay(PlayerConstants.PLAYER_TIP_DURATION_MS)
-                    _uiState.update { it.copy(shortcutTipText = null) }
+                    _uiState.update { it.copy(shortcutTipText = null, shortcutTipKey = null) }
                 }
         }
 
@@ -692,16 +680,11 @@ class PlayerViewModel
                     aid = newVideo.aid,
                     cid = newVideo.cid,
                     epid = newVideo.epid,
-                    seasonId = newVideo.seasonId ?: 0,
                     title = newVideo.title,
                     lastPlayed = 0,
                     isBuffering = true,
                     playerState = PlayerState.Ready,
                     videoShot = null,
-                    danmakuMask = null,
-                    subtitleList = emptyList(),
-                    subtitleData = emptyList(),
-                    subtitleId = -1L,
                     availableQuality = emptyMap(),
                     availableVideoCodec = emptyList(),
                     availableAudio = emptyList(),
@@ -710,6 +693,7 @@ class PlayerViewModel
                     showSkipToNextEp = false,
                     showBackToStart = false,
                     shortcutTipText = null,
+                    shortcutTipKey = null,
                     mediaProfileState =
                         MediaProfileState(
                             qualityId = Prefs.defaultQuality.code,
@@ -1003,7 +987,7 @@ class PlayerViewModel
             epid: Int = 0,
         ): PlaybackConfig {
             val apiType = Prefs.apiType
-            val playData = fetchPlayData(aid, cid, epid, apiType)
+            val playData = videoPlayRepository.getPlayData(aid = aid, cid = cid, preferApiType = apiType)
             this.playData = playData
 
             val resolutionMap =
@@ -1047,32 +1031,6 @@ class PlayerViewModel
 
             return PlaybackConfig(qn = targetQualityId, codec = targetCodec, audio = targetAudio)
         }
-
-        private suspend fun fetchPlayData(
-            aid: Long,
-            cid: Long,
-            epid: Int,
-            apiType: ApiType,
-        ): PlayData =
-            if (_uiState.value.fromSeason) {
-                videoPlayRepository.getPgcPlayData(
-                    aid = aid,
-                    cid = cid,
-                    epid = epid,
-                    preferCodec =
-                        Prefs.defaultVideoCodec.let {
-                            when (it) {
-                                VideoCodec.AVC -> dev.frost819.newbv.biliapi.entity.CodeType.Code264
-                                VideoCodec.HEVC -> dev.frost819.newbv.biliapi.entity.CodeType.Code265
-                                VideoCodec.AV1 -> dev.frost819.newbv.biliapi.entity.CodeType.CodeAv1
-                                else -> dev.frost819.newbv.biliapi.entity.CodeType.NoCode
-                            }
-                        },
-                    preferApiType = apiType,
-                )
-            } else {
-                videoPlayRepository.getPlayData(aid = aid, cid = cid, preferApiType = apiType)
-            }
 
         private fun calculateTargetQuality(
             available: Set<Int>,
@@ -1246,25 +1204,12 @@ class PlayerViewModel
         ) {
             try {
                 val apiType = Prefs.apiType
-                if (!state.fromSeason) {
-                    videoPlayRepository.sendHeartbeat(
-                        aid = state.aid,
-                        cid = state.cid,
-                        time = time,
-                        preferApiType = apiType,
-                    )
-                } else {
-                    videoPlayRepository.sendHeartbeat(
-                        aid = state.aid,
-                        cid = state.cid,
-                        time = time,
-                        type = HeartbeatVideoType.Season,
-                        subType = state.subType,
-                        epid = state.epid,
-                        seasonId = state.seasonId,
-                        preferApiType = apiType,
-                    )
-                }
+                videoPlayRepository.sendHeartbeat(
+                    aid = state.aid,
+                    cid = state.cid,
+                    time = time,
+                    preferApiType = apiType,
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1333,22 +1278,6 @@ class PlayerViewModel
                     bufferedPercentage = player.bufferedPercentage,
                 )
             }
-        }
-
-        private fun startClockUpdater() {
-            clockUpdateJob?.cancel()
-            clockUpdateJob =
-                viewModelScope.launch(Dispatchers.Main) {
-                    while (isActive) {
-                        val cal = Calendar.getInstance()
-                        _uiState.update {
-                            it.copy(
-                                clock = Pair(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE)),
-                            )
-                        }
-                        delay(PlayerConstants.CLOCK_UPDATE_INTERVAL_MS)
-                    }
-                }
         }
 
         /**
@@ -1465,7 +1394,6 @@ class PlayerViewModel
                             cid = target.video.cid,
                             title = target.title,
                             epid = target.video.epid,
-                            seasonId = target.video.seasonId,
                         ),
                     )
             }

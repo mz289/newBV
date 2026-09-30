@@ -62,7 +62,6 @@ import kotlinx.coroutines.delay
  * @param title 直播间标题
  * @param areaName 分区名
  * @param onlineCount 人气值
- * @param clock 时钟（hour, minute）
  * @param isPlaying 是否正在播放
  * @param danmakuEnabled 弹幕是否开启
  * @param onPlayPause 播放/暂停回调
@@ -77,7 +76,6 @@ fun LiveControllerInfo(
     title: String,
     areaName: String,
     onlineCount: String,
-    clock: Pair<Int, Int>,
     isPlaying: Boolean,
     danmakuEnabled: Boolean,
     onPlayPause: () -> Unit,
@@ -98,7 +96,6 @@ fun LiveControllerInfo(
                 title = title,
                 areaName = areaName,
                 onlineCount = onlineCount,
-                clock = clock,
             )
         }
         AnimatedVisibility(
@@ -133,8 +130,9 @@ private fun LiveControllerInfoTop(
     title: String,
     areaName: String,
     onlineCount: String,
-    clock: Pair<Int, Int>,
 ) {
+    val currentClock = rememberClock()
+
     Column(
         modifier =
             modifier
@@ -181,7 +179,7 @@ private fun LiveControllerInfoTop(
                     modifier = Modifier.padding(end = 16.dp),
                 )
             }
-            Clock(hour = clock.first, minute = clock.second)
+            Clock(hour = currentClock.first, minute = currentClock.second)
         }
         // 人气 meta 行：与点播的同时观看人数样式一致（标题下方小字）
         if (onlineCount.isNotBlank()) {

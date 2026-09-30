@@ -31,10 +31,4 @@ interface VideoPlayerListener {
 
     /** 播放结束（播放到末尾） */
     fun onEnd()
-
-    /** 后退跳跃（由遥控器触发） */
-    fun onSeekBack(seekBackIncrementMs: Long)
-
-    /** 前进跳跃（由遥控器触发） */
-    fun onSeekForward(seekForwardIncrementMs: Long)
 }

@@ -37,6 +37,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.VIDEO_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
@@ -107,7 +108,7 @@ private fun UserSpaceScreen(
 
     TvLazyVerticalGrid(
         state = gridState,
-        columns = GridCells.Fixed(4),
+        columns = GridCells.Adaptive(VIDEO_CARD_MIN_WIDTH),
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -161,6 +162,7 @@ private fun UserSpaceScreen(
                 isError = state.error,
                 hasMore = state.hasMore,
                 itemsIsEmpty = state.videos.isEmpty(),
+                onRetry = { viewModel.loadVideos(mid) },
             )
         }
     }

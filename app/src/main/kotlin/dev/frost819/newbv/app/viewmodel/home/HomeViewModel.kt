@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.AccountRepositoryImpl
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.home.RecommendPage
 import dev.frost819.newbv.biliapi.entity.rank.PopularVideoPage
 import dev.frost819.newbv.biliapi.entity.ugc.UgcItem
@@ -23,9 +25,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-
-/** 网络请求超时时间（毫秒）。 */
-private const val LOAD_TIMEOUT_MS = 10_000L
 
 /**
  * 首页 Tab 状态。
@@ -199,9 +198,7 @@ class HomeViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load popular videos" }
                     _uiState.update { it.copy(popularError = true) }
                 }
@@ -256,9 +253,7 @@ class HomeViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load dynamic videos" }
                     _uiState.update { it.copy(dynamicError = true) }
                 }

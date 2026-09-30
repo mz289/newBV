@@ -3,14 +3,14 @@ package dev.frost819.newbv.app.viewmodel.ugc
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.ugc.UgcItem
 import dev.frost819.newbv.biliapi.entity.ugc.UgcTypeV2
 import dev.frost819.newbv.biliapi.entity.ugc.region.UgcFeedData
 import dev.frost819.newbv.biliapi.entity.ugc.region.UgcFeedPage
 import dev.frost819.newbv.biliapi.repositories.UgcRepository
 import dev.frost819.newbv.core.log.Loggers
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,8 +18,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
-
-private const val LOAD_TIMEOUT_MS = 10_000L
 
 /**
  * UGC 分区 UI 状态。
@@ -108,9 +106,7 @@ class UgcViewModel
                         }
                     }
                 }.onFailure { error ->
-                    if (error is CancellationException && error !is TimeoutCancellationException) {
-                        throw error
-                    }
+                    error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load UGC region: $currentType" }
                     _uiState.update { it.copy(error = true) }
                 }

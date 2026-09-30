@@ -11,8 +11,8 @@ import dev.frost819.newbv.app.ui.screen.live.liveAreaScreen
 import dev.frost819.newbv.app.ui.screen.live.liveFollowScreen
 import dev.frost819.newbv.app.ui.screen.login.loginScreen
 import dev.frost819.newbv.app.ui.screen.pgc.pgcFeatureScreen
+import dev.frost819.newbv.app.ui.screen.pgc.pgcIndexScreen
 import dev.frost819.newbv.app.ui.screen.player.livePlayerScreen
-import dev.frost819.newbv.app.ui.screen.player.seasonPlayerScreen
 import dev.frost819.newbv.app.ui.screen.player.videoPlayerScreen
 import dev.frost819.newbv.app.ui.screen.search.searchResultScreen
 import dev.frost819.newbv.app.ui.screen.settings.settingsScreen
@@ -65,7 +65,6 @@ fun AppNavHost(
 
         // ── 播放器 ───────────────────────────────────────────────────
         videoPlayerScreen(navController)
-        seasonPlayerScreen(navController)
         livePlayerScreen(navController)
 
         // ── 用户 ─────────────────────────────────────────────────────
@@ -74,6 +73,7 @@ fun AppNavHost(
 
         // ── PGC ──────────────────────────────────────────────────────
         pgcFeatureScreen(navController)
+        pgcIndexScreen(navController)
 
         // ── 设置 ─────────────────────────────────────────────────────
         settingsScreen(navController)
