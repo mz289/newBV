@@ -177,7 +177,8 @@ private fun LiveCardInfo(
     uname: String,
 ) {
     Column(
-        modifier = modifier.padding(vertical = 6.dp),
+        // 水平微内缩：文字不直接顶到焦点描边
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 6.dp),
     ) {
         Text(
             text = title,

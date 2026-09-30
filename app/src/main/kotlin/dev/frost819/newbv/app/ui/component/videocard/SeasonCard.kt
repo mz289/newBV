@@ -119,7 +119,8 @@ fun SeasonCard(
             }
 
             Column(
-                modifier = Modifier.padding(vertical = 8.dp),
+                // 水平微内缩：文字不直接顶到焦点描边
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
             ) {
                 Text(
                     text = data.title,
