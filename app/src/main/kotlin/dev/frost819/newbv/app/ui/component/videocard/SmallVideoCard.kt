@@ -117,8 +117,8 @@ fun SmallVideoCard(
         modifier =
             modifier
                 .focusShakeTarget()
-                // 卡片内容（封面+文字）整体内缩：标题与封面左缘对齐，
-                // 视觉间距由网格间距 + 该边距共同构成；描边随 Card 边界内缩仍贴合内容
+                // 卡片内容（封面+文字）整体内缩：视觉间距由网格间距 + 该边距共同构成；
+                // 描边随 Card 边界内缩仍贴合内容，文字区另有水平微内缩避免顶到描边
                 .padding(horizontal = 6.dp, vertical = 6.dp)
                 .fillMaxWidth()
                 .touchClickable(
@@ -491,7 +491,8 @@ private fun CardInfo(
     pubTime: String?,
 ) {
     Column(
-        modifier = modifier.padding(vertical = 8.dp),
+        // 水平微内缩：文字不直接顶到焦点描边，也保持与封面左缘近似对齐
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 8.dp),
     ) {
         // 标题恒占两行高度（minLines）：单行标题下方留白，
         // 使 UP 名/时间行在不同卡片间保持水平对齐
