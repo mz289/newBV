@@ -65,6 +65,22 @@ newBV 是基于 [BV](https://github.com/aaa1115910/bv) 重构的 [哔哩哔哩](
 - JDK 17
 - Android SDK（compileSdk 36）
 
+### 模拟器无法加载视频
+
+如果日志出现 `UnknownHostException` / `Unable to resolve host`，且首页请求也超时，先检查模拟器的 DNS。关闭对应模拟器后，在 PowerShell 中运行：
+
+```powershell
+.\tools\start-emulator.ps1 -Avd Television_4K
+```
+
+脚本从 `ANDROID_HOME`、`ANDROID_SDK_ROOT` 或 `local.properties` 查找 SDK，以 `223.5.5.5,119.29.29.29` 为 DNS 冷启动模拟器，保留已安装应用和数据。默认使用本机验证可用的软件图形渲染；主机 GPU 在这台 AMD 机器上仍会视频绿屏，其他机器可通过 `-Gpu auto` 测试硬件渲染以降低 CPU 开销。可以通过 `-DnsServers`、`-SdkPath` 和 `-Gpu` 覆盖配置；其他模拟器请替换 `-Avd` 名称。
+
+启动后可用 `adb shell ping -c 1 api.bilibili.com` 检查域名能否解析（即使 ping 不回包，显示 IP 也说明解析成功）。此启动参数只对该次启动生效，后续需要继续使用脚本。
+
+如果冷启动后 `adb shell cmd wifi status` 显示 `Wifi is not connected`，执行 `adb shell cmd wifi connect-network AndroidWifi open` 重连模拟器 Wi-Fi，再重试应用。
+
+当前兼容策略仅对 Android 12 及以上 `ranchu` / `goldfish` 模拟器的旧 `OMX.google.*` 视频解码器使用同步模式；音频、新版 C2 解码器和真机继续使用 Media3 默认模式。本机已验证“软件图形渲染 + 同步视频解码”组合可以正常播放，尚未通过完整对照测试证明两项分别必需。DNS 参数说明见 [Android 官方文档](https://developer.android.com/studio/run/emulator-networking-dns)。
+
 ## 开发文档
 
 - [AGENTS.md](AGENTS.md) — AI 协作开发规范（架构决策、代码规范、测试策略、踩坑经验）
