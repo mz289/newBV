@@ -14,11 +14,32 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** 视频卡片栅格的最小卡片宽度（P1-1 自适应列数）：4K(1920dp) 约 6 列，避免卡过小标题难读。 */
-val VIDEO_CARD_MIN_WIDTH: Dp = 260.dp
+/**
+ * 视频卡片栅格的最小卡片宽度（P1-1 自适应列数）。
+ *
+ * 应用覆盖了 [LocalDensity]（默认 2.0，设置内可调），屏宽必须用覆盖后密度换算——
+ * LocalConfiguration.screenWidthDp 按系统密度折算，与实际布局宽度不符，不能直接用。
+ *
+ * 分档（侧边栏 ~92dp + 内容边距 48dp + 间距 24dp）：
+ * 4K(1920dp) 6 列、2K(1280dp) 5 列、1080p(960dp) 5 列（5×140 + 4×24 = 796 ≤ 可用 ~820dp）。
+ */
+@Composable
+fun videoCardMinWidth(): Dp {
+    val density = LocalDensity.current
+    val screenWidth = with(density) {
+        LocalView.current.resources.displayMetrics.widthPixels.toDp()
+    }
+    return when {
+        screenWidth >= 1600.dp -> 260.dp // 4K：6 列
+        screenWidth >= 1100.dp -> 200.dp // 2K：5 列
+        else -> 140.dp // 1080p：5 列
+    }
+}
 
 /** 海报卡片栅格（番剧/影视封面卡）的最小卡片宽度。 */
 val POSTER_CARD_MIN_WIDTH: Dp = 260.dp

@@ -25,7 +25,7 @@ import androidx.tv.material3.Text
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
-import dev.frost819.newbv.app.ui.component.VIDEO_CARD_MIN_WIDTH
+import dev.frost819.newbv.app.ui.component.videoCardMinWidth
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
@@ -153,7 +153,7 @@ private fun LiveFollowScreen(
 
         TvLazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Adaptive(VIDEO_CARD_MIN_WIDTH),
+            columns = GridCells.Adaptive(videoCardMinWidth()),
             contentPadding = PaddingValues(24.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
