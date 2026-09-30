@@ -54,6 +54,7 @@ import dev.frost819.newbv.app.ui.component.videoGridHSpacing
 import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
+import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.search.SearchResultFilter
 import dev.frost819.newbv.app.ui.component.search.UpCard
@@ -122,7 +123,16 @@ fun SearchResultContent(
     focusSaver.RestoreFocus()
 
     val activeResult = uiState.results[uiState.activeType] ?: TypedSearchResult(uiState.activeType)
-    val cardMinWidth = searchTypeCardMinWidth[uiState.activeType] ?: 170.dp
+
+    // 列数设置（≥2 固定列）优先；"自动"按类型最小宽度自适应
+    val prefColumns by Prefs.videoColumnsFlow.collectAsState()
+    val fixedColumns = prefColumns.code
+    val cardColumns =
+        if (fixedColumns >= 2) {
+            GridCells.Fixed(fixedColumns)
+        } else {
+            GridCells.Adaptive(searchTypeCardMinWidth[uiState.activeType] ?: 170.dp)
+        }
 
     val isVideoSearchViaWebApi =
         remember {
@@ -220,7 +230,7 @@ fun SearchResultContent(
                             focusOnContent = it.hasFocus
                         },
                 state = gridState,
-                columns = GridCells.Adaptive(cardMinWidth),
+                columns = cardColumns,
                 contentPadding = PaddingValues(24.dp),
                 verticalArrangement = Arrangement.spacedBy(videoGridVSpacing()),
                 horizontalArrangement = Arrangement.spacedBy(videoGridHSpacing()),
