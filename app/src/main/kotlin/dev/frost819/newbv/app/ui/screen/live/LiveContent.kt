@@ -53,6 +53,8 @@ import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.app.ui.component.videoCardGridCells
+import dev.frost819.newbv.app.ui.component.videoGridHSpacing
+import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.navigation.LiveAreaRoute
@@ -118,7 +120,7 @@ fun LiveContent(
         state = gridState,
         columns = videoCardGridCells(),
         contentPadding = PaddingValues(24.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(videoGridHSpacing()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         // ── Section 1: 我的关注（标题行） ──

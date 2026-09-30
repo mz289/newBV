@@ -29,6 +29,8 @@ import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.app.ui.component.videoCardGridCells
+import dev.frost819.newbv.app.ui.component.videoGridHSpacing
+import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
@@ -171,8 +173,8 @@ private fun LiveAreaListScreen(
             state = gridState,
             columns = videoCardGridCells(),
             contentPadding = PaddingValues(24.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(videoGridHSpacing()),
+            verticalArrangement = Arrangement.spacedBy(videoGridVSpacing()),
         ) {
             itemsIndexed(
                 items = state.items,

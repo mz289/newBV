@@ -22,6 +22,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.frost819.newbv.data.datastore.Prefs
 
+/** 应用实际布局屏宽：应用覆盖了 [LocalDensity]，须用覆盖后密度换算物理像素。 */
+@Composable
+private fun appScreenWidthDp(): Dp = with(LocalDensity.current) {
+    LocalView.current.resources.displayMetrics.widthPixels.toDp()
+}
+
 /**
  * 视频卡片栅格的最小卡片宽度（P1-1 自适应列数）。
  *
@@ -33,14 +39,38 @@ import dev.frost819.newbv.data.datastore.Prefs
  */
 @Composable
 private fun videoCardMinWidth(): Dp {
-    val density = LocalDensity.current
-    val screenWidth = with(density) {
-        LocalView.current.resources.displayMetrics.widthPixels.toDp()
-    }
+    val screenWidth = appScreenWidthDp()
     return when {
         screenWidth >= 1600.dp -> 260.dp // 4K：6 列
         screenWidth >= 1100.dp -> 200.dp // 2K：5 列
         else -> 140.dp // 1080p：5 列
+    }
+}
+
+/**
+ * 视频网格水平间距：与卡宽同比例分档。
+ *
+ * 视觉间隙（间距 + 卡片水平内缩 12dp）约占卡宽 13%，各分辨率一致
+ * （4K 36dp/277dp、2K 26dp/217dp、1080p 20dp/158dp）。
+ */
+@Composable
+fun videoGridHSpacing(): Dp {
+    val screenWidth = appScreenWidthDp()
+    return when {
+        screenWidth >= 1600.dp -> 24.dp
+        screenWidth >= 1100.dp -> 14.dp
+        else -> 8.dp
+    }
+}
+
+/** 视频网格垂直间距：与水平间距同比例分档。 */
+@Composable
+fun videoGridVSpacing(): Dp {
+    val screenWidth = appScreenWidthDp()
+    return when {
+        screenWidth >= 1600.dp -> 12.dp
+        screenWidth >= 1100.dp -> 10.dp
+        else -> 8.dp
     }
 }
 
