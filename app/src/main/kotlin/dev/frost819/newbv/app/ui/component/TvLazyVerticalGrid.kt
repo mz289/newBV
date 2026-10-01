@@ -74,6 +74,23 @@ fun videoGridVSpacing(): Dp {
     }
 }
 
+/**
+ * 视频卡片标题/次要文字的字号缩放系数。
+ *
+ * 固定列数时卡宽随列数变化，文字按"实际卡宽 / 档位自动卡宽"等比缩放，
+ * 保持标题占卡宽的比例与自动档一致；"自动"档恒为 1（维持原字号）。
+ * 侧边栏宽度按估算值（92dp）计，搜索页无侧边栏带来的少量偏差对字号不敏感。
+ */
+@Composable
+fun videoCardTitleScale(): Float {
+    val prefColumns by Prefs.videoColumnsFlow.collectAsState()
+    val fixed = prefColumns.code
+    if (fixed < 2) return 1f
+    val available = appScreenWidthDp() - 140.dp // 侧边栏 ~92dp + 网格内容边距 48dp
+    val cardWidth = (available - videoGridHSpacing() * (fixed - 1)) / fixed
+    return (cardWidth / videoCardMinWidth() / 1.1f).coerceIn(0.7f, 2f)
+}
+
 /** 海报卡片栅格（番剧/影视封面卡）的最小卡片宽度。 */
 val POSTER_CARD_MIN_WIDTH: Dp = 260.dp
 
