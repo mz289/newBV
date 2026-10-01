@@ -62,6 +62,27 @@ fun videoGridVSpacing(): Dp {
 val POSTER_CARD_MIN_WIDTH: Dp = 260.dp
 
 /**
+ * 番剧页卡片放大系数：横版 200dp、竖版 150dp、时间表 260dp 等基准宽度
+ * 乘以该系数得到实际卡宽。
+ *
+ * 与 [videoGridHSpacing] 同一屏宽分档（<800 / 1080p / 2K / 4K，密度覆盖后换算）。
+ * 分辨率越低卡宽越小、越高适度放大：写死卡宽时 1080p 下每行卡片过少（元素过大），
+ * 4K 下卡片又相对屏宽过小，分档让各分辨率下每行可见卡片数量保持可读。
+ */
+@Composable
+fun animeCardScale(): Float = animeCardScale(appScreenWidthDp())
+
+internal fun animeCardScale(
+    screenWidth: Dp,
+): Float =
+    when {
+        screenWidth >= 1600.dp -> 1.3f
+        screenWidth >= 1100.dp -> 1.15f
+        screenWidth >= 800.dp -> 1f
+        else -> 0.85f
+    }
+
+/**
  * "卡片宽度上限"栅格：社区通用语义（Flutter 的 [SliverGridDelegateWithMaxCrossAxisExtent]、
  * PiliPlus 的卡宽设置）——列数 = ceil(可用宽 / (卡宽上限 + 间距))，
  * 卡片实际宽度不超过 [maxWidth]：屏幕越宽加列而非拉宽卡片，卡片观感保持稳定。
