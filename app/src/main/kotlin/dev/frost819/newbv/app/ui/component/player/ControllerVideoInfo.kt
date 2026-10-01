@@ -94,7 +94,9 @@ import kotlinx.coroutines.delay
  * @param onDirectionLeft seek 左移回调
  * @param onDirectionRight seek 右移回调
  * @param onSeekGoTime 确认 seek 回调
- * @param onSeekToPosition 触屏拖拽/点击进度条时 seek 到指定位置（毫秒）
+ * @param onSeekDragStart 进度条触摸拖拽开始回调（挂起待执行的 seek）
+ * @param onSeekToPosition 触屏拖拽进度条时更新预览位置（毫秒）
+ * @param onSeekDragEnd 触屏拖拽结束回调，参数为最终位置（毫秒），此时立即执行 seek
  * @param onPlayPause 播放/暂停回调
  * @param onDanmakuSwitchChange 弹幕开关回调
  * @param onShowSettings 打开设置回调
@@ -123,7 +125,9 @@ fun ControllerVideoInfo(
     onDirectionLeft: () -> Unit,
     onDirectionRight: () -> Unit,
     onSeekGoTime: () -> Unit,
+    onSeekDragStart: () -> Unit,
     onSeekToPosition: (Long) -> Unit,
+    onSeekDragEnd: (Long?) -> Unit,
     onPlayPause: () -> Unit,
     onDanmakuSwitchChange: () -> Unit,
     onShowSettings: () -> Unit,
@@ -169,7 +173,9 @@ fun ControllerVideoInfo(
                 onDirectionLeft = onDirectionLeft,
                 onDirectionRight = onDirectionRight,
                 onSeekGoTime = onSeekGoTime,
+                onSeekDragStart = onSeekDragStart,
                 onSeekToPosition = onSeekToPosition,
+                onSeekDragEnd = onSeekDragEnd,
                 onPlayPause = onPlayPause,
                 onDanmakuSwitchChange = onDanmakuSwitchChange,
                 onShowSettings = onShowSettings,
@@ -282,7 +288,9 @@ fun ControllerVideoInfoBottom(
     onDirectionLeft: () -> Unit,
     onDirectionRight: () -> Unit,
     onSeekGoTime: () -> Unit,
+    onSeekDragStart: () -> Unit,
     onSeekToPosition: (Long) -> Unit,
+    onSeekDragEnd: (Long?) -> Unit,
     onPlayPause: () -> Unit,
     onDanmakuSwitchChange: () -> Unit,
     onShowSettings: () -> Unit,
@@ -360,32 +368,40 @@ fun ControllerVideoInfoBottom(
                                     pass = PointerEventPass.Initial,
                                 )
                             firstDown.consume()
+                            // 按下即进入拖拽：挂起待执行的 seek，期间只更新预览
+                            onSeekDragStart()
 
-                            while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Initial)
-                                val change = event.changes.firstOrNull() ?: break
-                                val w = this.size.width.toFloat()
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull() ?: break
+                                    val w = this.size.width.toFloat()
 
-                                if (!change.pressed) {
-                                    // 手指抬起：seek 到最终位置
-                                    if (w > 0 && seekerState.totalDuration > 0) {
-                                        val ratio = (change.position.x / w).coerceIn(0f, 1f)
-                                        val targetTime = (ratio * seekerState.totalDuration).toLong()
-                                        onSeekToPosition(targetTime)
+                                    if (!change.pressed) {
+                                        // 手指抬起：以最终位置立即执行 seek
+                                        if (w > 0 && seekerState.totalDuration > 0) {
+                                            val ratio = (change.position.x / w).coerceIn(0f, 1f)
+                                            onSeekDragEnd((ratio * seekerState.totalDuration).toLong())
+                                        } else {
+                                            onSeekDragEnd(null)
+                                        }
+                                        change.consume()
+                                        break
                                     }
-                                    change.consume()
-                                    break
-                                }
 
-                                if (change.positionChanged()) {
-                                    // 拖拽中：持续 seek 到触摸位置
-                                    if (w > 0 && seekerState.totalDuration > 0) {
-                                        val ratio = (change.position.x / w).coerceIn(0f, 1f)
-                                        val targetTime = (ratio * seekerState.totalDuration).toLong()
-                                        onSeekToPosition(targetTime)
+                                    if (change.positionChanged()) {
+                                        // 拖拽中：仅更新预览位置，避免反复 seek 触发重新缓冲卡死
+                                        if (w > 0 && seekerState.totalDuration > 0) {
+                                            val ratio = (change.position.x / w).coerceIn(0f, 1f)
+                                            onSeekToPosition((ratio * seekerState.totalDuration).toLong())
+                                        }
+                                        change.consume()
                                     }
-                                    change.consume()
                                 }
+                            } finally {
+                                // 手势被中断（节点移除/pointerInput 重启）时兜底结束拖拽态，
+                                // 以最后预览位置执行 seek；正常抬起路径已先行结束，此处为 no-op
+                                onSeekDragEnd(null)
                             }
                         }
                     }.onKeyEvent {
@@ -600,7 +616,9 @@ private fun ControllerVideoInfoPreview() {
             onDirectionLeft = {},
             onDirectionRight = {},
             onSeekGoTime = {},
+            onSeekDragStart = {},
             onSeekToPosition = {},
+            onSeekDragEnd = {},
             onPlayPause = {},
             onDanmakuSwitchChange = {},
             onShowSettings = {},

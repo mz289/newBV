@@ -127,6 +127,9 @@ fun VideoPlayerController(
     // Seek 加速状态
     var goTime by remember { mutableLongStateOf(0L) }
     var isSeeking by remember { mutableStateOf(false) }
+
+    /** 触摸拖拽 seek 进行中（手指未抬起）。拖拽期间只更新预览位置，不触发真实 seek。 */
+    var isSeekDragActive by remember { mutableStateOf(false) }
     var seekChangeCount by remember { mutableLongStateOf(0L) }
     var lastSeekChangeTime by remember { mutableLongStateOf(0L) }
     var seekCountdown: Job? by remember { mutableStateOf(null) }
@@ -148,12 +151,53 @@ fun VideoPlayerController(
             0
         }
 
-    fun onTimeForward() {
-        isSeeking = true
-        val coefficient = calCoefficient()
-        val step = PlayerConstants.SEEK_BASE_INCREMENT_MS + coefficient * PlayerConstants.SEEK_STEP_INCREMENT_MS
-        goTime = (goTime + step).coerceAtMost(seekerState.value.totalDuration)
-        lastSeekChangeTime = System.currentTimeMillis()
+    /**
+     * 立即执行 seek 并收尾：取消挂起的倒计时、上报目标位置、恢复播放状态、
+     * 收起信息栏。D-pad 倒计时到期、确认键和触摸拖拽抬手共用此收尾逻辑。
+     */
+    fun executeSeek() {
+        seekCountdown?.cancel()
+        seekCountdown = null
+        onGoTime(goTime)
+        if (uiState.playerState != PlayerState.Playing) onPlay()
+        isSeeking = false
+        showInfoSeekController = false
+    }
+
+    fun startSeekCountdown() {
+        seekCountdown?.cancel()
+        seekCountdown =
+            scope.launch {
+                // 触摸拖拽进行中不执行，逐秒等待抬手；正常路径由
+                // [onSeekDragEnd] 抬手立即执行并取消本倒计时，此处仅兜底
+                while (isSeekDragActive) {
+                    delay(PlayerConstants.SEEK_EXECUTE_DELAY_MS)
+                }
+                delay(PlayerConstants.SEEK_EXECUTE_DELAY_MS)
+                executeSeek()
+            }
+    }
+
+    /**
+     * 触摸拖拽 seek 开始（进度条按下 / 画面水平拖动判定为 seek）。
+     *
+     * 拖拽期间挂起待执行的 seek 倒计时并停用控制器自动隐藏，
+     * 避免长拖过程中真实 seek 反复触发重新缓冲导致画面卡死。
+     */
+    fun onSeekDragStart() {
+        isSeekDragActive = true
+        seekCountdown?.cancel()
+        hideInfoSeekCountdown?.cancel()
+    }
+
+    /** 触摸拖拽 seek 结束（手指抬起）。[positionMs] 非空时以其为最终位置，立即执行 seek。 */
+    fun onSeekDragEnd(positionMs: Long?) {
+        if (!isSeekDragActive) return
+        isSeekDragActive = false
+        if (positionMs != null) {
+            goTime = positionMs.coerceIn(0L, seekerState.value.totalDuration)
+        }
+        executeSeek()
     }
 
     fun onTimeBack() {
@@ -164,16 +208,12 @@ fun VideoPlayerController(
         lastSeekChangeTime = System.currentTimeMillis()
     }
 
-    fun startSeekCountdown() {
-        seekCountdown?.cancel()
-        seekCountdown =
-            scope.launch {
-                delay(PlayerConstants.SEEK_EXECUTE_DELAY_MS)
-                onGoTime(goTime)
-                if (uiState.playerState != PlayerState.Playing) onPlay()
-                isSeeking = false
-                showInfoSeekController = false
-            }
+    fun onTimeForward() {
+        isSeeking = true
+        val coefficient = calCoefficient()
+        val step = PlayerConstants.SEEK_BASE_INCREMENT_MS + coefficient * PlayerConstants.SEEK_STEP_INCREMENT_MS
+        goTime = (goTime + step).coerceAtMost(seekerState.value.totalDuration)
+        lastSeekChangeTime = System.currentTimeMillis()
     }
 
     fun onDirectionLeft() {
@@ -189,11 +229,7 @@ fun VideoPlayerController(
     }
 
     fun onSeekGoTime() {
-        seekCountdown?.cancel()
-        onGoTime(goTime)
-        if (uiState.playerState != PlayerState.Playing) onPlay()
-        isSeeking = false
-        showInfoSeekController = false
+        executeSeek()
     }
 
     /**
@@ -209,12 +245,15 @@ fun VideoPlayerController(
             }
     }
 
+    /**
+     * 进度条触摸拖拽中：仅更新预览位置。
+     *
+     * 真实 seek 统一延迟到抬手（[onSeekDragEnd]）立即执行，拖拽过程中
+     * 反复 seek 会让 ExoPlayer 不断丢弃缓冲重新拉流，长拖时表现为画面卡死。
+     */
     fun onSeekToPosition(positionMs: Long) {
         isSeeking = true
         goTime = positionMs.coerceIn(0L, seekerState.value.totalDuration)
-        lastSeekChangeTime = System.currentTimeMillis()
-        startSeekCountdown()
-        startControllerAutoHide()
     }
 
     fun closeAllControllers() {
@@ -447,6 +486,8 @@ fun VideoPlayerController(
                                 showInfoSeekController = true
                                 startSeekCountdown()
                             },
+                            onSeekStart = { onSeekDragStart() },
+                            onSeekEnd = { onSeekDragEnd(null) },
                             onBrightnessChange = { deltaY ->
                                 val activity = context as? android.app.Activity
                                 if (activity != null) {
@@ -584,7 +625,9 @@ fun VideoPlayerController(
                 onDirectionLeft = ::onDirectionLeft,
                 onDirectionRight = ::onDirectionRight,
                 onSeekGoTime = ::onSeekGoTime,
+                onSeekDragStart = ::onSeekDragStart,
                 onSeekToPosition = ::onSeekToPosition,
+                onSeekDragEnd = ::onSeekDragEnd,
                 onPlayPause = {
                     onPlay()
                     startControllerAutoHide()
