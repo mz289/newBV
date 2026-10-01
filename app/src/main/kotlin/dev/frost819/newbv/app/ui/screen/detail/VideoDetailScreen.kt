@@ -576,7 +576,7 @@ private fun VideoInfoHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = 50.dp, vertical = 16.dp),
         // 封面与右侧信息列垂直居中对齐
         verticalAlignment = Alignment.CenterVertically,
     ) {
