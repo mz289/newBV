@@ -88,7 +88,7 @@ fun videoCardTitleScale(): Float {
     if (fixed < 2) return 1f
     val available = appScreenWidthDp() - 140.dp // 侧边栏 ~92dp + 网格内容边距 48dp
     val cardWidth = (available - videoGridHSpacing() * (fixed - 1)) / fixed
-    return (cardWidth / videoCardMinWidth() / 1.1f).coerceIn(0.7f, 2f)
+    return (cardWidth / videoCardMinWidth() / 1.25f).coerceIn(0.7f, 2f)
 }
 
 /** 海报卡片栅格（番剧/影视封面卡）的最小卡片宽度。 */
