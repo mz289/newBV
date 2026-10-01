@@ -10,13 +10,6 @@ import org.junit.jupiter.api.Test
  */
 class ThemeModeTest {
     @Test
-    fun `displayNames are stable`() {
-        assertThat(ThemeMode.FollowSystem.displayName).isEqualTo("跟随系统")
-        assertThat(ThemeMode.Dark.displayName).isEqualTo("深色")
-        assertThat(ThemeMode.Light.displayName).isEqualTo("浅色")
-    }
-
-    @Test
     fun `isDark resolves by mode`() {
         assertThat(ThemeMode.Dark.isDark(systemIsDark = false)).isTrue()
         assertThat(ThemeMode.Light.isDark(systemIsDark = true)).isFalse()

@@ -11,11 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -35,7 +30,7 @@ enum class DpadDirection {
  * 撞墙抖动控制器（P2-1，参照 wiliwili 的焦点边界抖动）。
  *
  * 信号链路：
- * 1. 根容器（[Modifier.dpadBoundaryShake]）或 Activity 捕获"焦点移动失败"的方向键
+ * 1. Activity 捕获"焦点移动失败"的方向键
  *    （Compose 焦点搜索与所有节点 handler 都未消费该按键，即焦点已到边界）；
  * 2. [bump] 广播方向；
  * 3. 所有 [Modifier.focusShakeTarget] 中当前持有焦点的元素播放一次方向性抖动。
@@ -50,32 +45,6 @@ object FocusShakeController {
         bumps.tryEmit(direction)
     }
 }
-
-/**
- * 根容器挂载：捕获未被任何焦点逻辑消费的方向键按下（首次按下，过滤长按连发），
- * 判定为焦点撞墙并广播抖动。
- *
- * 只在事件未被消费时收到回调（onKeyEvent 为冒泡阶段），
- * 正常的焦点移动 / 滚动 / 播放器快捷键都在上游被消费，不会误触发。
- */
-fun Modifier.dpadBoundaryShake(controller: FocusShakeController = FocusShakeController): Modifier =
-    composed {
-        onKeyEvent { event ->
-            if (event.type != KeyEventType.KeyDown || event.nativeKeyEvent.repeatCount != 0) {
-                return@onKeyEvent false
-            }
-            val direction =
-                when (event.key) {
-                    Key.DirectionLeft -> DpadDirection.Left
-                    Key.DirectionRight -> DpadDirection.Right
-                    Key.DirectionUp -> DpadDirection.Up
-                    Key.DirectionDown -> DpadDirection.Down
-                    else -> null
-                } ?: return@onKeyEvent false
-            controller.bump(direction)
-            false
-        }
-    }
 
 /**
  * 焦点元素挂载：当前元素持有焦点时，收到撞墙广播播放一次方向性抖动。
@@ -95,7 +64,7 @@ fun Modifier.focusShakeTarget(controller: FocusShakeController = FocusShakeContr
         val density = LocalDensity.current
         val amplitudePx = with(density) { 4.dp.toPx() }
 
-        androidx.compose.runtime.LaunchedEffect(controller) {
+        LaunchedEffect(controller) {
             controller.bumps.collectLatest { dir ->
                 if (!hasFocus) return@collectLatest
                 direction = dir

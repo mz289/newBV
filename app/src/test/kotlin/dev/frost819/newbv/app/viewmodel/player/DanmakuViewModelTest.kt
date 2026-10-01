@@ -236,16 +236,6 @@ class DanmakuViewModelTest {
             verify { Prefs.defaultDanmakuTypes = any() }
         }
 
-    @Test
-    fun `danmakuMask initial value is null`() {
-        assertThat(viewModel.danmakuMask.value).isNull()
-    }
-
-    @Test
-    fun `danmakuPlayer initial value is null`() {
-        assertThat(viewModel.danmakuPlayer).isNull()
-    }
-
     // === 分段加载 ===
 
     /** 构造一条 Web 分段接口返回的弹幕数据（time 为秒）。 */

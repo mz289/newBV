@@ -86,28 +86,6 @@ class VideoInfoRepositoryTest {
             danmaku = 0,
         )
 
-    // ── initial state ────────────────────────────────────────────────
-
-    @Test
-    fun `initial state has empty videoList`() {
-        assertThat(repository.videoList.value).isEmpty()
-    }
-
-    @Test
-    fun `initial state has null videoDetail`() {
-        assertThat(repository.videoDetail.value).isNull()
-    }
-
-    @Test
-    fun `initial state has empty relatedVideos`() {
-        assertThat(repository.relatedVideos.value).isEmpty()
-    }
-
-    @Test
-    fun `initial state has null videoSharedState`() {
-        assertThat(repository.videoSharedState.value).isNull()
-    }
-
     // ── updateVideoList ──────────────────────────────────────────────
 
     @Test

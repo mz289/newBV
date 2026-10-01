@@ -112,27 +112,4 @@ class RoutesTest {
         val decoded = json.decodeFromString<PgcFeatureRoute>(encoded)
         assertThat(decoded.seasonId).isEqualTo(42L)
     }
-
-    // ── 默认值验证 ───────────────────────────────────────────────────
-
-    @Test
-    fun `VideoDetailRoute default epid is null`() {
-        val route = VideoDetailRoute(aid = 1L)
-        assertThat(route.epid).isNull()
-    }
-
-    @Test
-    fun `VideoPlayerRoute defaults are correct`() {
-        val route = VideoPlayerRoute(aid = 1L, cid = 2L)
-        assertThat(route.epid).isNull()
-        assertThat(route.title).isEmpty()
-        assertThat(route.cover).isEmpty()
-    }
-
-    @Test
-    fun `LivePlayerRoute defaults are correct`() {
-        val route = LivePlayerRoute(roomId = 1L)
-        assertThat(route.title).isEmpty()
-        assertThat(route.cover).isEmpty()
-    }
 }

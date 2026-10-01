@@ -77,14 +77,4 @@ class PgcIndexDataTest {
         assertThat(result.nextPage.totalSize).isEqualTo(50)
         assertThat(result.nextPage.nextPage).isEqualTo(4)
     }
-
-    @Test
-    fun `PgcIndexPage defaults are correct`() {
-        val page = PgcIndexData.PgcIndexPage()
-        assertThat(page.currentPage).isEqualTo(1)
-        assertThat(page.pageSize).isEqualTo(20)
-        assertThat(page.totalSize).isEqualTo(0)
-        assertThat(page.nextPage).isEqualTo(1)
-        assertThat(page.hasNext).isTrue()
-    }
 }

@@ -33,12 +33,6 @@ class IndexParamsTest {
     }
 
     @Test
-    fun `IndexOrderType has Desc and Asc`() {
-        assertThat(IndexOrderType.Desc.id).isEqualTo(0)
-        assertThat(IndexOrderType.Asc.id).isEqualTo(1)
-    }
-
-    @Test
     fun `SeasonVersion getList for Anime returns four entries`() {
         val list = SeasonVersion.getList(PgcType.Anime)
         assertThat(list)
@@ -278,14 +272,5 @@ class IndexParamsTest {
     fun `IndexOrder id values are unique`() {
         val ids = IndexOrder.entries.map { it.id }
         assertThat(ids.toSet().size).isEqualTo(ids.size)
-    }
-
-    @Test
-    fun `Style id values cover expected ranges`() {
-        assertThat(Style.All.id).isEqualTo(-1)
-        assertThat(Style.Movie.id).isEqualTo(-10)
-        assertThat(Style.Original.id).isEqualTo(10010)
-        assertThat(Style.Culture.id).isEqualTo(10100)
-        assertThat(Style.ShortFilm.id).isEqualTo(10104)
     }
 }

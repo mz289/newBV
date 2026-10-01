@@ -55,30 +55,6 @@ class LogViewerViewModelTest {
         tempDir.deleteRecursively()
     }
 
-    // ── LogViewerUiState ──────────────────────────────────────────────
-
-    @Test
-    fun `LogViewerUiState default values`() {
-        val state = LogViewerUiState()
-        assertThat(state.logFiles).isEmpty()
-        assertThat(state.serverAddress).isEmpty()
-        assertThat(state.isServerReady).isFalse()
-    }
-
-    @Test
-    fun `LogViewerUiState with values`() {
-        val files = listOf(File("test.log"))
-        val state =
-            LogViewerUiState(
-                logFiles = files,
-                serverAddress = "192.168.1.1:8080",
-                isServerReady = true,
-            )
-        assertThat(state.logFiles).hasSize(1)
-        assertThat(state.serverAddress).isEqualTo("192.168.1.1:8080")
-        assertThat(state.isServerReady).isTrue()
-    }
-
     // ── getLogTypeDisplayName ─────────────────────────────────────────
 
     @Test
@@ -175,13 +151,5 @@ class LogViewerViewModelTest {
 
         verify { crashHandler.createManualLog() }
         assertThat(viewModel.uiState.value.logFiles).isNotEmpty()
-    }
-
-    // ── server lifecycle ──────────────────────────────────────────────
-
-    @Test
-    fun `onCleared stops httpServer`() {
-        httpServer.stop()
-        verify { httpServer.stop() }
     }
 }

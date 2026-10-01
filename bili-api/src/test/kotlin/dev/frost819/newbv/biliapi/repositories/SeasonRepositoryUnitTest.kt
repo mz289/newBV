@@ -7,12 +7,9 @@ import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonType
 import dev.frost819.newbv.biliapi.entity.season.TimelineFilter
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.BiliResponse
-import dev.frost819.newbv.biliapi.http.entity.season.AppFollowingSeason
-import dev.frost819.newbv.biliapi.http.entity.season.FollowingSeasonAppData
 import dev.frost819.newbv.biliapi.http.entity.season.FollowingSeasonWebData
 import dev.frost819.newbv.biliapi.http.entity.season.WebFollowingSeason
 import dev.frost819.newbv.biliapi.http.entity.video.Timeline
-import dev.frost819.newbv.biliapi.http.entity.video.TimelineAppData
 import dev.frost819.newbv.biliapi.http.entity.video.VideoStat
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -21,7 +18,6 @@ import io.mockk.unmockkObject
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 /**
@@ -143,89 +139,6 @@ class SeasonRepositoryUnitTest {
         }
 
     // ------------------------------------------------------------------
-    // getTimeline (App)
-    // ------------------------------------------------------------------
-
-    @Test
-    @Disabled("Season timeline is Web-only")
-    fun `getTimeline App maps timelines correctly`() =
-        runTest {
-            val timelineAppData =
-                TimelineAppData(
-                    currentTimeText = "会一直在你身边的",
-                    data =
-                        listOf(
-                            httpTimeline(
-                                date = "2024-01-01",
-                                dateTs = 1704067200,
-                                dayOfWeek = 1,
-                                isToday = 1,
-                                episodes = listOf(httpEpisode()),
-                            ),
-                        ),
-                    filter = emptyList(),
-                    isNightMode = 0,
-                    navigationTitle = "放送时间表",
-                )
-            coEvery { BiliHttpApi.getTimeline(any<Int>()) } returns
-                BiliResponse(code = 0, message = "", data = timelineAppData)
-
-            val result = repository.getTimeline(filter = TimelineFilter.All, preferApiType = ApiType.App)
-
-            assertThat(result).hasSize(1)
-            assertThat(result[0].dateString).isEqualTo("2024-01-01")
-            assertThat(result[0].isToday).isTrue()
-            assertThat(result[0].episodes).hasSize(1)
-            assertThat(result[0].episodes[0].title).isEqualTo("番剧名")
-        }
-
-    @Test
-    @Disabled("Season timeline is Web-only")
-    fun `getTimeline App passes appFilterId`() =
-        runTest {
-            coEvery { BiliHttpApi.getTimeline(any<Int>()) } returns
-                BiliResponse(
-                    code = 0,
-                    message = "",
-                    data =
-                        TimelineAppData(
-                            currentTimeText = "",
-                            data = emptyList(),
-                            filter = emptyList(),
-                            isNightMode = 0,
-                            navigationTitle = "",
-                        ),
-                )
-
-            repository.getTimeline(filter = TimelineFilter.Anime, preferApiType = ApiType.App)
-
-            coVerify { BiliHttpApi.getTimeline(eq(TimelineFilter.Anime.appFilterId)) }
-        }
-
-    @Test
-    @Disabled("Season timeline is Web-only")
-    fun `getTimeline App returns empty list when no data`() =
-        runTest {
-            coEvery { BiliHttpApi.getTimeline(any<Int>()) } returns
-                BiliResponse(
-                    code = 0,
-                    message = "",
-                    data =
-                        TimelineAppData(
-                            currentTimeText = "",
-                            data = emptyList(),
-                            filter = emptyList(),
-                            isNightMode = 0,
-                            navigationTitle = "",
-                        ),
-                )
-
-            val result = repository.getTimeline(filter = TimelineFilter.All, preferApiType = ApiType.App)
-
-            assertThat(result).isEmpty()
-        }
-
-    // ------------------------------------------------------------------
     // getFollowingSeasons (Web)
     // ------------------------------------------------------------------
 
@@ -292,39 +205,6 @@ class SeasonRepositoryUnitTest {
             }
         }
 
-    // ------------------------------------------------------------------
-    // getFollowingSeasons (App)
-    // ------------------------------------------------------------------
-
-    @Test
-    @Disabled("Following seasons are Web-only")
-    fun `getFollowingSeasons App returns mapped seasons with total`() =
-        runTest {
-            val appData =
-                FollowingSeasonAppData(
-                    followList = listOf(fakeAppFollowingSeason(seasonId = 400, title = "番剧1")),
-                    _hasNext = 0,
-                    total = 1,
-                )
-            coEvery {
-                BiliHttpApi.getFollowingSeasons(any<String>(), any(), any(), any(), any(), any())
-            } returns
-                BiliResponse(code = 0, message = "", data = appData)
-
-            val result =
-                repository.getFollowingSeasons(
-                    type = FollowingSeasonType.Bangumi,
-                    status = FollowingSeasonStatus.All,
-                    pageNumber = 1,
-                    pageSize = 30,
-                    preferApiType = ApiType.App,
-                )
-
-            assertThat(result.list).hasSize(1)
-            assertThat(result.list[0].seasonId).isEqualTo(400)
-            assertThat(result.list[0].title).isEqualTo("番剧1")
-            assertThat(result.total).isEqualTo(1)
-        }
 
     // ------------------------------------------------------------------
     // 测试夹具
@@ -389,46 +269,6 @@ class SeasonRepositoryUnitTest {
         summary = "",
         title = title,
         totalCount = 12,
-        url = "",
-    )
-
-    private fun fakeAppFollowingSeason(
-        seasonId: Int = 400,
-        title: String = "测试番剧",
-    ) = AppFollowingSeason(
-        badge = "",
-        badgeInfo =
-            AppFollowingSeason.BadgeInfo(
-                bgColor = "",
-                bgColorNight = "",
-                text = "",
-            ),
-        badgeType = 0,
-        canWatch = 0,
-        cover = "http://cover.test",
-        follow = 0,
-        _isFinish = 0,
-        movable = 0,
-        mtime = 0,
-        newEp =
-            AppFollowingSeason.NewEp(
-                cover = "",
-                duration = 0,
-                id = 0,
-                indexShow = "",
-                _isNew = 0,
-            ),
-        seasonId = seasonId,
-        seasonType = 1,
-        seasonTypeName = "番剧",
-        series =
-            AppFollowingSeason.Series(
-                count = 1,
-                id = 0,
-                title = title,
-            ),
-        squareCover = "",
-        title = title,
         url = "",
     )
 

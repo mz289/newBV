@@ -4,33 +4,24 @@ import io.ktor.utils.io.core.use
 import org.brotli.dec.BrotliInputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.util.zip.Deflater
 import java.util.zip.Inflater
-
-fun ByteArray.zlibCompress(): ByteArray {
-    val output = ByteArray(this.size * 4)
-    val compressor =
-        Deflater().apply {
-            setInput(this@zlibCompress)
-            finish()
-        }
-    val compressedDataLength: Int = compressor.deflate(output)
-    return output.copyOfRange(0, compressedDataLength)
-}
 
 fun ByteArray.zlibDecompress(): ByteArray {
     val inflater = Inflater()
-    val outputStream = ByteArrayOutputStream()
-    return outputStream.use {
-        val buffer = ByteArray(1024)
-        inflater.setInput(this)
-        var count = -1
-        while (count != 0) {
-            count = inflater.inflate(buffer)
-            outputStream.write(buffer, 0, count)
+    return ByteArrayOutputStream().use { output ->
+        try {
+            inflater.setInput(this)
+            val buffer = ByteArray(8192)
+            while (!inflater.finished()) {
+                // 数据截断时 inflate 会一直返回 0 且 needsInput 恒真，直接终止而非死循环
+                if (inflater.needsInput()) break
+                val count = inflater.inflate(buffer)
+                output.write(buffer, 0, count)
+            }
+            output.toByteArray()
+        } finally {
+            inflater.end()
         }
-        inflater.end()
-        outputStream.toByteArray()
     }
 }
 
@@ -45,7 +36,7 @@ fun ByteArray.brotliDecompress(): ByteArray {
     outputStream.use { out ->
         ByteArrayInputStream(this).use { input ->
             BrotliInputStream(input).use { brotliInput ->
-                val buffer = ByteArray(1024)
+                val buffer = ByteArray(8192)
                 while (true) {
                     val read = brotliInput.read(buffer)
                     if (read == -1) break

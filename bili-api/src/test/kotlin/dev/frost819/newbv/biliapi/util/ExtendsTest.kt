@@ -34,6 +34,19 @@ class ExtendsTest {
     }
 
     @Test
+    fun `convertStringTimeToSeconds returns zero for NaN placeholder`() {
+        // Web 接口对无时长稿件返回 NaN:NaN:NaN
+        assertThat("NaN:NaN:NaN".convertStringTimeToSeconds()).isEqualTo(0)
+    }
+
+    @Test
+    fun `convertStringTimeToSeconds returns zero for blank input`() {
+        // App 接口对无时长稿件返回空字符串
+        assertThat("".convertStringTimeToSeconds()).isEqualTo(0)
+        assertThat("  ".convertStringTimeToSeconds()).isEqualTo(0)
+    }
+
+    @Test
     fun `toBv delegates to AvBvConverter`() {
         val bvid = 170001L.toBv()
         assertThat(bvid).isEqualTo("BV17x411w7KC")
