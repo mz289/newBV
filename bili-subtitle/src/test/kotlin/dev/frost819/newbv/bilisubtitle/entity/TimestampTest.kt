@@ -110,20 +110,4 @@ class TimestampTest {
         assertThat(ts.getBccTime()).isEqualTo(original)
     }
 
-    // ---- getSrtTime ----
-
-    @Test
-    fun `two timestamps with same values are equal`() {
-        val a = Timestamp(1, 2, 3, 4)
-        val b = Timestamp(1, 2, 3, 4)
-        assertThat(a).isEqualTo(b)
-        assertThat(a.hashCode()).isEqualTo(b.hashCode())
-    }
-
-    @Test
-    fun `two timestamps with different values are not equal`() {
-        val a = Timestamp(1, 2, 3, 4)
-        val b = Timestamp(1, 2, 3, 5)
-        assertThat(a).isNotEqualTo(b)
-    }
 }

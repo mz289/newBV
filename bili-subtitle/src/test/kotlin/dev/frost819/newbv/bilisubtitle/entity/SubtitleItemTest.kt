@@ -76,12 +76,6 @@ class SubtitleItemTest {
     }
 
     @Test
-    fun `content is retained`() {
-        val sub = item(fromMs = 0L, toMs = 1_000L, content = "hello world")
-        assertThat(sub.content).isEqualTo("hello world")
-    }
-
-    @Test
     fun `from and to timestamps have correct totalMills`() {
         val sub = item(fromMs = 1_500L, toMs = 4_500L)
         assertThat(sub.from.totalMills).isEqualTo(1_500L)

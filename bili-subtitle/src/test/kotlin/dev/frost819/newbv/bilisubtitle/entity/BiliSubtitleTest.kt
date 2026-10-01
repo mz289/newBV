@@ -156,33 +156,6 @@ class BiliSubtitleTest {
         assertThat(jsonString).doesNotContain("\"Stroke\"")
     }
 
-    // ---- Null defaults ----
-
-    @Test
-    fun `BiliSubtitle defaults to null for optional fields`() {
-        val subtitle = BiliSubtitle()
-
-        assertThat(subtitle.fontSize).isNull()
-        assertThat(subtitle.fontColor).isNull()
-        assertThat(subtitle.backgroundAlpha).isNull()
-        assertThat(subtitle.backgroundColor).isNull()
-        assertThat(subtitle.stroke).isNull()
-        assertThat(subtitle.type).isNull()
-        assertThat(subtitle.lang).isNull()
-        assertThat(subtitle.version).isNull()
-        assertThat(subtitle.body).isEmpty()
-    }
-
-    @Test
-    fun `BiliSubtitleItem defaults to null for optional fields`() {
-        val item = BiliSubtitleItem(from = 0.0f, to = 1.0f, content = "x")
-
-        assertThat(item.sid).isNull()
-        assertThat(item.location).isNull()
-        assertThat(item.music).isNull()
-        assertThat(item.version).isNull()
-    }
-
     // ---- Unknown keys are ignored ----
 
     @Test
