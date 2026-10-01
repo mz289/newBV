@@ -38,6 +38,7 @@ import dev.frost819.newbv.app.viewmodel.common.CollectWatchLaterEffects
 import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
 import dev.frost819.newbv.app.viewmodel.personal.PersonalViewModel
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -113,6 +114,14 @@ fun FavoriteScreen(
                                 shape =
                                     androidx.compose.foundation.shape
                                         .RoundedCornerShape(50),
+                            ),
+                        border =
+                            androidx.tv.material3.ClickableSurfaceDefaults.border(
+                                focusedBorder = outerFocusBorder(50.dp),
+                            ),
+                        scale =
+                            androidx.tv.material3.ClickableSurfaceDefaults.scale(
+                                focusedScale = 1f,
                             ),
                         colors =
                             ControlFocusDefaults.surfaceColors(
