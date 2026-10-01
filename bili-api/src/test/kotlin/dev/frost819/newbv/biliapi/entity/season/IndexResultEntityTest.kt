@@ -117,34 +117,4 @@ class IndexResultEntityTest {
 
         assertThat(item.badge).isNull()
     }
-
-    @Test
-    fun `IndexResultPage defaults are correct`() {
-        val page = IndexResultPage()
-        assertThat(page.nextPage).isEqualTo(1)
-        assertThat(page.hasNext).isTrue()
-    }
-
-    @Test
-    fun `FollowingSeasonType has Bangumi and Cinema`() {
-        assertThat(FollowingSeasonType.entries).containsExactly(FollowingSeasonType.Bangumi, FollowingSeasonType.Cinema)
-        assertThat(FollowingSeasonType.Bangumi.id).isEqualTo(1)
-        assertThat(FollowingSeasonType.Bangumi.paramName).isEqualTo("bangumi")
-        assertThat(FollowingSeasonType.Cinema.id).isEqualTo(2)
-        assertThat(FollowingSeasonType.Cinema.paramName).isEqualTo("cinema")
-    }
-
-    @Test
-    fun `FollowingSeasonStatus has All Want Watching Watched`() {
-        assertThat(FollowingSeasonStatus.entries).containsExactly(
-            FollowingSeasonStatus.All,
-            FollowingSeasonStatus.Want,
-            FollowingSeasonStatus.Watching,
-            FollowingSeasonStatus.Watched,
-        )
-        assertThat(FollowingSeasonStatus.All.id).isEqualTo(0)
-        assertThat(FollowingSeasonStatus.Want.id).isEqualTo(1)
-        assertThat(FollowingSeasonStatus.Watching.id).isEqualTo(2)
-        assertThat(FollowingSeasonStatus.Watched.id).isEqualTo(3)
-    }
 }

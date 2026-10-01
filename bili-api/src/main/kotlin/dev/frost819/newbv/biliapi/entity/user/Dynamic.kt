@@ -3,6 +3,7 @@ package dev.frost819.newbv.biliapi.entity.user
 import bilibili.app.dynamic.v2.DynModuleType
 import bilibili.app.dynamic.v2.ModuleDynamic
 import dev.frost819.newbv.biliapi.util.BiliLogger
+import dev.frost819.newbv.biliapi.util.convertStringTimeToSeconds
 
 data class DynamicVideoData(
     val videos: List<DynamicVideo>,
@@ -84,7 +85,7 @@ data class DynamicVideo(
                 cover = archive.cover,
                 author = author.name,
                 authorMid = author.mid,
-                duration = convertStringTimeToSeconds(archive.durationText),
+                duration = archive.durationText.convertStringTimeToSeconds(),
                 play = convertStringPlayCountToNumberPlayCount(archive.stat.play),
                 danmaku = convertStringPlayCountToNumberPlayCount(archive.stat.danmaku),
                 pubTime = author.pubTime,
@@ -115,7 +116,7 @@ data class DynamicVideo(
                         cover = archive.cover,
                         author = author.author.name,
                         authorMid = author.author.mid,
-                        duration = convertStringTimeToSeconds(archive.coverLeftText1),
+                        duration = archive.coverLeftText1.convertStringTimeToSeconds(),
                         play = convertStringPlayCountToNumberPlayCount(archive.coverLeftText2),
                         danmaku = convertStringPlayCountToNumberPlayCount(archive.coverLeftText3),
                         pubTime = author.ptimeLabelText.substringBefore(" "),
@@ -134,7 +135,7 @@ data class DynamicVideo(
                         cover = pgc.cover,
                         author = author.author.name,
                         authorMid = author.author.mid,
-                        duration = convertStringTimeToSeconds(pgc.coverLeftText1),
+                        duration = pgc.coverLeftText1.convertStringTimeToSeconds(),
                         play = convertStringPlayCountToNumberPlayCount(pgc.coverLeftText2),
                         danmaku = convertStringPlayCountToNumberPlayCount(pgc.coverLeftText3),
                         pubTime = author.ptimeLabelText.substringBefore(" "),
@@ -145,17 +146,6 @@ data class DynamicVideo(
             }
         }
     }
-}
-
-private fun convertStringTimeToSeconds(time: String): Int {
-    // 部分稿件可能没有时长，Web 接口返回 NaN:NaN:NaN，App 接口返回空字符串
-    if (time.startsWith("NaN") || time.isBlank()) return 0
-
-    val parts = time.split(":")
-    val hours = if (parts.size == 3) parts[0].toInt() else 0
-    val minutes = parts[parts.size - 2].toInt()
-    val seconds = parts[parts.size - 1].toInt()
-    return (hours * 3600) + (minutes * 60) + seconds
 }
 
 // web 接口获取到的是“xx万”，而 grpc 接口获取到的是“xx.x万播放”

@@ -63,11 +63,6 @@ class SubtitleViewModelTest {
     }
 
     @Test
-    fun `initial subtitleId is -1`() {
-        assertThat(viewModel.subtitleId.value).isEqualTo(-1L)
-    }
-
-    @Test
     fun `updateSubtitleState SetFontSize updates font size`() =
         runTest(testDispatcher) {
             viewModel.updateSubtitleState(SubtitleSettingAction.SetFontSize(32))

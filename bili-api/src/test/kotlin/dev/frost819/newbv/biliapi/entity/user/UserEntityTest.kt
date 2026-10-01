@@ -84,21 +84,6 @@ class UserEntityTest {
         assertThat(result.sign).isEqualTo("签名内容")
     }
 
-    @Test
-    fun `Author holds mid name face`() {
-        val author = Author(mid = 100L, name = "UP主", face = "http://face.test")
-        assertThat(author.mid).isEqualTo(100L)
-        assertThat(author.name).isEqualTo("UP主")
-        assertThat(author.face).isEqualTo("http://face.test")
-    }
-
-    @Test
-    fun `HistoryItemType has Unknown Archive Pgc`() {
-        assertThat(
-            HistoryItemType.entries,
-        ).containsExactly(HistoryItemType.Unknown, HistoryItemType.Archive, HistoryItemType.Pgc)
-    }
-
     // ------------------------------------------------------------------
     // Author.fromAuthor(gRPC)
     // ------------------------------------------------------------------

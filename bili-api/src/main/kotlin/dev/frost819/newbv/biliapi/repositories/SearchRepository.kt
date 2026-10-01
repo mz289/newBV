@@ -12,6 +12,7 @@ import dev.frost819.newbv.biliapi.entity.search.Hotword
 import dev.frost819.newbv.biliapi.grpc.utils.handleGrpcException
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.util.smartDate
+import dev.frost819.newbv.biliapi.util.convertStringTimeToSeconds
 
 class SearchRepository(
     private val authRepository: AuthRepository,
@@ -369,7 +370,7 @@ data class SearchTypeResult(
                     cover = "https:${video.pic}",
                     author = video.author,
                     mid = video.mid,
-                    duration = convertStringTimeToSeconds(video.duration),
+                    duration = video.duration.convertStringTimeToSeconds(),
                     play = video.play ?: 0,
                     danmaku = video.danmaku,
                     pubTime = video.pubDate.smartDate,
@@ -383,7 +384,7 @@ data class SearchTypeResult(
                     cover = video.av.cover,
                     author = video.av.author,
                     mid = video.av.mid,
-                    duration = convertStringTimeToSeconds(video.av.duration),
+                    duration = video.av.duration.convertStringTimeToSeconds(),
                     play = video.av.play,
                     danmaku = video.av.danmaku,
                 )
@@ -471,14 +472,6 @@ data class SearchTypeResult(
 }
 
 private fun String.toHttpsUrl(): String = if (startsWith("//")) "https:$this" else this
-
-private fun convertStringTimeToSeconds(time: String): Int {
-    val parts = time.split(":")
-    val hours = if (parts.size == 3) parts[0].toInt() else 0
-    val minutes = parts[parts.size - 2].toInt()
-    val seconds = parts[parts.size - 1].toInt()
-    return (hours * 3600) + (minutes * 60) + seconds
-}
 
 /**
  * 全量搜索（`Search.SearchAll` / HTTP `/search/all/v2`）的结果。

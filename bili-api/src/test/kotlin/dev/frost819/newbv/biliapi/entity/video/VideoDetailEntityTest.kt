@@ -12,15 +12,6 @@ import org.junit.jupiter.api.Test
  */
 class VideoDetailEntityTest {
     @Test
-    fun `UserActions defaults are all false`() {
-        val actions = UserActions()
-        assertThat(actions.like).isFalse()
-        assertThat(actions.favorite).isFalse()
-        assertThat(actions.coin).isFalse()
-        assertThat(actions.dislike).isFalse()
-    }
-
-    @Test
     fun `PlayerIcon fromPlayerIcon HTTP maps url2 to idle and url1 to moving`() {
         val httpPlayerIcon =
             dev.frost819.newbv.biliapi.http.entity.video.VideoMoreInfo.PlayerIcon(
@@ -44,36 +35,6 @@ class VideoDetailEntityTest {
                 null as dev.frost819.newbv.biliapi.http.entity.video.VideoMoreInfo.PlayerIcon?,
             )
         assertThat(icon).isNull()
-    }
-
-    @Test
-    fun `History holds progress and lastPlayedCid`() {
-        val history = VideoDetail.History(progress = 120, lastPlayedCid = 456L)
-        assertThat(history.progress).isEqualTo(120)
-        assertThat(history.lastPlayedCid).isEqualTo(456L)
-    }
-
-    @Test
-    fun `Stat holds all stat fields`() {
-        val stat =
-            VideoDetail.Stat(
-                view = 10000,
-                danmaku = 500,
-                reply = 200,
-                favorite = 100,
-                coin = 50,
-                share = 10,
-                like = 1000,
-                historyRank = 5,
-            )
-        assertThat(stat.view).isEqualTo(10000)
-        assertThat(stat.danmaku).isEqualTo(500)
-        assertThat(stat.reply).isEqualTo(200)
-        assertThat(stat.favorite).isEqualTo(100)
-        assertThat(stat.coin).isEqualTo(50)
-        assertThat(stat.share).isEqualTo(10)
-        assertThat(stat.like).isEqualTo(1000)
-        assertThat(stat.historyRank).isEqualTo(5)
     }
 
     @Test

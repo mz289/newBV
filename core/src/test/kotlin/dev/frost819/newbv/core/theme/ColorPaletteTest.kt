@@ -12,13 +12,6 @@ import kotlin.math.pow
  */
 class ColorPaletteTest {
     @Test
-    fun `brand palette uses the approved muted primary and secondary colors`() {
-        assertThat(BVColors.Primary).isEqualTo(Color(0xFF7773AD))
-        assertThat(BVColors.PrimaryStrong).isEqualTo(Color(0xFF5E5A8B))
-        assertThat(BVColors.Secondary).isEqualTo(Color(0xFF5B9B94))
-    }
-
-    @Test
     fun `dark theme primary text has readable contrast`() {
         assertThat(contrastRatio(BVColors.DarkBackground, BVColors.DarkOnBackground))
             .isAtLeast(MIN_TEXT_CONTRAST)

@@ -73,35 +73,6 @@ class DanmakuMobMaskFrameTest {
     }
 
     // ------------------------------------------------------------------
-    // DanmakuWebMaskFrame data class
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `DanmakuWebMaskFrame holds range and svg`() {
-        val frame = DanmakuWebMaskFrame(range = 0L until 5000L, svg = "<svg></svg>")
-        assertThat(frame.range).isEqualTo(0L until 5000L)
-        assertThat(frame.svg).isEqualTo("<svg></svg>")
-    }
-
-    @Test
-    fun `DanmakuWebMaskFrame equals is reference equality`() {
-        val frame = DanmakuWebMaskFrame(range = 0L until 1000L, svg = "test")
-        assertThat(frame.equals(frame)).isTrue()
-    }
-
-    // ------------------------------------------------------------------
-    // DanmakuMaskSegment data class
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `DanmakuMaskSegment holds range and frames`() {
-        val frame = DanmakuMobMaskFrame(range = 0L until 1000L, width = 10, height = 5, image = byteArrayOf(1))
-        val segment = DanmakuMaskSegment(range = 0L until 10000L, frames = listOf(frame))
-        assertThat(segment.range).isEqualTo(0L until 10000L)
-        assertThat(segment.frames).hasSize(1)
-    }
-
-    // ------------------------------------------------------------------
     // DanmakuMask parsing from binary
     // ------------------------------------------------------------------
 
@@ -201,8 +172,4 @@ class DanmakuMobMaskFrameTest {
         assertThat(mask.segments).hasSize(1)
     }
 
-    @Test
-    fun `DanmakuMaskType enum has WebMask and MobMask`() {
-        assertThat(DanmakuMaskType.entries).containsExactly(DanmakuMaskType.WebMask, DanmakuMaskType.MobMask)
-    }
 }

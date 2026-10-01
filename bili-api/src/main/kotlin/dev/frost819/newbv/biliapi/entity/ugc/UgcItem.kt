@@ -91,7 +91,7 @@ data class UgcItem(
             return UgcItem(
                 aid = card.base.param.toLong(),
                 title = card.base.title,
-                duration = convertStringTimeToSeconds(card.coverRightText1),
+                duration = card.coverRightText1.convertStringTimeToSeconds(),
                 author = card.rightDesc1,
                 authorMid = card.up.id,
                 cover = card.base.cover,
@@ -115,15 +115,6 @@ data class UgcItem(
                 pubTime = archive.pubdate.toSmartDate(),
             )
     }
-}
-
-private fun convertStringTimeToSeconds(time: String): Int {
-    if (time.isBlank()) return 0
-    val parts = time.split(":")
-    val hours = if (parts.size == 3) parts[0].toInt() else 0
-    val minutes = parts[parts.size - 2].toInt()
-    val seconds = parts[parts.size - 1].toInt()
-    return (hours * 3600) + (minutes * 60) + seconds
 }
 
 private fun convertPlayStringToInt(text: String): Int {

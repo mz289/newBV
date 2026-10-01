@@ -18,7 +18,6 @@ import io.mockk.unmockkObject
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 /**
@@ -89,29 +88,6 @@ class FavoriteRepositoryUnitTest {
             coVerify { BiliHttpApi.checkVideoFavoured(eq(AID), isNull()) }
         }
 
-    @Test
-    @Disabled("App HTTP path was removed; favorite is Web-only")
-    fun `checkVideoFavoured App passes accessToken as accessKey`() =
-        runTest {
-            coEvery { BiliHttpApi.checkVideoFavoured(any(), any()) } returns true
-
-            repository.checkVideoFavoured(aid = AID, preferApiType = ApiType.App)
-
-            coVerify { BiliHttpApi.checkVideoFavoured(eq(AID), eq(ACCESS_TOKEN)) }
-        }
-
-    @Test
-    @Disabled("App HTTP path was removed; favorite is Web-only")
-    fun `checkVideoFavoured App uses empty string when accessToken is null`() =
-        runTest {
-            authRepository.accessToken = null
-            coEvery { BiliHttpApi.checkVideoFavoured(any(), any()) } returns false
-
-            repository.checkVideoFavoured(aid = AID, preferApiType = ApiType.App)
-
-            coVerify { BiliHttpApi.checkVideoFavoured(eq(AID), eq("")) }
-        }
-
     // ------------------------------------------------------------------
     // addVideoToFavoriteFolder
     // ------------------------------------------------------------------
@@ -136,27 +112,6 @@ class FavoriteRepositoryUnitTest {
             }
         }
 
-    @Test
-    @Disabled("App HTTP path was removed; favorite is Web-only")
-    fun `addVideoToFavoriteFolder App passes accessToken instead of csrf`() =
-        runTest {
-            coJustRun { BiliHttpApi.setVideoToFavorite(any(), any(), any(), any(), any(), any()) }
-            val addMediaIds = listOf(100L)
-
-            repository.addVideoToFavoriteFolder(aid = AID, addMediaIds = addMediaIds, preferApiType = ApiType.App)
-
-            coVerify {
-                BiliHttpApi.setVideoToFavorite(
-                    avid = eq(AID),
-                    type = eq(VIDEO_TYPE_VALUE),
-                    addMediaIds = eq(addMediaIds),
-                    delMediaIds = any(),
-                    accessKey = eq(ACCESS_TOKEN),
-                    csrf = isNull(),
-                )
-            }
-        }
-
     // ------------------------------------------------------------------
     // delVideoFromFavoriteFolder
     // ------------------------------------------------------------------
@@ -177,25 +132,6 @@ class FavoriteRepositoryUnitTest {
                     delMediaIds = eq(delMediaIds),
                     accessKey = isNull(),
                     csrf = eq(BILI_JCT),
-                )
-            }
-        }
-
-    @Test
-    @Disabled("App HTTP path was removed; favorite is Web-only")
-    fun `delVideoFromFavoriteFolder App passes accessToken`() =
-        runTest {
-            coJustRun { BiliHttpApi.setVideoToFavorite(any(), any(), any(), any(), any(), any()) }
-            val delMediaIds = listOf(300L)
-
-            repository.delVideoFromFavoriteFolder(aid = AID, delMediaIds = delMediaIds, preferApiType = ApiType.App)
-
-            coVerify {
-                BiliHttpApi.setVideoToFavorite(
-                    avid = eq(AID),
-                    type = eq(VIDEO_TYPE_VALUE),
-                    delMediaIds = eq(delMediaIds),
-                    accessKey = eq(ACCESS_TOKEN),
                 )
             }
         }
@@ -226,33 +162,6 @@ class FavoriteRepositoryUnitTest {
                     delMediaIds = eq(delMediaIds),
                     accessKey = isNull(),
                     csrf = eq(BILI_JCT),
-                )
-            }
-        }
-
-    @Test
-    @Disabled("App HTTP path was removed; favorite is Web-only")
-    fun `updateVideoToFavoriteFolder App passes both add and del mediaIds with accessToken`() =
-        runTest {
-            coJustRun { BiliHttpApi.setVideoToFavorite(any(), any(), any(), any(), any(), any()) }
-            val addMediaIds = listOf(100L)
-            val delMediaIds = listOf(200L)
-
-            repository.updateVideoToFavoriteFolder(
-                aid = AID,
-                addMediaIds = addMediaIds,
-                delMediaIds = delMediaIds,
-                preferApiType = ApiType.App,
-            )
-
-            coVerify {
-                BiliHttpApi.setVideoToFavorite(
-                    avid = eq(AID),
-                    type = eq(VIDEO_TYPE_VALUE),
-                    addMediaIds = eq(addMediaIds),
-                    delMediaIds = eq(delMediaIds),
-                    accessKey = eq(ACCESS_TOKEN),
-                    csrf = isNull(),
                 )
             }
         }
@@ -331,57 +240,6 @@ class FavoriteRepositoryUnitTest {
             }
         }
 
-    @Test
-    @Disabled("App HTTP path was removed; favorite is Web-only")
-    fun `getAllFavoriteFolderMetadataList App passes accessToken`() =
-        runTest {
-            coEvery {
-                BiliHttpApi.getAllFavoriteFoldersInfo(any(), any(), any(), any())
-            } returns
-                BiliResponse(
-                    code = 0,
-                    message = "",
-                    data = UserFavoriteFoldersData(count = 0, list = emptyList()),
-                )
-
-            repository.getAllFavoriteFolderMetadataList(mid = MID, preferApiType = ApiType.App)
-
-            coVerify {
-                BiliHttpApi.getAllFavoriteFoldersInfo(
-                    mid = eq(MID),
-                    type = any(),
-                    rid = isNull(),
-                    accessKey = eq(ACCESS_TOKEN),
-                )
-            }
-        }
-
-    @Test
-    @Disabled("App HTTP path was removed; favorite is Web-only")
-    fun `getAllFavoriteFolderMetadataList App uses empty string when accessToken is null`() =
-        runTest {
-            authRepository.accessToken = null
-            coEvery {
-                BiliHttpApi.getAllFavoriteFoldersInfo(any(), any(), any(), any())
-            } returns
-                BiliResponse(
-                    code = 0,
-                    message = "",
-                    data = UserFavoriteFoldersData(count = 0, list = emptyList()),
-                )
-
-            repository.getAllFavoriteFolderMetadataList(mid = MID, preferApiType = ApiType.App)
-
-            coVerify {
-                BiliHttpApi.getAllFavoriteFoldersInfo(
-                    mid = eq(MID),
-                    type = any(),
-                    rid = isNull(),
-                    accessKey = eq(""),
-                )
-            }
-        }
-
     // ------------------------------------------------------------------
     // getFavoriteFolderData
     // ------------------------------------------------------------------
@@ -411,64 +269,6 @@ class FavoriteRepositoryUnitTest {
             assertThat(result.info.videoInThisFav).isTrue()
             assertThat(result.medias).hasSize(2)
             assertThat(result.hasMore).isTrue()
-        }
-
-    @Test
-    @Disabled("App HTTP path was removed; favorite is Web-only")
-    fun `getFavoriteFolderData App passes accessToken`() =
-        runTest {
-            val listData =
-                FavoriteFolderInfoListData(
-                    info = favoriteFolderInfo(favState = 0, mediaCount = 0),
-                    medias = emptyList(),
-                    hasMore = false,
-                )
-            coEvery {
-                BiliHttpApi.getFavoriteList(any(), any(), any(), any(), any(), any(), any(), any(), any())
-            } returns BiliResponse(code = 0, message = "", data = listData)
-
-            repository.getFavoriteFolderData(
-                mediaId = MEDIA_ID,
-                pageSize = 10,
-                pageNumber = 2,
-                preferApiType = ApiType.App,
-            )
-
-            coVerify {
-                BiliHttpApi.getFavoriteList(
-                    mediaId = eq(MEDIA_ID),
-                    pageSize = eq(10),
-                    pageNumber = eq(2),
-                    accessKey = eq(ACCESS_TOKEN),
-                )
-            }
-        }
-
-    @Test
-    @Disabled("App HTTP path was removed; favorite is Web-only")
-    fun `getFavoriteFolderData App uses empty string when accessToken is null`() =
-        runTest {
-            authRepository.accessToken = null
-            val listData =
-                FavoriteFolderInfoListData(
-                    info = favoriteFolderInfo(favState = 0, mediaCount = 0),
-                    medias = emptyList(),
-                    hasMore = false,
-                )
-            coEvery {
-                BiliHttpApi.getFavoriteList(any(), any(), any(), any(), any(), any(), any(), any(), any())
-            } returns BiliResponse(code = 0, message = "", data = listData)
-
-            repository.getFavoriteFolderData(mediaId = MEDIA_ID, preferApiType = ApiType.App)
-
-            coVerify {
-                BiliHttpApi.getFavoriteList(
-                    mediaId = eq(MEDIA_ID),
-                    pageSize = any(),
-                    pageNumber = any(),
-                    accessKey = eq(""),
-                )
-            }
         }
 
     // ------------------------------------------------------------------

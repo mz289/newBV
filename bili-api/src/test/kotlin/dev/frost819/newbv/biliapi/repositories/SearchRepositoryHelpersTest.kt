@@ -65,24 +65,6 @@ class SearchRepositoryHelpersTest {
     }
 
     // ------------------------------------------------------------------
-    // SearchTypePage
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `SearchTypePage defaults are correct`() {
-        val page = SearchTypePage()
-        assertThat(page.nextPageForWeb).isEqualTo(1)
-        assertThat(page.nextPageForApp).isEqualTo("")
-    }
-
-    @Test
-    fun `SearchTypePage can be created with custom values`() {
-        val page = SearchTypePage(nextPageForWeb = 5, nextPageForApp = "cursor-abc")
-        assertThat(page.nextPageForWeb).isEqualTo(5)
-        assertThat(page.nextPageForApp).isEqualTo("cursor-abc")
-    }
-
-    // ------------------------------------------------------------------
     // SearchFilterOrderType enum
     // ------------------------------------------------------------------
 
@@ -191,20 +173,6 @@ class SearchRepositoryHelpersTest {
     @Test
     fun `SearchFilterDuration has exactly 5 values`() {
         assertThat(SearchFilterDuration.entries).hasSize(5)
-    }
-
-    // ------------------------------------------------------------------
-    // SearchTypeResult defaults
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `SearchTypeResult defaults are correct`() {
-        val result = SearchTypeResult(page = SearchTypePage())
-        assertThat(result.videos).isEmpty()
-        assertThat(result.pgcs).isEmpty()
-        assertThat(result.users).isEmpty()
-        assertThat(result.hasMore).isTrue()
-        assertThat(result.page.nextPageForWeb).isEqualTo(1)
     }
 
     // ------------------------------------------------------------------

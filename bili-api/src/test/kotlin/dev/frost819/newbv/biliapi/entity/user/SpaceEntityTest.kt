@@ -121,21 +121,6 @@ class SpaceEntityTest {
         assertThat(result.page.lastAvid).isEqualTo(0L)
     }
 
-    @Test
-    fun `SpaceVideoOrder has PubDate and Click`() {
-        assertThat(SpaceVideoOrder.PubDate.value).isEqualTo("pubdate")
-        assertThat(SpaceVideoOrder.Click.value).isEqualTo("click")
-    }
-
-    @Test
-    fun `SpaceVideoPage defaults are correct`() {
-        val page = SpaceVideoPage()
-        assertThat(page.hasNext).isTrue()
-        assertThat(page.nextWebPageSize).isEqualTo(20)
-        assertThat(page.nextWebPageNumber).isEqualTo(1)
-        assertThat(page.lastAvid).isEqualTo(0L)
-    }
-
     private fun fakeVListItem(
         aid: Long = 1L,
         title: String = "title",

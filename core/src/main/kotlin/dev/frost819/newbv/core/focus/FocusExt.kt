@@ -36,10 +36,6 @@ import androidx.tv.material3.Border
 import dev.frost819.newbv.core.interaction.InputMethod
 import dev.frost819.newbv.core.interaction.LocalInteractionTracker
 import dev.frost819.newbv.core.theme.LocalFocusOutlineColor
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * 圆角 TV 控件的外侧焦点描边：2dp 线宽，内缘紧贴控件边缘。
@@ -179,20 +175,3 @@ fun Modifier.focusedScale(scale: Float = 0.9f): Modifier =
             .scale(scaleValue)
     }
 
-/**
- * 改进的请求焦点方法。
- *
- * 首次请求失败后等待 100ms 重试一次，处理 Compose 焦点系统时序问题。
- *
- * @param scope 协程作用域，在 Main 调度器执行。
- */
-fun FocusRequester.requestFocus(scope: CoroutineScope) {
-    scope.launch(Dispatchers.Main) {
-        runCatching {
-            requestFocus()
-        }.onFailure {
-            delay(100)
-            runCatching { requestFocus() }
-        }
-    }
-}
