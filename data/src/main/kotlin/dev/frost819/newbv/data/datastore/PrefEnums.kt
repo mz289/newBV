@@ -237,25 +237,3 @@ enum class PersonalTopNavItem {
         fun fromOrdinal(ordinal: Int): PersonalTopNavItem = entries.getOrElse(ordinal) { ToView }
     }
 }
-
-/**
- * 视频卡片网格列数。
- *
- * 通过 [code] 持久化，反序列化时未知 code 回退到 [Fixed4]。
- *
- * @property code 列数。
- */
-enum class VideoColumnCount(
-    val code: Int,
-) {
-    Fixed4(4),
-    Fixed5(5),
-    Fixed6(6),
-    Fixed7(7),
-    ;
-
-    companion object {
-        /** 从 code 安全解析，未知 code 返回 [Fixed4]。 */
-        fun fromCode(code: Int): VideoColumnCount = entries.find { it.code == code } ?: Fixed4
-    }
-}

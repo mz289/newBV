@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -50,11 +49,11 @@ import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TopNav
 import dev.frost819.newbv.app.ui.component.focusSaverItem
+import dev.frost819.newbv.app.ui.component.videoCardGridCells
 import dev.frost819.newbv.app.ui.component.videoGridHSpacing
 import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
-import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.search.SearchResultFilter
 import dev.frost819.newbv.app.ui.component.search.UpCard
@@ -87,16 +86,6 @@ private val searchTypeLabels =
         SearchType.LiveRoom to "直播间",
     )
 
-// 各搜索类型的卡片最小宽度（P1-1）：列数随可用宽度自适应
-private val searchTypeCardMinWidth =
-    mapOf(
-        SearchType.Video to 280.dp,
-        SearchType.MediaBangumi to 260.dp,
-        SearchType.MediaFt to 260.dp,
-        SearchType.BiliUser to 320.dp,
-        SearchType.LiveRoom to 320.dp,
-    )
-
 /**
  * 搜索结果页内容。
  *
@@ -124,15 +113,7 @@ fun SearchResultContent(
 
     val activeResult = uiState.results[uiState.activeType] ?: TypedSearchResult(uiState.activeType)
 
-    // 列数设置（≥2 固定列）优先；"自动"按类型最小宽度自适应
-    val prefColumns by Prefs.videoColumnsFlow.collectAsState()
-    val fixedColumns = prefColumns.code
-    val cardColumns =
-        if (fixedColumns >= 2) {
-            GridCells.Fixed(fixedColumns)
-        } else {
-            GridCells.Adaptive(searchTypeCardMinWidth[uiState.activeType] ?: 170.dp)
-        }
+    val cardColumns = videoCardGridCells()
 
     val isVideoSearchViaWebApi =
         remember {

@@ -386,13 +386,26 @@ object Prefs {
     /** 界面缩放密度（默认 2f，app 层 init 时按屏幕宽度重新计算）。 */
     var density by pref(PrefKeys.density, 2f)
 
-    /** 视频卡片网格列数（默认 4 列）。 */
-    var videoColumns by pref(
-        PrefKeys.videoColumns,
-        VideoColumnCount.Fixed4,
-        save = { it.code },
-        restore = { VideoColumnCount.fromCode(it) },
-    )
+    /** 视频卡片宽度可调下限（dp，默认 TV 布局下约 7 列）。 */
+    const val VIDEO_CARD_WIDTH_MIN = 110
+
+    /** 视频卡片宽度可调上限（dp）。 */
+    const val VIDEO_CARD_WIDTH_MAX = 300
+
+    /** 视频卡片宽度调节步进（dp）。 */
+    const val VIDEO_CARD_WIDTH_STEP = 10
+
+    /** 视频卡片宽度默认值（dp，约等于旧 4 列档的卡宽）。 */
+    const val VIDEO_CARD_WIDTH_DEFAULT = 200
+
+    /**
+     * 视频卡片宽度上限（dp）。
+     *
+     * 社区通用的自适应栅格语义（替代旧"视频卡片列数"）：
+     * 列数 = ceil(可用宽度 / (卡宽上限 + 间距))，卡片实际宽度不超过该值（对齐余量最多少量超出），
+     * 屏幕越宽加列而非拉宽卡片，卡片本身的大小与观感保持稳定。
+     */
+    var videoCardWidth by pref(PrefKeys.videoCardWidth, VIDEO_CARD_WIDTH_DEFAULT)
 
     /** 启动页（左侧导航项）。 */
     var homeLeftNavItem by pref(
@@ -446,42 +459,46 @@ object Prefs {
     var cacheAutoClean by pref(PrefKeys.cacheAutoClean, true)
 
     // ===== Flow 属性（用于 Compose collectAsState 实时观察） =====
+    // 均为懒加载单例：stateIn(Eagerly) 订阅永不取消，不能在 getter 里每次新建。
 
     /** 主题模式 Flow（实时响应设置变更）。 */
-    val themeModeFlow: StateFlow<ThemeMode>
-        get() =
-            (delegateMap[PrefKeys.themeMode] as? PrefDelegate<ThemeMode, Int>)
-                ?.flow
-                ?.map { ThemeMode.fromOrdinal(it as? Int ?: 0) }
-                ?.stateIn(scope, SharingStarted.Eagerly, ThemeMode.FollowSystem)
-                ?: MutableStateFlow(ThemeMode.FollowSystem)
+    val themeModeFlow: StateFlow<ThemeMode> by lazy {
+        (delegateMap[PrefKeys.themeMode] as? PrefDelegate<ThemeMode, Int>)
+            ?.flow
+            ?.map { ThemeMode.fromOrdinal(it as? Int ?: 0) }
+            ?.stateIn(scope, SharingStarted.Eagerly, ThemeMode.FollowSystem)
+            ?: MutableStateFlow(ThemeMode.FollowSystem)
+    }
 
     /** 强调色 Flow（实时响应设置变更）。 */
-    val accentColorFlow: StateFlow<AccentColor>
-        get() =
-            (delegateMap[PrefKeys.accentColor] as? PrefDelegate<AccentColor, String>)
-                ?.flow
-                ?.map { AccentColor.fromName(it as? String) }
-                ?.stateIn(scope, SharingStarted.Eagerly, AccentColor.Brand)
-                ?: MutableStateFlow(AccentColor.Brand)
+    val accentColorFlow: StateFlow<AccentColor> by lazy {
+        (delegateMap[PrefKeys.accentColor] as? PrefDelegate<AccentColor, String>)
+            ?.flow
+            ?.map { AccentColor.fromName(it as? String) }
+            ?.stateIn(scope, SharingStarted.Eagerly, AccentColor.Brand)
+            ?: MutableStateFlow(AccentColor.Brand)
+    }
 
     /** Density Flow（实时响应设置变更）。 */
-    val densityFlow: StateFlow<Float>
-        get() =
-            (delegateMap[PrefKeys.density] as? PrefDelegate<Float, Float>)
-                ?.flow
-                ?.map { it as? Float ?: 2f }
-                ?.stateIn(scope, SharingStarted.Eagerly, 2f)
-                ?: MutableStateFlow(2f)
+    val densityFlow: StateFlow<Float> by lazy {
+        (delegateMap[PrefKeys.density] as? PrefDelegate<Float, Float>)
+            ?.flow
+            ?.map { it as? Float ?: 2f }
+            ?.stateIn(scope, SharingStarted.Eagerly, 2f)
+            ?: MutableStateFlow(2f)
+    }
 
-    /** 视频卡片列数 Flow（实时响应设置变更）。 */
-    val videoColumnsFlow: StateFlow<VideoColumnCount>
-        get() =
-            (delegateMap[PrefKeys.videoColumns] as? PrefDelegate<VideoColumnCount, Int>)
-                ?.flow
-                ?.map { VideoColumnCount.fromCode(it as? Int ?: 4) }
-                ?.stateIn(scope, SharingStarted.Eagerly, VideoColumnCount.Fixed4)
-                ?: MutableStateFlow(VideoColumnCount.Fixed4)
+    /** 视频卡片宽度 Flow（实时响应设置变更）。 */
+    val videoCardWidthFlow: StateFlow<Int> by lazy {
+        (delegateMap[PrefKeys.videoCardWidth] as? PrefDelegate<Int, Int>)
+            ?.flow
+            ?.map {
+                (it as? Int ?: VIDEO_CARD_WIDTH_DEFAULT)
+                    .coerceIn(VIDEO_CARD_WIDTH_MIN, VIDEO_CARD_WIDTH_MAX)
+            }
+            ?.stateIn(scope, SharingStarted.Eagerly, VIDEO_CARD_WIDTH_DEFAULT)
+            ?: MutableStateFlow(VIDEO_CARD_WIDTH_DEFAULT)
+    }
 
     // ===== 初始化 =====
 
@@ -507,7 +524,26 @@ object Prefs {
                 (delegate as PrefDelegate<Any?, Any?>).flow.value = initialPrefs[key]
             }
         }
+        migrateVideoColumnsToCardWidth(initialPrefs)
         checkAndInitBuvid(initialPrefs)
+    }
+
+    /**
+     * 旧"视频卡片列数"迁移为"视频卡片宽度"。
+     *
+     * 列数档位按默认 TV 布局（可用宽度约 820dp）换算为近似卡宽，
+     * 仅在新键缺失时执行一次；旧键保留在 DataStore 中，之后不再读写。
+     */
+    private fun migrateVideoColumnsToCardWidth(prefs: Preferences) {
+        if (prefs.contains(PrefKeys.videoCardWidth)) return
+        val legacyColumns = prefs[PrefKeys.videoColumns] ?: return
+        videoCardWidth =
+            when (legacyColumns) {
+                5 -> 155
+                6 -> 125
+                7 -> 105
+                else -> VIDEO_CARD_WIDTH_DEFAULT
+            }
     }
 
     /** 检查 buvid / buvid3 是否缺失，缺失则自动生成并持久化。 */

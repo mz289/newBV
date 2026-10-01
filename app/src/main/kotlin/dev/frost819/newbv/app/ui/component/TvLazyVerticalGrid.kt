@@ -18,9 +18,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.frost819.newbv.data.datastore.Prefs
+import kotlin.math.ceil
+import kotlin.math.max
 
 /** 应用实际布局屏宽：应用覆盖了 [LocalDensity]，须用覆盖后密度换算物理像素。 */
 @Composable
@@ -55,31 +58,39 @@ fun videoGridVSpacing(): Dp {
     }
 }
 
-/**
- * 视频卡片标题/次要文字的字号缩放系数。
- *
- * 列数越多卡片越窄，文字按"当前列数卡宽 / 默认 4 列卡宽"等比缩小，
- * 保持标题占卡宽的比例与默认档一致。
- * 侧边栏宽度按估算值（92dp）计，搜索页无侧边栏带来的少量偏差对字号不敏感。
- */
-@Composable
-fun videoCardTitleScale(): Float {
-    val prefColumns by Prefs.videoColumnsFlow.collectAsState()
-    val available = appScreenWidthDp() - 140.dp // 侧边栏 ~92dp + 网格内容边距 48dp
-    val spacing = videoGridHSpacing()
-    val cardWidth = (available - spacing * (prefColumns.code - 1)) / prefColumns.code
-    val defaultCardWidth = (available - spacing * 3) / 4
-    return (cardWidth / defaultCardWidth).coerceIn(0.7f, 1f)
-}
-
 /** 海报卡片栅格（番剧/影视封面卡）的最小卡片宽度。 */
 val POSTER_CARD_MIN_WIDTH: Dp = 260.dp
 
-/** 视频卡片栅格列配置：设置项"视频卡片列数"（4~7 列）驱动，经 [Prefs.videoColumnsFlow] 实时生效。 */
+/**
+ * "卡片宽度上限"栅格：社区通用语义（Flutter 的 [SliverGridDelegateWithMaxCrossAxisExtent]、
+ * PiliPlus 的卡宽设置）——列数 = ceil(可用宽 / (卡宽上限 + 间距))，
+ * 卡片实际宽度不超过 [maxWidth]：屏幕越宽加列而非拉宽卡片，卡片观感保持稳定。
+ */
+private class MaxCardWidthCells(
+    private val maxWidth: Dp,
+) : GridCells {
+    override fun Density.calculateCrossAxisCellSizes(availableSize: Int, spacing: Int): List<Int> {
+        val count =
+            max(1, ceil(availableSize / (maxWidth.roundToPx() + spacing.toFloat())).toInt())
+        val cellSize = (availableSize - spacing * (count - 1)) / count
+        return List(count) { index ->
+            if (index == count - 1) {
+                availableSize - spacing * (count - 1) - cellSize * (count - 1)
+            } else {
+                cellSize
+            }
+        }
+    }
+}
+
+/**
+ * 视频卡片栅格：设置项"视频卡片宽度"驱动，列数按屏宽自适应
+ * （卡片不超过设置宽度，屏宽越大列数越多），经 [Prefs.videoCardWidthFlow] 实时生效。
+ */
 @Composable
 fun videoCardGridCells(): GridCells {
-    val prefColumns by Prefs.videoColumnsFlow.collectAsState()
-    return GridCells.Fixed(prefColumns.code)
+    val cardWidth by Prefs.videoCardWidthFlow.collectAsState()
+    return MaxCardWidthCells(cardWidth.dp)
 }
 
 /**

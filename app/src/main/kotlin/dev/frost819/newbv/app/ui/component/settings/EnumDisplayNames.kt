@@ -8,7 +8,6 @@ import dev.frost819.newbv.data.datastore.PersonalTopNavItem
 import dev.frost819.newbv.data.datastore.PlaySpeed
 import dev.frost819.newbv.data.datastore.Resolution
 import dev.frost819.newbv.data.datastore.VideoCodec
-import dev.frost819.newbv.data.datastore.VideoColumnCount
 
 /** 画质显示名称。 */
 val Resolution.displayName: String
@@ -95,14 +94,4 @@ val PersonalTopNavItem.displayName: String
             PersonalTopNavItem.History -> "历史"
             PersonalTopNavItem.Favorite -> "收藏"
             PersonalTopNavItem.FollowingSeason -> "追番"
-        }
-
-/** 视频卡片列数显示名称。 */
-val VideoColumnCount.displayName: String
-    get() =
-        when (this) {
-            VideoColumnCount.Fixed4 -> "4 列"
-            VideoColumnCount.Fixed5 -> "5 列"
-            VideoColumnCount.Fixed6 -> "6 列"
-            VideoColumnCount.Fixed7 -> "7 列"
         }

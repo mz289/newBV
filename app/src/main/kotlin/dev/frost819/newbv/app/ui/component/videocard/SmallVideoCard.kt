@@ -44,7 +44,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.R
-import dev.frost819.newbv.app.ui.component.videoCardTitleScale
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.focusShakeTarget
 import dev.frost819.newbv.core.focus.touchClickable
@@ -482,7 +481,7 @@ private fun CardCover(
 /**
  * 卡片信息区域。
  *
- * 标题（2 行省略）+ UP 主名 + 发布时间；字号随列数设置导致的卡宽变化等比缩放。
+ * 标题（2 行省略）+ UP 主名 + 发布时间。
  */
 @Composable
 private fun CardInfo(
@@ -491,13 +490,8 @@ private fun CardInfo(
     upName: String,
     pubTime: String?,
 ) {
-    val textScale = videoCardTitleScale()
-    val titleStyle = MaterialTheme.typography.titleMedium.copy(
-        fontSize = MaterialTheme.typography.titleMedium.fontSize * textScale,
-    )
-    val labelStyle = MaterialTheme.typography.labelMedium.copy(
-        fontSize = MaterialTheme.typography.labelMedium.fontSize * textScale,
-    )
+    val titleStyle = MaterialTheme.typography.titleSmall
+    val labelStyle = MaterialTheme.typography.labelMedium
     Column(
         // 水平微内缩：文字不直接顶到焦点描边，也保持与封面左缘近似对齐
         modifier = modifier.padding(horizontal = 4.dp, vertical = 8.dp),
