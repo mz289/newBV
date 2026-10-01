@@ -16,16 +16,32 @@ object AppConfiguration {
     private const val patch = 0
     private const val hotFix = 0
 
-    @Suppress("KotlinConstantConditions")
-    val versionName: String
-        get() {
-            val base =
-                System.getenv("NEWBV_VERSION_BASE")?.takeIf { it.isNotBlank() }
-                    ?: "$major.$minor.$patch${".$hotFix".takeIf { hotFix != 0 } ?: ""}"
-            return "$base.r$versionCode.${"git rev-list HEAD --abbrev-commit --max-count=1".exec()}"
-        }
-    val versionCode: Int
-        get() = "git rev-list --count HEAD".exec().toIntOrNull() ?: 1
-}
+    // git 信息在一次构建内只取一次：避免配置期多次求值导致数值漂移与进程泄漏
+    private val gitCommitCount: Int by lazy {
+        runGit("git", "rev-list", "--count", "HEAD").toIntOrNull() ?: 1
+    }
+    private val gitShortHash: String by lazy {
+        runGit("git", "rev-list", "HEAD", "--abbrev-commit", "--max-count=1")
+    }
 
-fun String.exec() = String(Runtime.getRuntime().exec(this).inputStream.readBytes()).trim()
+    @Suppress("KotlinConstantConditions")
+    val versionName: String by lazy {
+        val base =
+            System.getenv("NEWBV_VERSION_BASE")?.takeIf { it.isNotBlank() }
+                ?: "$major.$minor.$patch${".$hotFix".takeIf { hotFix != 0 } ?: ""}"
+        "$base.r$gitCommitCount.$gitShortHash"
+    }
+    val versionCode: Int get() = gitCommitCount
+
+    /** 执行外部命令并返回标准输出；命令缺失或失败时返回空串。 */
+    private fun runGit(vararg command: String): String =
+        runCatching {
+            ProcessBuilder(*command)
+                .start()
+                .let { process ->
+                    process.inputStream.bufferedReader().readText().trim().also {
+                        process.waitFor()
+                    }
+                }
+        }.getOrDefault("")
+}
