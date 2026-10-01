@@ -44,14 +44,18 @@ enum class GestureTipType {
  *
  * @param onSingleTap 单击：显示/隐藏控制器。
  * @param onDoubleTap 双击：播放/暂停。
+ * @param onSeekStart 水平拖拽判定为 seek 时触发一次（拖拽开始）。
  * @param onSeekDelta 水平拖拽 seek：正值快进、负值快退（毫秒增量）。
+ * @param onSeekEnd seek 拖拽手指抬起时触发一次（拖拽结束，此时应执行 seek）。
  * @param onBrightnessChange 亮度变化：deltaY > 0 增加亮度，< 0 降低亮度。
  * @param onVolumeChange 音量变化：deltaY > 0 增加音量，< 0 降低音量。
  */
 data class PlayerGestureCallbacks(
     val onSingleTap: () -> Unit,
     val onDoubleTap: () -> Unit,
+    val onSeekStart: () -> Unit = {},
     val onSeekDelta: (deltaMs: Long) -> Unit,
+    val onSeekEnd: () -> Unit = {},
     val onBrightnessChange: (deltaY: Float) -> Unit,
     val onVolumeChange: (deltaY: Float) -> Unit,
 )
@@ -107,6 +111,7 @@ fun Modifier.playerGestures(
             val width = this.size.width.toFloat()
 
             var isDragging = false
+            var isSeekDragging = false
             var totalDeltaX = 0f
             var totalDeltaY = 0f
             var isHorizontalDrag: Boolean? = null
@@ -119,12 +124,16 @@ fun Modifier.playerGestures(
 
                 if (!change.pressed) {
                     // 手指抬起
-                    // 如果事件已被子组件消费（如按钮点击），跳过手势处理
-                    if (change.isConsumed) break
-
                     if (isDragging) {
                         gestureTipState.value = GestureTipState(isActive = false)
-                    } else {
+                        // seek 拖拽的结束回调必须先于「事件被子组件消费」检查触发，
+                        // 否则抬手落在按钮上时 seek 会永远挂起
+                        if (isSeekDragging) {
+                            callbacks.onSeekEnd()
+                            isSeekDragging = false
+                        }
+                    } else if (!change.isConsumed) {
+                        // 如果事件已被子组件消费（如按钮点击），跳过 tap 判定
                         // 判断是否为 tap
                         val moved =
                             abs(change.position.x - startX) > tapSlop ||
@@ -161,6 +170,10 @@ fun Modifier.playerGestures(
                     if (isHorizontalDrag == null && (absX > dragThreshold || absY > dragThreshold)) {
                         isHorizontalDrag = absX > absY
                         isDragging = true
+                        if (isHorizontalDrag == true) {
+                            isSeekDragging = true
+                            callbacks.onSeekStart()
+                        }
                     }
 
                     if (isHorizontalDrag == true) {
