@@ -576,7 +576,7 @@ private fun VideoInfoHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 50.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
         // 封面与右侧信息列垂直居中对齐
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -585,7 +585,7 @@ private fun VideoInfoHeader(
                 Modifier
                     .focusRequester(coverFocusRequester)
                     .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("cover") }
-                    .weight(3f)
+                    .weight(4f)
                     .fillMaxHeight()
                     .aspectRatio(1.6f)
                     .touchClickable(onClick = onPlayVideo),
@@ -614,10 +614,10 @@ private fun VideoInfoHeader(
             )
         }
 
-        Spacer(modifier = Modifier.width(24.dp))
+        Spacer(modifier = Modifier.width(16.dp))
 
         Column(
-            modifier = Modifier.weight(7f),
+            modifier = Modifier.weight(6f),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
