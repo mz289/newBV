@@ -45,6 +45,8 @@ data class PlayerUiState(
     val playSpeed: Float = 1f,
     val aspectRatio: VideoAspectRatio = VideoAspectRatio.Default,
     val isLooping: Boolean = false,
+    /** 投屏/外部直链播放（无站内视频身份，弹幕/字幕/历史/心跳均不适用）。 */
+    val isExternalMedia: Boolean = false,
 ) {
     /**
      * 是否为番剧（PGC）播放内容。

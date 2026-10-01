@@ -1,6 +1,8 @@
 package dev.frost819.newbv.app
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import coil3.ImageLoader
@@ -9,6 +11,7 @@ import coil3.disk.DiskCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import dagger.hilt.android.HiltAndroidApp
+import dev.frost819.newbv.app.cast.CastReceiverService
 import dev.frost819.newbv.app.network.HttpServer
 import dev.frost819.newbv.app.util.CacheManager
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
@@ -147,5 +150,27 @@ class BVApplication : Application() {
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             CacheManager(this@BVApplication).checkCache()
         }
+
+        // 投屏接收：随应用启动，并在每次界面回到前台时补启（进程后台被杀后由界面拉起）
+        registerActivityLifecycleCallbacks(
+            object : Application.ActivityLifecycleCallbacks {
+                override fun onActivityResumed(activity: Activity) {
+                    if (Prefs.enableCastReceiver) CastReceiverService.start(this@BVApplication)
+                }
+
+                override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+
+                override fun onActivityStarted(activity: Activity) = Unit
+
+                override fun onActivityPaused(activity: Activity) = Unit
+
+                override fun onActivityStopped(activity: Activity) = Unit
+
+                override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+
+                override fun onActivityDestroyed(activity: Activity) = Unit
+            },
+        )
+        if (Prefs.enableCastReceiver) CastReceiverService.start(this)
     }
 }

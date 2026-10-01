@@ -116,6 +116,12 @@ class PlayerViewModel
 
         private var playData: PlayData? = null
 
+        /** 投屏接收的直链媒体（非空时走外部媒体播放链路）。 */
+        private var externalMediaUrl: String? = null
+
+        /** 直链媒体是否指向 B 站 CDN（决定播放请求是否附带 B 站 Referer/UA）。 */
+        private var externalBilibiliMedia: Boolean = false
+
         /** 本次播放已尝试过的「画质|编码」组合，用于解码回退去重与终止。 */
         private val attemptedDecodeProfiles = mutableSetOf<String>()
 
@@ -274,6 +280,43 @@ class PlayerViewModel
         }
 
         /**
+         * 初始化为外部直链媒体播放（投屏接收的非站内视频）。
+         *
+         * 外部媒体无站内身份（aid/cid = 0），弹幕、字幕、历史、心跳、
+         * 相关视频均不适用；播放地址由 [playExternalMedia] 直接交给播放器。
+         *
+         * @param mediaUrl 媒体直链
+         * @param title 标题（投屏元数据或 URL 兜底）
+         * @param lastPlayed 起播位置（秒，投屏续播）
+         * @param isBilibiliMedia 直链是否指向 B 站 CDN
+         */
+        fun initExternalMedia(
+            mediaUrl: String,
+            title: String,
+            lastPlayed: Int,
+            isBilibiliMedia: Boolean,
+        ) {
+            externalMediaUrl = mediaUrl
+            externalBilibiliMedia = isBilibiliMedia
+            _uiState.update {
+                it.copy(
+                    aid = 0,
+                    cid = 0,
+                    epid = null,
+                    title = title,
+                    lastPlayed = lastPlayed,
+                    authorMid = 0,
+                    authorName = "",
+                    mediaProfileState = MediaProfileState(),
+                    availableQuality = emptyMap(),
+                    availableVideoCodec = emptyList(),
+                    availableAudio = emptyList(),
+                    isExternalMedia = true,
+                )
+            }
+        }
+
+        /**
          * 加载视频详情（相关视频、历史进度等）。
          *
          * 视频列表由详情页在导航前通过 [VideoInfoRepository] 填充。
@@ -375,16 +418,27 @@ class PlayerViewModel
          */
         fun initVideoPlayer(context: Context) {
             val apiType = Prefs.apiType
+            // 外部直链：B 站 CDN 链接需要 B 站 Referer 防盗链，其余用通用 UA
+            val userAgent =
+                if (_uiState.value.isExternalMedia) {
+                    if (externalBilibiliMedia) {
+                        PlayerConstants.WEB_USER_AGENT
+                    } else {
+                        "Mozilla/5.0"
+                    }
+                } else {
+                    PlayerConstants.getUserAgent(apiType)
+                }
+            val referer =
+                if (_uiState.value.isExternalMedia) {
+                    PlayerConstants.WEB_REFERER.takeIf { externalBilibiliMedia }
+                } else {
+                    PlayerConstants.getReferer(apiType)
+                }
             val options =
                 VideoPlayerOptions(
-                    userAgent =
-                        PlayerConstants.getUserAgent(
-                            apiType,
-                        ),
-                    referer =
-                        PlayerConstants.getReferer(
-                            apiType,
-                        ),
+                    userAgent = userAgent,
+                    referer = referer,
                     enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer,
                     enableSoftwareVideoDecoder = Prefs.enableSoftwareVideoDecoder,
                 )
@@ -761,6 +815,21 @@ class PlayerViewModel
                             )
                         }
                     }
+                }
+        }
+
+        /**
+         * 播放外部直链媒体（外部媒体链路，不走 URL 解析）。
+         *
+         * 须在 [initVideoPlayer] 之后调用；断点续播由 onPlay 监听器
+         * 依据 [PlayerUiState.lastPlayed] 统一处理。
+         */
+        fun playExternalMedia() {
+            val url = externalMediaUrl ?: return
+            loadVideoJob?.cancel()
+            loadVideoJob =
+                viewModelScope.launch {
+                    executePlayback(MediaUrls(url, null))
                 }
         }
 
@@ -1166,6 +1235,8 @@ class PlayerViewModel
         ) {
             val player = videoPlayer ?: return
             val state = _uiState.value
+            // 外部直链媒体无站内身份，历史/心跳上报无意义
+            if (state.aid <= 0L || state.cid <= 0L) return
             val currentTime = (player.currentPosition.coerceAtLeast(0) / 1000).toInt()
             val totalTime = (player.duration.coerceAtLeast(0) / 1000).toInt()
             val reportTime =

@@ -32,6 +32,8 @@ sealed interface DanmakuSettingAction {
 
     data class SetEnabledTypes(
         val types: List<DanmakuType>,
+        /** 是否持久化为默认弹幕开关（投屏临时开关传 false，避免覆盖用户默认设置）。 */
+        val persist: Boolean = true,
     ) : DanmakuSettingAction
 }
 

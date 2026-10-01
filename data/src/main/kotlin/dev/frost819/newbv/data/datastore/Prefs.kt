@@ -252,6 +252,17 @@ object Prefs {
      */
     var autoSelectCdn by pref(PrefKeys.autoSelectCdn, false)
 
+    /**
+     * 是否启用投屏接收（默认关闭）。
+     *
+     * 开启后在局域网内广播 DLNA/Bilibili Nirvana MediaRenderer，
+     * 手机 B 站客户端与标准 DLNA 控制点可投屏到本机。
+     */
+    var enableCastReceiver by pref(PrefKeys.enableCastReceiver, false)
+
+    /** 投屏接收端 UPnP UUID（首次启用时生成，用于设备发现去重）。 */
+    var castReceiverUuid by pref(PrefKeys.castReceiverUuid, "")
+
     // --- 更新 ---
 
     /**
