@@ -29,6 +29,7 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
+import dev.frost819.newbv.app.ui.component.videoCardTitleScale
 import dev.frost819.newbv.core.focus.focusShakeTarget
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.theme.LocalFocusOutlineColor
@@ -176,13 +177,21 @@ private fun LiveCardInfo(
     title: String,
     uname: String,
 ) {
+    // 字号随列数设置导致的卡宽变化等比缩放
+    val textScale = videoCardTitleScale()
+    val titleStyle = MaterialTheme.typography.titleMedium.copy(
+        fontSize = MaterialTheme.typography.titleMedium.fontSize * textScale,
+    )
+    val labelStyle = MaterialTheme.typography.labelMedium.copy(
+        fontSize = MaterialTheme.typography.labelMedium.fontSize * textScale,
+    )
     Column(
         // 水平微内缩：文字不直接顶到焦点描边
         modifier = modifier.padding(horizontal = 4.dp, vertical = 6.dp),
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = titleStyle,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth(),
@@ -190,7 +199,7 @@ private fun LiveCardInfo(
         Spacer(Modifier.height(4.dp))
         Text(
             text = uname,
-            style = MaterialTheme.typography.labelMedium,
+            style = labelStyle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
