@@ -74,6 +74,11 @@ internal object PrefKeys {
 
     // ===== 应用界面 =====
     val density = floatPreferencesKey("density")
+
+    /** 视频卡片宽度上限（dp），列数按屏宽自适应。 */
+    val videoCardWidth = intPreferencesKey("video_card_width")
+
+    /** 已废弃：旧"视频卡片列数"设置，仅在 [Prefs] 迁移为卡宽时读取。 */
     val videoColumns = intPreferencesKey("video_columns")
     val homeLeftNavItem = intPreferencesKey("home_left_nav")
     val firstHomeTopNavItem = intPreferencesKey("first_home_top_nav")

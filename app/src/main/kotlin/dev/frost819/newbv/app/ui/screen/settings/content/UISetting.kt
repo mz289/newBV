@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,13 +49,12 @@ import dev.frost819.newbv.data.datastore.HomeTopNavItem
 import dev.frost819.newbv.data.datastore.LeftNaviItem
 import dev.frost819.newbv.data.datastore.PersonalTopNavItem
 import dev.frost819.newbv.data.datastore.Prefs
-import dev.frost819.newbv.data.datastore.VideoColumnCount
 import kotlin.math.roundToInt
 
 /**
  * 界面设置页。
  *
- * 启动页/首页 Tab/个人页 Tab/显示视频详情/常显进度条/视频卡片列数/Density/主题模式。
+ * 启动页/首页 Tab/个人页 Tab/显示视频详情/常显进度条/视频卡片宽度/Density/主题模式。
  */
 @Composable
 fun UISetting(modifier: Modifier = Modifier) {
@@ -67,7 +67,7 @@ fun UISetting(modifier: Modifier = Modifier) {
     var showPersonalPageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showAccentDialog by remember { mutableStateOf(false) }
-    var showVideoColumnsDialog by remember { mutableStateOf(false) }
+    var showVideoCardWidthDialog by remember { mutableStateOf(false) }
 
     var showVideoInfo by remember { mutableStateOf(Prefs.showVideoInfo) }
     var showPersistentSeek by remember { mutableStateOf(Prefs.showPersistentSeek) }
@@ -76,7 +76,8 @@ fun UISetting(modifier: Modifier = Modifier) {
     var selectedFirstPersonalTopNavItem by remember { mutableStateOf(Prefs.firstPersonalTopNavItem) }
     var selectedThemeMode by remember { mutableStateOf(Prefs.themeMode) }
     var selectedAccentColor by remember { mutableStateOf(Prefs.accentColor) }
-    var selectedVideoColumns by remember { mutableStateOf(Prefs.videoColumns) }
+    var selectedVideoCardWidth by remember { mutableIntStateOf(Prefs.videoCardWidth) }
+    var dialogVideoCardWidth by remember { mutableIntStateOf(Prefs.videoCardWidth) }
     var density by remember { mutableFloatStateOf(Prefs.density) }
 
     Box(modifier = modifier) {
@@ -155,9 +156,12 @@ fun UISetting(modifier: Modifier = Modifier) {
                 }
                 item {
                     SettingListItem(
-                        title = "视频卡片列数",
-                        supportText = "当前：${selectedVideoColumns.displayName}",
-                        onClick = { showVideoColumnsDialog = true },
+                        title = "视频卡片宽度",
+                        supportText = "当前：${selectedVideoCardWidth}dp（卡片不超过该宽度，列数随屏宽自适应）",
+                        onClick = {
+                            dialogVideoCardWidth = selectedVideoCardWidth
+                            showVideoCardWidthDialog = true
+                        },
                     )
                 }
                 item {
@@ -252,18 +256,18 @@ fun UISetting(modifier: Modifier = Modifier) {
         )
     }
 
-    if (showVideoColumnsDialog) {
-        OptionDialog(
-            options = VideoColumnCount.entries.toTypedArray(),
-            selectedOption = selectedVideoColumns,
-            onDismiss = { showVideoColumnsDialog = false },
-            onSelect = {
-                Prefs.videoColumns = it
-                selectedVideoColumns = it
-            },
-            getDisplayName = { it.displayName },
-        )
-    }
+    VideoCardWidthDialog(
+        show = showVideoCardWidthDialog,
+        onHideDialog = {
+            showVideoCardWidthDialog = false
+            if (dialogVideoCardWidth != selectedVideoCardWidth) {
+                selectedVideoCardWidth = dialogVideoCardWidth
+                Prefs.videoCardWidth = dialogVideoCardWidth
+            }
+        },
+        cardWidth = dialogVideoCardWidth,
+        onCardWidthChange = { dialogVideoCardWidth = it },
+    )
 }
 
 /**
@@ -339,6 +343,87 @@ private fun UIDensityDialog(
                                 newDensity = (newDensity * 10).roundToInt() / 10f
                                 onDensityChange(newDensity.coerceIn(0.5f, 5f))
                             },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(imageVector = Icons.Rounded.ArrowDropDown, contentDescription = "减少")
+                    }
+                }
+            },
+            confirmButton = {},
+        )
+    }
+}
+
+/**
+ * 视频卡片宽度调节弹窗。
+ *
+ * D-Pad Up/Down 调整卡片最小宽度，范围 [Prefs.VIDEO_CARD_WIDTH_MIN] ~
+ * [Prefs.VIDEO_CARD_WIDTH_MAX]，步进 [Prefs.VIDEO_CARD_WIDTH_STEP]；
+ * 栅格列数由屏宽按该宽度自适应。弹窗打开期间仅更新本地 [cardWidth]，关闭时才写入 Prefs。
+ */
+@Composable
+private fun VideoCardWidthDialog(
+    modifier: Modifier = Modifier,
+    show: Boolean,
+    onHideDialog: () -> Unit,
+    cardWidth: Int,
+    onCardWidthChange: (Int) -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(show) {
+        if (show) {
+            runCatching { focusRequester.requestFocus() }
+        }
+    }
+
+    fun stepBy(delta: Int) {
+        onCardWidthChange(
+            (cardWidth + delta).coerceIn(Prefs.VIDEO_CARD_WIDTH_MIN, Prefs.VIDEO_CARD_WIDTH_MAX),
+        )
+    }
+
+    if (show) {
+        AlertDialog(
+            modifier = modifier,
+            onDismissRequest = onHideDialog,
+            title = { Text(text = "视频卡片宽度") },
+            text = {
+                Column(
+                    modifier =
+                        Modifier
+                            .focusRequester(focusRequester)
+                            .focusable()
+                            .fillMaxWidth()
+                            .onPreviewKeyEvent {
+                                if ((it.key == Key.DirectionUp || it.key == Key.DirectionDown) &&
+                                    it.type == KeyEventType.KeyDown
+                                ) {
+                                    val delta =
+                                        if (it.key == Key.DirectionUp) {
+                                            Prefs.VIDEO_CARD_WIDTH_STEP
+                                        } else {
+                                            -Prefs.VIDEO_CARD_WIDTH_STEP
+                                        }
+                                    stepBy(delta)
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier =
+                            Modifier.clickable { stepBy(Prefs.VIDEO_CARD_WIDTH_STEP) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(imageVector = Icons.Rounded.ArrowDropUp, contentDescription = "增加")
+                    }
+                    Text(text = "${cardWidth}dp")
+                    Box(
+                        modifier =
+                            Modifier.clickable { stepBy(-Prefs.VIDEO_CARD_WIDTH_STEP) },
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(imageVector = Icons.Rounded.ArrowDropDown, contentDescription = "减少")
