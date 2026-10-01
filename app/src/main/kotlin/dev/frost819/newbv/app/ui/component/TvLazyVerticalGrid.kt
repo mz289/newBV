@@ -29,25 +29,6 @@ private fun appScreenWidthDp(): Dp = with(LocalDensity.current) {
 }
 
 /**
- * 视频卡片栅格的最小卡片宽度（P1-1 自适应列数）。
- *
- * 应用覆盖了 [LocalDensity]（默认 2.0，设置内可调），屏宽必须用覆盖后密度换算——
- * LocalConfiguration.screenWidthDp 按系统密度折算，与实际布局宽度不符，不能直接用。
- *
- * 分档（侧边栏 ~92dp + 内容边距 48dp + 间距 24dp）：
- * 4K(1920dp) 6 列、2K(1280dp) 5 列、1080p(960dp) 5 列（5×140 + 4×24 = 796 ≤ 可用 ~820dp）。
- */
-@Composable
-private fun videoCardMinWidth(): Dp {
-    val screenWidth = appScreenWidthDp()
-    return when {
-        screenWidth >= 1600.dp -> 260.dp // 4K：6 列
-        screenWidth >= 1100.dp -> 200.dp // 2K：5 列
-        else -> 140.dp // 1080p：5 列
-    }
-}
-
-/**
  * 视频网格水平间距：与卡宽同比例分档。
  *
  * 视觉间隙（间距 + 卡片水平内缩 12dp）约占卡宽 13%，各分辨率一致
@@ -77,38 +58,28 @@ fun videoGridVSpacing(): Dp {
 /**
  * 视频卡片标题/次要文字的字号缩放系数。
  *
- * 固定列数时卡宽随列数变化，文字按"实际卡宽 / 档位自动卡宽"等比缩放，
- * 保持标题占卡宽的比例与自动档一致；"自动"档恒为 1（维持原字号）。
+ * 列数越多卡片越窄，文字按"当前列数卡宽 / 默认 4 列卡宽"等比缩小，
+ * 保持标题占卡宽的比例与默认档一致。
  * 侧边栏宽度按估算值（92dp）计，搜索页无侧边栏带来的少量偏差对字号不敏感。
  */
 @Composable
 fun videoCardTitleScale(): Float {
     val prefColumns by Prefs.videoColumnsFlow.collectAsState()
-    val fixed = prefColumns.code
-    if (fixed < 2) return 1f
     val available = appScreenWidthDp() - 140.dp // 侧边栏 ~92dp + 网格内容边距 48dp
-    val cardWidth = (available - videoGridHSpacing() * (fixed - 1)) / fixed
-    return (cardWidth / videoCardMinWidth() / 1.25f).coerceIn(0.7f, 2f)
+    val spacing = videoGridHSpacing()
+    val cardWidth = (available - spacing * (prefColumns.code - 1)) / prefColumns.code
+    val defaultCardWidth = (available - spacing * 3) / 4
+    return (cardWidth / defaultCardWidth).coerceIn(0.7f, 1f)
 }
 
 /** 海报卡片栅格（番剧/影视封面卡）的最小卡片宽度。 */
 val POSTER_CARD_MIN_WIDTH: Dp = 260.dp
 
-/**
- * 视频卡片栅格列配置（设置项"视频卡片列数"驱动）。
- *
- * 设置为固定列数（≥2）时用 [GridCells.Fixed] 强制；"自动"按屏宽分档（[videoCardMinWidth]）。
- * 通过 [Prefs.videoColumnsFlow] 实时响应设置变更，改完立即生效。
- */
+/** 视频卡片栅格列配置：设置项"视频卡片列数"（4~7 列）驱动，经 [Prefs.videoColumnsFlow] 实时生效。 */
 @Composable
 fun videoCardGridCells(): GridCells {
     val prefColumns by Prefs.videoColumnsFlow.collectAsState()
-    val fixed = prefColumns.code
-    return if (fixed >= 2) {
-        GridCells.Fixed(fixed)
-    } else {
-        GridCells.Adaptive(videoCardMinWidth())
-    }
+    return GridCells.Fixed(prefColumns.code)
 }
 
 /**

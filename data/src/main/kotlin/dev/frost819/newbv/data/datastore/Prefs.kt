@@ -375,10 +375,10 @@ object Prefs {
     /** 界面缩放密度（默认 2f，app 层 init 时按屏幕宽度重新计算）。 */
     var density by pref(PrefKeys.density, 2f)
 
-    /** 视频卡片网格列数（Auto 按屏宽自适应分档，其余固定列数）。 */
+    /** 视频卡片网格列数（默认 4 列）。 */
     var videoColumns by pref(
         PrefKeys.videoColumns,
-        VideoColumnCount.Auto,
+        VideoColumnCount.Fixed4,
         save = { it.code },
         restore = { VideoColumnCount.fromCode(it) },
     )
@@ -468,9 +468,9 @@ object Prefs {
         get() =
             (delegateMap[PrefKeys.videoColumns] as? PrefDelegate<VideoColumnCount, Int>)
                 ?.flow
-                ?.map { VideoColumnCount.fromCode(it as? Int ?: 0) }
-                ?.stateIn(scope, SharingStarted.Eagerly, VideoColumnCount.Auto)
-                ?: MutableStateFlow(VideoColumnCount.Auto)
+                ?.map { VideoColumnCount.fromCode(it as? Int ?: 4) }
+                ?.stateIn(scope, SharingStarted.Eagerly, VideoColumnCount.Fixed4)
+                ?: MutableStateFlow(VideoColumnCount.Fixed4)
 
     // ===== 初始化 =====
 

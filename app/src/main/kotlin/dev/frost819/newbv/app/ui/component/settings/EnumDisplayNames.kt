@@ -101,7 +101,6 @@ val PersonalTopNavItem.displayName: String
 val VideoColumnCount.displayName: String
     get() =
         when (this) {
-            VideoColumnCount.Auto -> "自动"
             VideoColumnCount.Fixed4 -> "4 列"
             VideoColumnCount.Fixed5 -> "5 列"
             VideoColumnCount.Fixed6 -> "6 列"
