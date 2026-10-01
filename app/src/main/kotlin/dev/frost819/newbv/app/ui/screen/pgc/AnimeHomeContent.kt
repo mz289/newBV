@@ -52,10 +52,10 @@ import coil3.compose.AsyncImage
 import dev.frost819.newbv.R
 import dev.frost819.newbv.app.ui.component.ErrorTip
 import dev.frost819.newbv.app.ui.component.FocusSaver
-import dev.frost819.newbv.app.ui.component.POSTER_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.SKELETON_FIRST_SCREEN_COUNT
 import dev.frost819.newbv.app.ui.component.SkeletonSeasonCard
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.animeCardScale
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.navigation.PgcFeatureRoute
 import dev.frost819.newbv.app.ui.navigation.PgcIndexRoute
@@ -119,7 +119,8 @@ fun AnimeHomeContent(
 /**
  * 番剧页主网格。
  *
- * 所有板块堆叠在同一个 4 列网格中（分区标题与横向滚动行占满整行），
+ * 所有板块堆叠在同一个网格中（分区标题与横向滚动行占满整行，
+ * 网格列宽仅决定首屏骨架卡宽度，随屏宽分档与竖版卡同宽），
  * D-Pad 上下移动时由 BringIntoViewSpec 自动滚动到焦点项。
  */
 @Composable
@@ -132,8 +133,11 @@ private fun AnimeHomeGrid(
 ) {
     var selectedDayIndex by rememberSaveable { mutableIntStateOf(-1) }
 
+    val cardScale = animeCardScale()
+
     TvLazyVerticalGrid(
-        columns = GridCells.Adaptive(POSTER_CARD_MIN_WIDTH),
+        // 实际内容行均占满整行，网格列宽只决定首屏骨架卡宽度，与竖版卡片同宽
+        columns = GridCells.Adaptive(150.dp * cardScale),
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -384,7 +388,7 @@ private fun AnimeModuleLandscapeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AnimeCardSurface(onClick = onClick, modifier = modifier.width(300.dp)) {
+    AnimeCardSurface(onClick = onClick, modifier = modifier.width(200.dp * animeCardScale())) {
         Column {
             Box(
                 modifier =
@@ -471,7 +475,7 @@ private fun AnimeModulePortraitCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AnimeCardSurface(onClick = onClick, modifier = modifier.width(190.dp)) {
+    AnimeCardSurface(onClick = onClick, modifier = modifier.width(150.dp * animeCardScale())) {
         Column {
             Box(
                 modifier =
@@ -544,7 +548,7 @@ private fun AnimeRankCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AnimeCardSurface(onClick = onClick, modifier = modifier.width(190.dp)) {
+    AnimeCardSurface(onClick = onClick, modifier = modifier.width(150.dp * animeCardScale())) {
         Column {
             Box(
                 modifier =
@@ -706,7 +710,7 @@ private fun AnimeTimelineCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AnimeCardSurface(onClick = onClick, modifier = modifier.width(300.dp), cornerRadius = 8.dp) {
+    AnimeCardSurface(onClick = onClick, modifier = modifier.width(260.dp * animeCardScale()), cornerRadius = 8.dp) {
         Row(
             modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -714,7 +718,7 @@ private fun AnimeTimelineCard(
             Box(
                 modifier =
                     Modifier
-                        .width(132.dp)
+                        .width(108.dp * animeCardScale())
                         .aspectRatio(1.6f)
                         .clip(MaterialTheme.shapes.medium),
             ) {
