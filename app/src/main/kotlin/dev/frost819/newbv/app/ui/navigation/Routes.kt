@@ -36,6 +36,28 @@ data class VideoPlayerRoute(
     val epid: Long? = null,
     val title: String = "",
     val cover: String = "",
+    /** 投屏指定的初始倍速（0 表示未指定）。 */
+    val initialSpeed: Float = 0f,
+    /** 投屏指定的弹幕开关（null 表示未指定）。 */
+    val danmakuEnabled: Boolean? = null,
+)
+
+/**
+ * 外部直链播放器页面（投屏接收的非站内媒体，含 B 站 CDN 直链）。
+ *
+ * @param url 媒体直链
+ * @param title 展示标题
+ * @param seekSeconds 起播位置（秒）
+ * @param isBilibili 直链是否指向 B 站 CDN（播放请求需附带 B 站 Referer）
+ * @param initialSpeed 投屏指定的初始倍速（0 表示未指定）
+ */
+@Serializable
+data class ExternalMediaRoute(
+    val url: String,
+    val title: String,
+    val seekSeconds: Int = 0,
+    val isBilibili: Boolean = false,
+    val initialSpeed: Float = 0f,
 )
 
 // ── 搜索 ──────────────────────────────────────────────────────────────

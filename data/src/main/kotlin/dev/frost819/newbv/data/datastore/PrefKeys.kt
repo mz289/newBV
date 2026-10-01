@@ -36,6 +36,8 @@ internal object PrefKeys {
     val apiType = intPreferencesKey("api_type")
     val crashReportEnabled = booleanPreferencesKey("crash_report_enabled")
     val autoSelectCdn = booleanPreferencesKey("auto_select_cdn")
+    val enableCastReceiver = booleanPreferencesKey("enable_cast_receiver")
+    val castReceiverUuid = stringPreferencesKey("cast_receiver_uuid")
 
     // ===== 更新 =====
     val acceptPrerelease = booleanPreferencesKey("accept_prerelease")

@@ -482,6 +482,8 @@ class DanmakuViewModel
 
             if (new.enabledTypes != old.enabledTypes) {
                 updateDanmakuConfigTypeFilter(new.enabledTypes)
+                // 投屏等临时开关不写入默认设置
+                if (action is DanmakuSettingAction.SetEnabledTypes && !action.persist) return
                 Prefs.defaultDanmakuTypes = new.enabledTypes.map { it.toDataDanmakuType() }
             }
             if (new.scale != old.scale) {

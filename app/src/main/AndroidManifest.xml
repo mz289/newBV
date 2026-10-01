@@ -3,6 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 投屏接收：SSDP 组播发现 + 局域网 HTTP/SOAP 服务 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <uses-feature
         android:name="android.hardware.touchscreen"
@@ -35,6 +40,11 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 投屏接收服务（SSDP + DLNA/Nirvana HTTP），仅应用存活期间运行 -->
+        <service
+            android:name=".app.cast.CastReceiverService"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
