@@ -74,7 +74,4 @@ object PlayerConstants {
 
     /** SponsorBlock 自动跳过提示展示时长（毫秒）。 */
     const val SPONSOR_BLOCK_TIP_DURATION_MS = 2_500L
-
-    /** 章节切换提示展示时长（毫秒）。 */
-    const val CHAPTER_TIP_DURATION_MS = 2_000L
 }

@@ -177,10 +177,6 @@ class PlayerViewModel
         private var onlineWatchJob: Job? = null
         private var sponsorBlockTipJob: Job? = null
         private var chapterLoadJob: Job? = null
-        private var chapterTipJob: Job? = null
-
-        /** 当前所在章节下标（-1 表示不在任何章节内），用于章节切换检测。 */
-        private var currentChapterIndex = -1
 
         // ===== SponsorBlock =====
 
@@ -624,8 +620,7 @@ class PlayerViewModel
                         .collectLatest { cid ->
                             val state = _uiState.value
                             // 章节状态随视频/分 P 重置
-                            currentChapterIndex = -1
-                            _uiState.update { it.copy(chapterMarks = emptyList(), chapterTip = null) }
+                            _uiState.update { it.copy(chapterMarks = emptyList()) }
                             if (state.isExternalMedia || state.aid <= 0L) return@collectLatest
                             val marks = loadChapterMarks(state.aid, cid)
                             _uiState.update { it.copy(chapterMarks = marks) }
@@ -662,38 +657,6 @@ class PlayerViewModel
                 error.rethrowUnlessTimeout()
                 logger.warn { "Failed to load chapters: $error" }
             }.getOrDefault(emptyList())
-
-        /**
-         * 检测当前播放位置所在章节（seeker 更新循环内每 100ms 调用）。
-         *
-         * 章节切换且正在播放时短暂提示新章节标题；暂停/缓冲/出错/结束时不动。
-         */
-        private fun checkCurrentChapter() {
-            val marks = _uiState.value.chapterMarks
-            if (marks.isEmpty()) return
-            val player = videoPlayer ?: return
-            val state = _uiState.value
-            if (state.isExternalMedia || state.playerState != PlayerState.Playing) return
-            val positionMs = player.currentPosition.coerceAtLeast(0L)
-
-            val index = marks.indexOfFirst { positionMs in it }
-            if (index == currentChapterIndex) return
-            currentChapterIndex = index
-            if (index >= 0) {
-                showChapterTip("章节：${marks[index].title}")
-            }
-        }
-
-        /** 显示章节提示并自动消退；新提示覆盖旧提示并重新计时。 */
-        private fun showChapterTip(text: String) {
-            chapterTipJob?.cancel()
-            _uiState.update { it.copy(chapterTip = text) }
-            chapterTipJob =
-                viewModelScope.launch {
-                    delay(PlayerConstants.CHAPTER_TIP_DURATION_MS)
-                    _uiState.update { it.copy(chapterTip = null) }
-                }
-        }
 
         /**
          * 初始化视频播放器实例。
@@ -1019,7 +982,6 @@ class PlayerViewModel
             handledSponsorSegmentIds.clear()
             dismissedSponsorSegmentIds.clear()
             sponsorBlockTipJob?.cancel()
-            chapterTipJob?.cancel()
 
             _uiState.update {
                 it.copy(
@@ -1043,7 +1005,6 @@ class PlayerViewModel
                     pendingSponsorSkip = null,
                     sponsorBlockTip = null,
                     chapterMarks = emptyList(),
-                    chapterTip = null,
                     mediaProfileState =
                         MediaProfileState(
                             qualityId = Prefs.defaultQuality.code,
@@ -1604,7 +1565,6 @@ class PlayerViewModel
                     while (isActive) {
                         updateSeekerState()
                         checkSponsorBlockSegments()
-                        checkCurrentChapter()
                         delay(PlayerConstants.SEEKER_UPDATE_INTERVAL_MS)
                     }
                 }

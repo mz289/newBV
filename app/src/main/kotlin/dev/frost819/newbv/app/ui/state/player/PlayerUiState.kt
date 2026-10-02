@@ -49,8 +49,6 @@ data class PlayerUiState(
     // 章节看点
     /** 章节（view_points 看点）标记，按开始时间升序，无章节时为空。 */
     val chapterMarks: List<ChapterMark> = emptyList(),
-    /** 章节切换提示文本，null 时不显示。 */
-    val chapterTip: String? = null,
     // 可用资源
     val availableQuality: Map<Int, String> = emptyMap(),
     val availableVideoCodec: List<VideoCodec> = emptyList(),
