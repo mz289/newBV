@@ -34,6 +34,7 @@ import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
 import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
 import dev.frost819.newbv.app.ui.navigation.navigateFromVideoCard
 import dev.frost819.newbv.app.util.formatHourMinSec
+import dev.frost819.newbv.app.util.toWanString
 import dev.frost819.newbv.app.viewmodel.common.CollectWatchLaterEffects
 import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
 import dev.frost819.newbv.app.viewmodel.personal.PersonalViewModel
@@ -166,8 +167,8 @@ fun FavoriteScreen(
                             avid = item.id,
                             title = item.title,
                             cover = item.cover,
-                            playString = "",
-                            danmakuString = "",
+                            playString = item.play.toWanString(),
+                            danmakuString = item.danmaku.toWanString(),
                             timeString = (item.duration * 1000L).formatHourMinSec(),
                             upName = item.upper.name,
                             upMid = item.upper.mid,

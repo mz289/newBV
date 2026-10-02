@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -41,12 +40,15 @@ import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
-import dev.frost819.newbv.app.ui.component.POSTER_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.app.ui.component.focusSaverItem
-import dev.frost819.newbv.app.ui.component.videocard.SeasonCard
-import dev.frost819.newbv.app.ui.component.videocard.SeasonCardData
+import dev.frost819.newbv.app.ui.component.videoCardGridCells
+import dev.frost819.newbv.app.ui.component.videoGridHSpacing
+import dev.frost819.newbv.app.ui.component.videoGridVSpacing
+import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
+import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
 import dev.frost819.newbv.app.ui.navigation.PgcFeatureRoute
+import dev.frost819.newbv.app.util.toWanString
 import dev.frost819.newbv.app.viewmodel.personal.PersonalViewModel
 import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonStatus
 import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonType
@@ -56,7 +58,7 @@ import dev.frost819.newbv.core.focus.touchClickable
 /**
  * 追番页面。
  *
- * 5 列网格 + 无限滚动 + 菜单键筛选弹窗。
+ * 与其他个人页 tab 一致的视频卡片网格 + 无限滚动 + 菜单键筛选弹窗。
  *
  * @param viewModel 个人页 ViewModel。
  * @param navController 导航控制器。
@@ -107,10 +109,10 @@ fun FollowingSeasonScreen(
     ) {
         TvLazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Adaptive(POSTER_CARD_MIN_WIDTH),
+            columns = videoCardGridCells(),
             contentPadding = PaddingValues(24.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(videoGridHSpacing()),
+            verticalArrangement = Arrangement.spacedBy(videoGridVSpacing()),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Row(
@@ -148,13 +150,20 @@ fun FollowingSeasonScreen(
             ) { index, item ->
                 val cardData =
                     remember(item) {
-                        SeasonCardData(
-                            seasonId = item.seasonId,
+                        // 番剧无 UP 主：播放数/弹幕数有值才显示；
+                        // 右下角角标展示总话数，时间槽位展示观看进度/更新进度
+                        VideoCardData(
+                            avid = 0L,
                             title = item.title,
-                            cover = item.cover,
+                            cover = item.horizontalCover ?: item.cover,
+                            playString = item.play.toWanString(),
+                            danmakuString = item.danmaku.toWanString(),
+                            timeString = item.totalCount?.let { "全${it}话" }.orEmpty(),
+                            upName = "",
+                            pubTime = item.progress ?: item.newEpIndexShow,
                         )
                     }
-                SeasonCard(
+                SmallVideoCard(
                     data = cardData,
                     onClick = {
                         navController.navigate(PgcFeatureRoute(seasonId = item.seasonId.toLong()))

@@ -44,6 +44,8 @@ data class HistoryItem(
     val duration: Int,
     val progress: Int,
     val type: HistoryItemType,
+    /** 播放数（仅 App 通道 gRPC CardUGC 提供，Web 通道与 OGV 记录缺失为 -1）。 */
+    val play: Int = -1,
 ) {
     companion object {
         fun fromHistoryItem(item: dev.frost819.newbv.biliapi.http.entity.history.HistoryItem) =
@@ -124,6 +126,12 @@ data class HistoryItem(
                         CursorItem.CardItemCase.CARD_UGC -> HistoryItemType.Archive
                         CursorItem.CardItemCase.CARD_OGV -> HistoryItemType.Pgc
                         else -> HistoryItemType.Unknown
+                    },
+                play =
+                    when (item.cardItemCase) {
+                        CursorItem.CardItemCase.CARD_UGC ->
+                            item.cardUgc.view.takeIf { it > 0 }?.toInt() ?: -1
+                        else -> -1
                     },
             )
     }

@@ -167,6 +167,8 @@ class SeasonRepositoryUnitTest {
             assertThat(result.list).hasSize(1)
             assertThat(result.list[0].seasonId).isEqualTo(400)
             assertThat(result.list[0].title).isEqualTo("番剧1")
+            assertThat(result.list[0].play).isEqualTo(123456)
+            assertThat(result.list[0].danmaku).isEqualTo(789)
             assertThat(result.total).isEqualTo(1)
         }
 
@@ -264,7 +266,7 @@ class SeasonRepositoryUnitTest {
         section = emptyList(),
         shortUrl = "",
         squareCover = "",
-        stat = VideoStat(aid = seasonId.toLong()),
+        stat = VideoStat(aid = seasonId.toLong(), _view = 123456L, danmaku = 789),
         subtitle = "",
         summary = "",
         title = title,
