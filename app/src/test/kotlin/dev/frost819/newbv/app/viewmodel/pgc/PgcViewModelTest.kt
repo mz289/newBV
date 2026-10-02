@@ -2,11 +2,14 @@ package dev.frost819.newbv.app.viewmodel.pgc
 
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.biliapi.entity.CarouselData
-import dev.frost819.newbv.biliapi.entity.pgc.PgcFeedData
-import dev.frost819.newbv.biliapi.entity.pgc.PgcItem
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
-import dev.frost819.newbv.biliapi.http.SeasonIndexType
+import dev.frost819.newbv.biliapi.entity.pgc.PgcWebPage
+import dev.frost819.newbv.biliapi.entity.season.Timeline
+import dev.frost819.newbv.biliapi.entity.season.TimelineEp
+import dev.frost819.newbv.biliapi.entity.season.TimelineFilter
 import dev.frost819.newbv.biliapi.repositories.PgcRepository
+import dev.frost819.newbv.biliapi.repositories.SeasonRepository
+import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -20,26 +23,31 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
+import java.util.Date
 
 /**
  * [PgcViewModel] 的单元测试。
  *
- * 验证分区数据懒加载、轮播图加载、切换分区、刷新、超时/错误处理。
- * 使用 MockK mock [PgcRepository]，用 answers + callCount 区分多次调用。
+ * 验证分区富布局数据的聚合加载：分区页服务端板块（标题/条目按接口下发）、
+ * 索引分组，国创额外聚合放送时间表；以及分区间状态隔离、懒加载去重、刷新、
+ * 页面数据与时间表的失败隔离。使用 MockK mock 仓库层。
  *
- * 注：番剧 Tab 由 [AnimeHomeViewModel] 负责，本 VM 改为 [PgcViewModel.loadIfNeeded]
- * 懒加载（不再于 init 自动加载），测试统一以 loadIfNeeded 触发首次加载。
+ * 时间表加载读取 [Prefs.apiType]：用 resetForTesting 重置内存缓存即可
+ * 读到默认值，无需初始化 DataStore（避免多测试类共享 JVM 时的实例冲突）。
  */
 class PgcViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var pgcRepository: PgcRepository
+    private lateinit var seasonRepository: SeasonRepository
     private lateinit var viewModel: PgcViewModel
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        Prefs.resetForTesting()
         pgcRepository = mockk()
+        seasonRepository = mockk()
     }
 
     @AfterEach
@@ -47,30 +55,36 @@ class PgcViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun fakePgcItem(seasonId: Int) =
-        PgcItem(
-            cover = "https://example.com/cover$seasonId.jpg",
-            title = "番剧 $seasonId",
-            subTitle = "副标题 $seasonId",
-            seasonId = seasonId,
-            episodeId = seasonId * 100,
-            seasonType = SeasonIndexType.Anime,
-            rating = "9.0",
-        )
+    private fun fakeModuleItem(
+        seasonId: Int,
+        title: String = "影视 $seasonId",
+    ) = PgcWebPage.ModuleItem(
+        seasonId = seasonId,
+        episodeId = null,
+        avid = null,
+        title = title,
+        subTitle = "副标题 $seasonId",
+        cover = "https://example.com/cover$seasonId.jpg",
+        rating = "9.0",
+        rank = null,
+    )
 
-    private fun fakeFeedData(
-        items: List<PgcItem>,
-        hasNext: Boolean,
-        cursor: Int,
-    ) = PgcFeedData(
-        hasNext = hasNext,
-        cursor = cursor,
+    private fun fakeModule(
+        moduleId: Int,
+        title: String,
+        style: String,
+        items: List<PgcWebPage.ModuleItem>,
+    ) = PgcWebPage.WebModule(
+        moduleId = moduleId,
+        title = title,
+        style = style,
         items = items,
     )
 
-    private fun fakeCarouselData() =
-        CarouselData(
-            items =
+    /** 服务端下发的分区页数据：板块标题与顺序模拟接口返回。 */
+    private fun fakeWebPage(moduleTitle: String = "电影热播榜"): PgcWebPage =
+        PgcWebPage(
+            banner =
                 listOf(
                     CarouselData.CarouselItem(
                         cover = "https://example.com/banner.jpg",
@@ -79,295 +93,197 @@ class PgcViewModelTest {
                         episodeId = 100,
                     ),
                 ),
+            indexGroups =
+                listOf(
+                    PgcWebPage.IndexGroup(
+                        field = "style_id",
+                        name = "风格",
+                        values =
+                            listOf(
+                                PgcWebPage.IndexGroup.Value(keyword = "-1", name = "全部"),
+                                PgcWebPage.IndexGroup.Value(keyword = "10051", name = "喜剧"),
+                            ),
+                    ),
+                ),
+            modules =
+                listOf(
+                    fakeModule(
+                        moduleId = 1,
+                        title = "推荐模块",
+                        style = "web_hot_v2",
+                        items = listOf(fakeModuleItem(1), fakeModuleItem(2)),
+                    ),
+                    fakeModule(
+                        moduleId = 2,
+                        title = moduleTitle,
+                        style = "web_rank_v2",
+                        items =
+                            listOf(
+                                fakeModuleItem(3).copy(rank = 1, rating = "9.8"),
+                                fakeModuleItem(4).copy(rank = 2),
+                            ),
+                    ),
+                ),
         )
 
-    @Test
-    fun `loadIfNeeded loads first page with carousel`() =
-        runTest(testDispatcher) {
-            val items = listOf(fakePgcItem(1), fakePgcItem(2))
-            coEvery { pgcRepository.getFeed(any(), any()) } returns
-                fakeFeedData(items, hasNext = true, cursor = 1)
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.items).hasSize(2)
-            assertThat(viewModel.uiState.value.loading).isFalse()
-            assertThat(viewModel.uiState.value.hasMore).isTrue()
-            assertThat(viewModel.uiState.value.error).isFalse()
-            assertThat(viewModel.uiState.value.carouselItems).hasSize(1)
-        }
-
-    @Test
-    fun `loadIfNeeded is no-op when items already loaded`() =
-        runTest(testDispatcher) {
-            coEvery { pgcRepository.getFeed(any(), any()) } returns
-                fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-
-            coVerify(exactly = 1) { pgcRepository.getFeed(any(), any()) }
-        }
-
-    @Test
-    fun `loadMore appends items and stops when hasNext is false`() =
-        runTest(testDispatcher) {
-            var callCount = 0
-            coEvery { pgcRepository.getFeed(any(), any()) } answers {
-                callCount++
-                if (callCount == 1) {
-                    fakeFeedData(listOf(fakePgcItem(1), fakePgcItem(2)), hasNext = true, cursor = 1)
-                } else {
-                    fakeFeedData(listOf(fakePgcItem(3), fakePgcItem(4)), hasNext = false, cursor = 2)
-                }
-            }
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-            viewModel.loadMore()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.items).hasSize(4)
-            assertThat(viewModel.uiState.value.hasMore).isFalse()
-        }
-
-    @Test
-    fun `switchType clears and loads new region`() =
-        runTest(testDispatcher) {
-            coEvery {
-                pgcRepository.getFeed(PgcType.Anime, any())
-            } returns fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
-            coEvery {
-                pgcRepository.getFeed(PgcType.Movie, any())
-            } returns fakeFeedData(listOf(fakePgcItem(100)), hasNext = false, cursor = 1)
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-            viewModel.switchType(PgcType.Movie)
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.items).hasSize(1)
-            assertThat(
-                viewModel.uiState.value.items[0]
-                    .seasonId,
-            ).isEqualTo(100)
-            assertThat(viewModel.uiState.value.hasMore).isFalse()
-        }
-
-    @Test
-    fun `error sets error flag and preserves existing items`() =
-        runTest(testDispatcher) {
-            var callCount = 0
-            coEvery { pgcRepository.getFeed(any(), any()) } answers {
-                callCount++
-                if (callCount == 1) {
-                    fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
-                } else {
-                    throw IOException("network error")
-                }
-            }
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-            assertThat(viewModel.uiState.value.items).hasSize(1)
-
-            viewModel.loadMore()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.items).hasSize(1)
-            assertThat(viewModel.uiState.value.error).isTrue()
-            assertThat(viewModel.uiState.value.loading).isFalse()
-        }
-
-    @Test
-    fun `refresh clears items and reloads`() =
-        runTest(testDispatcher) {
-            var callCount = 0
-            coEvery { pgcRepository.getFeed(any(), any()) } answers {
-                callCount++
-                if (callCount == 1) {
-                    fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
-                } else {
-                    fakeFeedData(listOf(fakePgcItem(99)), hasNext = false, cursor = 1)
-                }
-            }
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-            assertThat(viewModel.uiState.value.items).hasSize(1)
-            assertThat(
-                viewModel.uiState.value.items[0]
-                    .seasonId,
-            ).isEqualTo(1)
-
-            viewModel.refresh()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.items).hasSize(1)
-            assertThat(
-                viewModel.uiState.value.items[0]
-                    .seasonId,
-            ).isEqualTo(99)
-        }
-
-    @Test
-    fun `loadMore is no-op when hasMore is false`() =
-        runTest(testDispatcher) {
-            var callCount = 0
-            coEvery { pgcRepository.getFeed(any(), any()) } answers {
-                callCount++
-                fakeFeedData(listOf(fakePgcItem(callCount)), hasNext = false, cursor = 1)
-            }
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-            assertThat(viewModel.uiState.value.items).hasSize(1)
-            assertThat(viewModel.uiState.value.hasMore).isFalse()
-
-            viewModel.loadMore()
-            advanceUntilIdle()
-
-            assertThat(callCount).isEqualTo(1)
-            assertThat(viewModel.uiState.value.items).hasSize(1)
-        }
-
-    @Test
-    fun `carousel load failure does not block feed`() =
-        runTest(testDispatcher) {
-            coEvery { pgcRepository.getFeed(any(), any()) } returns
-                fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
-            coEvery { pgcRepository.getCarousel(any()) } throws IOException("carousel error")
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.items).hasSize(1)
-            assertThat(viewModel.uiState.value.carouselItems).isEmpty()
-        }
-
-    @Test
-    fun `switchType to same type with existing items is no-op`() =
-        runTest(testDispatcher) {
-            coEvery { pgcRepository.getFeed(any(), any()) } returns
-                fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-
-            viewModel.switchType(PgcType.Anime)
-            advanceUntilIdle()
-
-            coVerify(exactly = 1) { pgcRepository.getFeed(any(), any()) }
-        }
-
-    @Test
-    fun `loadIfNeeded error on first load sets error with empty items`() =
-        runTest(testDispatcher) {
-            coEvery { pgcRepository.getFeed(any(), any()) } throws IOException("init error")
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.items).isEmpty()
-            assertThat(viewModel.uiState.value.error).isTrue()
-            assertThat(viewModel.uiState.value.loading).isFalse()
-        }
-
-    @Test
-    fun `refresh reloads carousel and feed`() =
-        runTest(testDispatcher) {
-            var feedCallCount = 0
-            coEvery { pgcRepository.getFeed(any(), any()) } answers {
-                feedCallCount++
-                if (feedCallCount == 1) {
-                    fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
-                } else {
-                    fakeFeedData(listOf(fakePgcItem(99)), hasNext = false, cursor = 1)
-                }
-            }
-            var carouselCallCount = 0
-            coEvery { pgcRepository.getCarousel(any()) } answers {
-                carouselCallCount++
-                fakeCarouselData()
-            }
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-
-            viewModel.refresh()
-            advanceUntilIdle()
-
-            assertThat(feedCallCount).isEqualTo(2)
-            assertThat(carouselCallCount).isAtLeast(2)
-            assertThat(
-                viewModel.uiState.value.items[0]
-                    .seasonId,
-            ).isEqualTo(99)
-        }
-
-    @Test
-    fun `loadMore appends to existing items`() =
-        runTest(testDispatcher) {
-            var callCount = 0
-            coEvery { pgcRepository.getFeed(any(), any()) } answers {
-                callCount++
-                if (callCount == 1) {
-                    fakeFeedData(listOf(fakePgcItem(1), fakePgcItem(2)), hasNext = true, cursor = 1)
-                } else {
-                    fakeFeedData(listOf(fakePgcItem(3)), hasNext = false, cursor = 2)
-                }
-            }
-            coEvery { pgcRepository.getCarousel(any()) } returns fakeCarouselData()
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
-            advanceUntilIdle()
-
-            viewModel.loadMore()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.items).hasSize(3)
-            assertThat(
-                viewModel.uiState.value.items[2]
-                    .seasonId,
-            ).isEqualTo(3)
-        }
-
-    @Test
-    fun `carousel success sets carousel items`() =
-        runTest(testDispatcher) {
-            coEvery { pgcRepository.getFeed(any(), any()) } returns
-                fakeFeedData(listOf(fakePgcItem(1)), hasNext = true, cursor = 1)
-            val carouselData =
-                CarouselData(
-                    items =
-                        listOf(
-                            CarouselData.CarouselItem(cover = "c1", title = "B1", seasonId = 10, episodeId = 100),
-                            CarouselData.CarouselItem(cover = "c2", title = "B2", seasonId = 20, episodeId = 200),
+    private fun fakeTimeline() =
+        listOf(
+            Timeline(
+                dateString = "2026-10-02",
+                date = Date(),
+                dayOfWeek = 5,
+                isToday = true,
+                episodes =
+                    listOf(
+                        TimelineEp(
+                            cover = "https://example.com/tl.jpg",
+                            title = "时间表国创",
+                            seasonId = 900,
+                            publishIndex = "第7话",
+                            publishTime = "10:00",
+                            publishDate = Date(),
                         ),
-                )
-            coEvery { pgcRepository.getCarousel(any()) } returns carouselData
-            viewModel = PgcViewModel(pgcRepository)
-            viewModel.loadIfNeeded()
+                    ),
+            ),
+        )
+
+    private fun stubAll() {
+        coEvery { pgcRepository.getPgcWebPage(any()) } returns fakeWebPage()
+        coEvery { seasonRepository.getTimeline(any(), any()) } returns fakeTimeline()
+    }
+
+    @Test
+    fun `loadIfNeeded loads server modules index and carousel`() =
+        runTest(testDispatcher) {
+            stubAll()
+
+            viewModel = PgcViewModel(pgcRepository, seasonRepository)
+            viewModel.loadIfNeeded(PgcType.Movie)
             advanceUntilIdle()
 
-            assertThat(viewModel.uiState.value.carouselItems).hasSize(2)
-            assertThat(
-                viewModel.uiState.value.carouselItems[0]
-                    .title,
-            ).isEqualTo("B1")
+            val state = viewModel.uiStateFor(PgcType.Movie)
+            assertThat(state.loaded).isTrue()
+            assertThat(state.error).isFalse()
+            // 板块标题与顺序保持接口下发
+            assertThat(state.modules.map { it.title }).containsExactly("推荐模块", "电影热播榜").inOrder()
+            assertThat(state.modules[1].items).hasSize(2)
+            assertThat(state.carouselItems).hasSize(1)
+            assertThat(state.indexGroups.single().name).isEqualTo("风格")
+        }
+
+    @Test
+    fun `loadIfNeeded is no-op when already loaded`() =
+        runTest(testDispatcher) {
+            stubAll()
+
+            viewModel = PgcViewModel(pgcRepository, seasonRepository)
+            viewModel.loadIfNeeded(PgcType.Movie)
+            advanceUntilIdle()
+            viewModel.loadIfNeeded(PgcType.Movie)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { pgcRepository.getPgcWebPage(PgcType.Movie) }
+        }
+
+    @Test
+    fun `guochuang loads timeline with guochuang filter`() =
+        runTest(testDispatcher) {
+            stubAll()
+
+            viewModel = PgcViewModel(pgcRepository, seasonRepository)
+            viewModel.loadIfNeeded(PgcType.GuoChuang)
+            advanceUntilIdle()
+
+            val state = viewModel.uiStateFor(PgcType.GuoChuang)
+            assertThat(state.timeline).hasSize(1)
+            assertThat(state.timelineError).isFalse()
+            coVerify { seasonRepository.getTimeline(TimelineFilter.GuoChuang, any()) }
+        }
+
+    @Test
+    fun `non guochuang does not load timeline`() =
+        runTest(testDispatcher) {
+            stubAll()
+
+            viewModel = PgcViewModel(pgcRepository, seasonRepository)
+            viewModel.loadIfNeeded(PgcType.Tv)
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { seasonRepository.getTimeline(any(), any()) }
+        }
+
+    @Test
+    fun `states are isolated between types`() =
+        runTest(testDispatcher) {
+            stubAll()
+            coEvery {
+                pgcRepository.getPgcWebPage(PgcType.Tv)
+            } returns fakeWebPage(moduleTitle = "电视剧热播榜")
+
+            viewModel = PgcViewModel(pgcRepository, seasonRepository)
+            viewModel.loadIfNeeded(PgcType.Movie)
+            advanceUntilIdle()
+            viewModel.loadIfNeeded(PgcType.Tv)
+            advanceUntilIdle()
+
+            // 切到电视剧后电影状态保留，互不清空
+            assertThat(viewModel.uiStateFor(PgcType.Movie).modules.map { it.title }).contains("电影热播榜")
+            assertThat(viewModel.uiStateFor(PgcType.Tv).modules.map { it.title }).contains("电视剧热播榜")
+            coVerify(exactly = 1) { pgcRepository.getPgcWebPage(PgcType.Movie) }
+        }
+
+    @Test
+    fun `refresh reloads page data`() =
+        runTest(testDispatcher) {
+            var callCount = 0
+            coEvery { pgcRepository.getPgcWebPage(any()) } answers {
+                callCount++
+                fakeWebPage(moduleTitle = "热播榜第$callCount 次加载")
+            }
+            coEvery { seasonRepository.getTimeline(any(), any()) } returns fakeTimeline()
+
+            viewModel = PgcViewModel(pgcRepository, seasonRepository)
+            viewModel.loadIfNeeded(PgcType.Movie)
+            advanceUntilIdle()
+            viewModel.refresh(PgcType.Movie)
+            advanceUntilIdle()
+
+            assertThat(callCount).isEqualTo(2)
+            assertThat(viewModel.uiStateFor(PgcType.Movie).modules.map { it.title })
+                .contains("热播榜第2 次加载")
+            assertThat(viewModel.uiStateFor(PgcType.Movie).loaded).isTrue()
+        }
+
+    @Test
+    fun `web page failure sets error`() =
+        runTest(testDispatcher) {
+            coEvery { pgcRepository.getPgcWebPage(any()) } throws IOException("page error")
+            coEvery { seasonRepository.getTimeline(any(), any()) } returns fakeTimeline()
+
+            viewModel = PgcViewModel(pgcRepository, seasonRepository)
+            viewModel.loadIfNeeded(PgcType.Movie)
+            advanceUntilIdle()
+
+            val state = viewModel.uiStateFor(PgcType.Movie)
+            assertThat(state.error).isTrue()
+            assertThat(state.modules).isEmpty()
+            assertThat(state.carouselItems).isEmpty()
+        }
+
+    @Test
+    fun `timeline failure only sets timelineError`() =
+        runTest(testDispatcher) {
+            stubAll()
+            coEvery { seasonRepository.getTimeline(any(), any()) } throws IOException("timeline error")
+
+            viewModel = PgcViewModel(pgcRepository, seasonRepository)
+            viewModel.loadIfNeeded(PgcType.GuoChuang)
+            advanceUntilIdle()
+
+            val state = viewModel.uiStateFor(PgcType.GuoChuang)
+            assertThat(state.timelineError).isTrue()
+            assertThat(state.timeline).isEmpty()
+            assertThat(state.error).isFalse()
+            assertThat(state.modules).isNotEmpty()
         }
 }

@@ -15,16 +15,63 @@ data class PgcWebInitialStateData(
 ) {
     /**
      * @param banner 轮播图
-     * @param index 索引
-     * @param ext 时间表
+     * @param index 索引快捷筛选分组
+     * @param ext 板块列表（标题/样式/条目均由服务端下发，v2 与 v3 分区页同构）
      */
     @Suppress("KDocUnresolvedReference")
     @Serializable
     data class Modules(
         val banner: Banner,
-        // val index: Index,
-        // val ext:Ext,
+        val index: Index? = null,
+        val ext: List<ExtModule> = emptyList(),
     ) {
+        /** 索引快捷筛选模块：每个条目是一组筛选维度（排序/风格/地区…）。 */
+        @Serializable
+        data class Index(
+            val items: List<IndexGroup> = emptyList(),
+        ) {
+            @Serializable
+            data class IndexGroup(
+                val field: String? = null,
+                val name: String? = null,
+                val all: IndexValue? = null,
+                val values: List<List<IndexValue>> = emptyList(),
+            ) {
+                @Serializable
+                data class IndexValue(
+                    val keyword: String? = null,
+                    val name: String? = null,
+                )
+            }
+        }
+
+        @Serializable
+        data class ExtModule(
+            val title: String? = null,
+            val style: String? = null,
+            @SerialName("module_id")
+            val moduleId: Int? = null,
+            val items: List<ExtItem> = emptyList(),
+        ) {
+            @Serializable
+            data class ExtItem(
+                val title: String? = null,
+                val cover: String? = null,
+                val link: String? = null,
+                @SerialName("season_id")
+                val seasonId: Int? = null,
+                @SerialName("episode_id")
+                val episodeId: Long? = null,
+                val rating: String? = null,
+                @SerialName("sub_title")
+                val subTitle: String? = null,
+                val rank: Int? = null,
+                val avid: Long? = null,
+                @SerialName("sub_items")
+                val subItems: List<ExtItem>? = null,
+            )
+        }
+
         @Serializable
         data class Banner(
             val title: String,
