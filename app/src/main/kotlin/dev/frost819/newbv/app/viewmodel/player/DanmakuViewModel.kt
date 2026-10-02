@@ -87,17 +87,33 @@ class DanmakuViewModel
         private var danmakuConfig = DanmakuConfig()
         private val danmakuTypeFilter = TypeFilter()
 
-        private val _danmakuState =
-            MutableStateFlow(
-                DanmakuState(
-                    scale = Prefs.defaultDanmakuScale,
-                    opacity = Prefs.defaultDanmakuOpacity,
-                    area = Prefs.defaultDanmakuArea,
-                    speedFactor = Prefs.defaultDanmakuSpeedFactor,
-                    maskEnabled = Prefs.defaultDanmakuMask,
-                    enabledTypes = Prefs.defaultDanmakuTypes.map { it.toDanmakuEntity() },
-                ),
+        /**
+         * 从 Prefs 构建初始弹幕状态。
+         *
+         * 兼容旧版本数据：旧版把「总开关关闭」实现为清空类型列表并持久化，
+         * 检测到类型列表为空且总开关为开时，视为旧版的关闭状态——
+         * 总开关置为关闭，类型勾选还原为全选，避免用户已保存的类型设置丢失。
+         */
+        private fun initialDanmakuState(): DanmakuState {
+            val savedTypes = Prefs.defaultDanmakuTypes
+            val legacyOff = savedTypes.isEmpty() && Prefs.defaultDanmakuEnabled
+            return DanmakuState(
+                enabled = !legacyOff,
+                scale = Prefs.defaultDanmakuScale,
+                opacity = Prefs.defaultDanmakuOpacity,
+                area = Prefs.defaultDanmakuArea,
+                speedFactor = Prefs.defaultDanmakuSpeedFactor,
+                maskEnabled = Prefs.defaultDanmakuMask,
+                enabledTypes =
+                    if (legacyOff) {
+                        DanmakuEntityDanmakuType.entries.toList()
+                    } else {
+                        savedTypes.map { it.toDanmakuEntity() }
+                    },
             )
+        }
+
+        private val _danmakuState = MutableStateFlow(initialDanmakuState())
         val danmakuState = _danmakuState.asStateFlow()
 
         /** 弹幕防遮挡蒙版数据，由 [loadDanmakuMask] 加载后存储。 */
@@ -450,14 +466,9 @@ class DanmakuViewModel
             danmakuPlayer?.updatePlaySpeed(speed)
         }
 
-        /** 切换弹幕开关。 */
+        /** 切换弹幕总开关；不改动各类型勾选，重新打开后保留原有过滤设置。 */
         fun toggleDanmaku() {
-            val current = _danmakuState.value.enabledTypes
-            if (current.isEmpty()) {
-                updateDanmakuState(DanmakuSettingAction.SetEnabledTypes(DanmakuEntityDanmakuType.entries))
-            } else {
-                updateDanmakuState(DanmakuSettingAction.SetEnabledTypes(emptyList()))
-            }
+            updateDanmakuState(DanmakuSettingAction.SetEnabled(!_danmakuState.value.enabled))
         }
 
         /**
@@ -469,6 +480,7 @@ class DanmakuViewModel
             val old = _danmakuState.value
             val new =
                 when (action) {
+                    is DanmakuSettingAction.SetEnabled -> old.copy(enabled = action.enabled)
                     is DanmakuSettingAction.SetScale -> old.copy(scale = action.scale)
                     is DanmakuSettingAction.SetOpacity -> old.copy(opacity = action.opacity)
                     is DanmakuSettingAction.SetArea -> old.copy(area = action.area)
@@ -480,6 +492,11 @@ class DanmakuViewModel
 
             _danmakuState.update { new }
 
+            if (new.enabled != old.enabled) {
+                // 投屏等临时开关不写入默认设置
+                if (action is DanmakuSettingAction.SetEnabled && !action.persist) return
+                Prefs.defaultDanmakuEnabled = new.enabled
+            }
             if (new.enabledTypes != old.enabledTypes) {
                 updateDanmakuConfigTypeFilter(new.enabledTypes)
                 // 投屏等临时开关不写入默认设置
@@ -524,7 +541,7 @@ class DanmakuViewModel
         }
 
         private fun initDanmakuConfig() {
-            rebuildTypeFilter(Prefs.defaultDanmakuTypes.map { it.toDanmakuEntity() })
+            rebuildTypeFilter(_danmakuState.value.enabledTypes)
 
             danmakuConfig =
                 danmakuConfig.copy(

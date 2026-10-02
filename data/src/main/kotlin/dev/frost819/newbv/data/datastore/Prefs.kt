@@ -320,6 +320,9 @@ object Prefs {
 
     // --- 播放器 - 弹幕（PRD 7.3） ---
 
+    /** 默认弹幕总开关（进度条下方按钮；关闭不影响各类型勾选）。 */
+    var defaultDanmakuEnabled by pref(PrefKeys.defaultDanmakuEnabled, true)
+
     /** 默认弹幕类型（多选，逗号分隔的序号字符串）。 */
     var defaultDanmakuTypes by pref(
         PrefKeys.defaultDanmakuTypes,

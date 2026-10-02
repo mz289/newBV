@@ -45,7 +45,7 @@ fun LivePlayerScreen(
     val videoPlayer = viewModel.videoPlayer
     val danmakuPlayer = danmakuViewModel.danmakuPlayer
 
-    val danmakuEnabled = danmakuState.enabledTypes.isNotEmpty()
+    val danmakuEnabled = danmakuState.enabled
 
     // 双击退出：TV 遥控器（Controller onBack）和非 TV（BackHandler）共用同一计时器
     val handleBack =
