@@ -55,6 +55,12 @@ fun PersonalContent(
                     navController = navController,
                     focusSaver = focusSaver,
                 )
+            PersonalTopNavItem.Subscription ->
+                SubscriptionScreen(
+                    viewModel = viewModel,
+                    navController = navController,
+                    focusSaver = focusSaver,
+                )
             PersonalTopNavItem.FollowingSeason ->
                 FollowingSeasonScreen(
                     viewModel = viewModel,

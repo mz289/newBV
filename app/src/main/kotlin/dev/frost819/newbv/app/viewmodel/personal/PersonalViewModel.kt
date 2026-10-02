@@ -6,9 +6,12 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
 import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
+import dev.frost819.newbv.biliapi.entity.CollectedFavoriteFolder
+import dev.frost819.newbv.biliapi.entity.CollectedFavoriteType
 import dev.frost819.newbv.biliapi.entity.FavoriteFolderData
 import dev.frost819.newbv.biliapi.entity.FavoriteFolderMetadata
 import dev.frost819.newbv.biliapi.entity.FavoriteItem
+import dev.frost819.newbv.biliapi.entity.FavoriteItemType
 import dev.frost819.newbv.biliapi.entity.season.FollowingSeason
 import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonStatus
 import dev.frost819.newbv.biliapi.entity.season.FollowingSeasonType
@@ -40,7 +43,7 @@ sealed interface PersonalUiEffect {
 /**
  * 个人页 UI 状态。
  *
- * 管理稍后再看、历史、收藏、追番四个 Tab 的数据。
+ * 管理稍后再看、历史、收藏、订阅、追番五个 Tab 的数据。
  *
  * @property toViewLoading 稍后再看加载中。
  * @property toViewError 稍后再看加载失败。
@@ -54,6 +57,15 @@ sealed interface PersonalUiEffect {
  * @property favoriteError 收藏加载失败。
  * @property favoriteHasMore 收藏夹是否还有更多。
  * @property currentFolderId 当前选中的收藏夹 ID。
+ * @property subscriptionFolders 订阅（收藏的收藏夹/合集）列表。
+ * @property subscriptionLoading 订阅列表加载中。
+ * @property subscriptionError 订阅列表加载失败。
+ * @property subscriptionHasMore 订阅列表是否还有更多。
+ * @property subscriptionItems 当前订阅夹/合集内容视频列表。
+ * @property subscriptionItemsLoading 订阅内容加载中。
+ * @property subscriptionItemsError 订阅内容加载失败。
+ * @property subscriptionItemsHasMore 订阅内容是否还有更多。
+ * @property currentSubscriptionFolder 当前进入的订阅夹/合集，null 表示停留在订阅列表。
  * @property followingSeasons 追番列表。
  * @property followingLoading 追番加载中。
  * @property followingError 追番加载失败。
@@ -75,6 +87,15 @@ data class PersonalUiState(
     val favoriteError: Boolean = false,
     val favoriteHasMore: Boolean = true,
     val currentFolderId: Long = -1L,
+    val subscriptionFolders: List<CollectedFavoriteFolder> = emptyList(),
+    val subscriptionLoading: Boolean = false,
+    val subscriptionError: Boolean = false,
+    val subscriptionHasMore: Boolean = true,
+    val subscriptionItems: List<FavoriteItem> = emptyList(),
+    val subscriptionItemsLoading: Boolean = false,
+    val subscriptionItemsError: Boolean = false,
+    val subscriptionItemsHasMore: Boolean = false,
+    val currentSubscriptionFolder: CollectedFavoriteFolder? = null,
     val followingSeasons: List<FollowingSeason> = emptyList(),
     val followingLoading: Boolean = false,
     val followingError: Boolean = false,
@@ -87,7 +108,7 @@ data class PersonalUiState(
 /**
  * 个人页 ViewModel。
  *
- * 管理稍后再看、历史、收藏、追番四个 Tab 的数据加载、分页、刷新。
+ * 管理稍后再看、历史、收藏、订阅、追番五个 Tab 的数据加载、分页、刷新。
  * 使用 [StateFlow] 暴露状态，UI 通过 [uiState] 观察。
  *
  * @property toViewRepository 稍后再看仓库。
@@ -116,6 +137,8 @@ class PersonalViewModel
 
         private var historyCursor: Long = 0L
         private var favoritePageNumber: Int = 1
+        private var subscriptionPageNumber: Int = 1
+        private var subscriptionItemsPageNumber: Int = 1
         private var followingPageNumber: Int = 1
         private var followingTotal: Int = 0
 
@@ -125,6 +148,7 @@ class PersonalViewModel
                 loadToView()
                 loadHistory()
                 loadFavoriteFolders()
+                loadSubscriptionFolders()
                 loadFollowingSeasons()
             }
         }
@@ -369,6 +393,147 @@ class PersonalViewModel
 
         // endregion
 
+        // region Subscription（我的订阅：订阅的收藏夹/合集）
+
+        /**
+         * 加载订阅（收藏的收藏夹/合集）列表。
+         *
+         * 使用页码分页，每页 20 条。
+         */
+        fun loadSubscriptionFolders() {
+            viewModelScope.launch {
+                val current = _uiState.value
+                if (current.subscriptionLoading || !current.subscriptionHasMore) return@launch
+
+                _uiState.update { it.copy(subscriptionLoading = true, subscriptionError = false) }
+
+                runCatching {
+                    withTimeout(LOAD_TIMEOUT_MS) {
+                        val data =
+                            favoriteRepository.getCollectedFavoriteFolderList(
+                                mid = Prefs.uid,
+                                pageNumber = subscriptionPageNumber,
+                            )
+                        subscriptionPageNumber++
+                        _uiState.update {
+                            it.copy(
+                                subscriptionFolders = it.subscriptionFolders + data.folders,
+                                subscriptionHasMore = data.hasMore,
+                            )
+                        }
+                    }
+                }.onFailure { error ->
+                    error.rethrowUnlessTimeout()
+                    logger.error(error) { "Failed to load subscription folders" }
+                    _uiState.update { it.copy(subscriptionError = true) }
+                }
+
+                _uiState.update { it.copy(subscriptionLoading = false) }
+            }
+        }
+
+        /**
+         * 加载订阅夹/合集的视频列表。
+         *
+         * 订阅的收藏夹走收藏夹详情接口，订阅的合集走合集内容接口。
+         *
+         * @param folder 订阅夹/合集。
+         * @param forceRefresh 是否强制刷新（进入订阅夹时为 true）。
+         */
+        fun loadSubscriptionItems(
+            folder: CollectedFavoriteFolder,
+            forceRefresh: Boolean = false,
+        ) {
+            viewModelScope.launch {
+                val current = _uiState.value
+                if (current.subscriptionItemsLoading) return@launch
+
+                if (forceRefresh || folder != current.currentSubscriptionFolder) {
+                    subscriptionItemsPageNumber = 1
+                    _uiState.update {
+                        it.copy(
+                            subscriptionItems = emptyList(),
+                            subscriptionItemsHasMore = true,
+                            subscriptionItemsError = false,
+                            currentSubscriptionFolder = folder,
+                        )
+                    }
+                }
+
+                if (!_uiState.value.subscriptionItemsHasMore && !forceRefresh) return@launch
+
+                _uiState.update { it.copy(subscriptionItemsLoading = true, subscriptionItemsError = false) }
+
+                runCatching {
+                    withTimeout(LOAD_TIMEOUT_MS) {
+                        val data: FavoriteFolderData =
+                            if (folder.type == CollectedFavoriteType.Season) {
+                                favoriteRepository.getCollectedSeasonData(
+                                    seasonId = folder.id,
+                                    pageNumber = subscriptionItemsPageNumber,
+                                )
+                            } else {
+                                favoriteRepository.getFavoriteFolderData(
+                                    mediaId = folder.id,
+                                    pageNumber = subscriptionItemsPageNumber,
+                                    preferApiType = Prefs.apiType,
+                                )
+                            }
+                        subscriptionItemsPageNumber++
+                        val videoItems = data.medias.filter { it.type == FavoriteItemType.Video }
+                        _uiState.update {
+                            it.copy(
+                                subscriptionItems = it.subscriptionItems + videoItems,
+                                subscriptionItemsHasMore = data.hasMore,
+                            )
+                        }
+                    }
+                }.onFailure { error ->
+                    error.rethrowUnlessTimeout()
+                    logger.error(error) { "Failed to load subscription items for folder ${folder.id}" }
+                    _uiState.update { it.copy(subscriptionItemsError = true) }
+                }
+
+                _uiState.update { it.copy(subscriptionItemsLoading = false) }
+            }
+        }
+
+        /**
+         * 退出当前订阅夹/合集，返回订阅列表。
+         */
+        fun exitSubscriptionFolder() {
+            _uiState.update {
+                it.copy(
+                    subscriptionItems = emptyList(),
+                    subscriptionItemsHasMore = false,
+                    subscriptionItemsError = false,
+                    currentSubscriptionFolder = null,
+                )
+            }
+        }
+
+        /**
+         * 刷新订阅列表。
+         */
+        fun refreshSubscription() {
+            subscriptionPageNumber = 1
+            subscriptionItemsPageNumber = 1
+            _uiState.update {
+                it.copy(
+                    subscriptionFolders = emptyList(),
+                    subscriptionHasMore = true,
+                    subscriptionError = false,
+                    subscriptionItems = emptyList(),
+                    subscriptionItemsHasMore = false,
+                    subscriptionItemsError = false,
+                    currentSubscriptionFolder = null,
+                )
+            }
+            loadSubscriptionFolders()
+        }
+
+        // endregion
+
         // region FollowingSeason
 
         /**
@@ -463,6 +628,7 @@ class PersonalViewModel
                 dev.frost819.newbv.data.datastore.PersonalTopNavItem.ToView -> refreshToView()
                 dev.frost819.newbv.data.datastore.PersonalTopNavItem.History -> refreshHistory()
                 dev.frost819.newbv.data.datastore.PersonalTopNavItem.Favorite -> refreshFavorite()
+                dev.frost819.newbv.data.datastore.PersonalTopNavItem.Subscription -> refreshSubscription()
                 dev.frost819.newbv.data.datastore.PersonalTopNavItem.FollowingSeason -> refreshFollowingSeasons()
             }
         }

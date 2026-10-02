@@ -1,9 +1,11 @@
 package dev.frost819.newbv.biliapi.repositories
 
 import dev.frost819.newbv.biliapi.entity.ApiType
+import dev.frost819.newbv.biliapi.entity.CollectedFavoriteFolderList
 import dev.frost819.newbv.biliapi.entity.FavoriteFolderData
 import dev.frost819.newbv.biliapi.entity.FavoriteFolderMetadata
 import dev.frost819.newbv.biliapi.entity.FavoriteItemType
+import dev.frost819.newbv.biliapi.entity.toFavoriteFolderData
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 
 class FavoriteRepository(
@@ -96,5 +98,41 @@ class FavoriteRepository(
                     accessKey = authRepository.accessToken.takeIf { preferApiType == ApiType.App },
                 ).getResponseData()
         return FavoriteFolderData.fromHttpFavoriteFolderInfoListData(favoriteFolderListData)
+    }
+
+    /**
+     * 获取当前用户[mid]订阅（收藏）的收藏夹/合集列表（分页）。
+     */
+    suspend fun getCollectedFavoriteFolderList(
+        mid: Long,
+        pageSize: Int = 20,
+        pageNumber: Int = 1,
+    ): CollectedFavoriteFolderList {
+        val collectedFavoriteFoldersData =
+            BiliHttpApi
+                .getCollectedFavoriteFolders(
+                    mid = mid,
+                    pageSize = pageSize,
+                    pageNumber = pageNumber,
+                ).getResponseData()
+        return CollectedFavoriteFolderList.fromHttpCollectedFavoriteFoldersData(collectedFavoriteFoldersData)
+    }
+
+    /**
+     * 获取订阅的合集[seasonId]内容列表。
+     */
+    suspend fun getCollectedSeasonData(
+        seasonId: Long,
+        pageSize: Int = 20,
+        pageNumber: Int = 1,
+    ): FavoriteFolderData {
+        val favSeasonContentData =
+            BiliHttpApi
+                .getFavSeasonContent(
+                    seasonId = seasonId,
+                    pageSize = pageSize,
+                    pageNumber = pageNumber,
+                ).getResponseData()
+        return favSeasonContentData.toFavoriteFolderData(seasonId)
     }
 }

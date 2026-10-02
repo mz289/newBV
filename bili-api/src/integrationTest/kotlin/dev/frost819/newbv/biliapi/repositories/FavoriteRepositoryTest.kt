@@ -12,7 +12,7 @@ import java.util.Properties
 /**
  * [FavoriteRepository] 的集成测试。
  *
- * 验证收藏状态查询、收藏/取消收藏、收藏夹列表与内容获取（Web + App HTTP）。
+ * 验证收藏状态查询、收藏/取消收藏、收藏夹列表与内容获取、订阅（收藏的收藏夹/合集）列表（Web + App HTTP）。
  * 查询类接口断言正常返回数据；收藏为互动类操作仅断言接口返回正常。
  * 依赖真实 B 站凭证和网络。
  */
@@ -210,6 +210,31 @@ class FavoriteRepositoryTest {
                 )
             println("app folder medias: ${result.medias.size}")
             assertThat(result.medias).isNotEmpty()
+        }
+
+    @Test
+    fun `get collected favorite folder list with cookies`() =
+        runBlocking {
+            // 查询类：订阅列表可能为空（账号未订阅收藏夹/合集），断言接口正常返回结构化数据
+            val result =
+                favoriteRepository.getCollectedFavoriteFolderList(
+                    mid = UID,
+                    pageNumber = 1,
+                )
+            println("collected folders: ${result.folders.map { "${it.id}:${it.title}:${it.type}" }}")
+            assertThat(result.total).isAtLeast(0)
+
+            // 有订阅的合集时验证合集内容接口；仅有收藏夹订阅时跳过
+            val season =
+                result.folders.firstOrNull { it.type == dev.frost819.newbv.biliapi.entity.CollectedFavoriteType.Season }
+            if (season != null) {
+                val seasonData =
+                    favoriteRepository.getCollectedSeasonData(
+                        seasonId = season.id,
+                        pageNumber = 1,
+                    )
+                println("collected season medias: ${seasonData.medias.size}")
+            }
         }
 
     private suspend fun getDefaultFavoriteFolderId(preferApiType: ApiType): Long {

@@ -94,4 +94,5 @@ val PersonalTopNavItem.displayName: String
             PersonalTopNavItem.History -> "历史"
             PersonalTopNavItem.Favorite -> "收藏"
             PersonalTopNavItem.FollowingSeason -> "追番"
+            PersonalTopNavItem.Subscription -> "订阅"
         }
