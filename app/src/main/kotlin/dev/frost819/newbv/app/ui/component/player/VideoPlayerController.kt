@@ -69,7 +69,8 @@ import kotlinx.coroutines.launch
  * 5. RelatedVideosController — 相关视频
  * 6. ControllerVideoInfo — 信息栏 + 进度条 + 按钮
  * 7. VideoListController — 分集列表
- * 8. MenuController — 设置菜单
+ * 8. ChapterListController — 章节列表
+ * 9. MenuController — 设置菜单
  */
 @Composable
 @Suppress("LongParameterList", "CyclomaticComplexMethod")
@@ -87,6 +88,8 @@ fun VideoPlayerController(
     onGoTime: (time: Long) -> Unit,
     onBackToStart: () -> Unit,
     onCancelSkipToNextEp: () -> Unit,
+    onConfirmSponsorSkip: () -> Unit,
+    onDismissSponsorSkip: () -> Unit,
     onPlayNewVideo: (VideoListItem) -> Unit,
     onPlayPrevious: () -> Unit,
     onPlayNext: () -> Unit,
@@ -112,12 +115,14 @@ fun VideoPlayerController(
 
     // 覆盖层可见性
     var showListController by remember { mutableStateOf(false) }
+    var showChapterListController by remember { mutableStateOf(false) }
     var showMenuController by remember { mutableStateOf(false) }
     var showInfoSeekController by remember { mutableStateOf(false) }
     var showRelatedVideosController by remember { mutableStateOf(false) }
     val showClickableControllers by remember {
         derivedStateOf {
             showListController ||
+                showChapterListController ||
                 showMenuController ||
                 showInfoSeekController ||
                 showRelatedVideosController
@@ -258,6 +263,7 @@ fun VideoPlayerController(
 
     fun closeAllControllers() {
         showListController = false
+        showChapterListController = false
         showMenuController = false
         showInfoSeekController = false
         showRelatedVideosController = false
@@ -355,10 +361,11 @@ fun VideoPlayerController(
     ): Boolean =
         when (event.key) {
             Key.Back -> {
-                if (showClickableControllers) {
-                    closeAllControllers()
-                } else {
-                    onExit()
+                when {
+                    // 待确认跳过片段：返回键为"忽略"，不退出播放器/关闭覆盖层
+                    uiState.pendingSponsorSkip != null -> onDismissSponsorSkip()
+                    showClickableControllers -> closeAllControllers()
+                    else -> onExit()
                 }
                 true
             }
@@ -399,10 +406,11 @@ fun VideoPlayerController(
                         showMenuController = true
                     }
                 } else {
-                    if (uiState.showBackToStart) {
-                        onBackToStart()
-                    } else {
-                        onPlay()
+                    when {
+                        uiState.showBackToStart -> onBackToStart()
+                        // 待确认跳过片段：确认键跳过（优先于播放/暂停）
+                        uiState.pendingSponsorSkip != null -> onConfirmSponsorSkip()
+                        else -> onPlay()
                     }
                 }
                 true
@@ -557,6 +565,8 @@ fun VideoPlayerController(
                     position = seekerState.value.currentTime,
                     bufferedPercentage = seekerState.value.bufferedPercentage,
                     isPersistentSeek = true,
+                    segmentMarks = uiState.sponsorBlockMarks,
+                    chapterMarks = uiState.chapterMarks,
                 )
             }
 
@@ -584,6 +594,15 @@ fun VideoPlayerController(
                 showPreviewTip = uiState.showPreviewTip,
                 shortcutTipText = uiState.shortcutTipText,
                 shortcutTipKey = uiState.shortcutTipKey,
+                sponsorBlockTip = uiState.sponsorBlockTip,
+                chapterTip = uiState.chapterTip,
+                // 仅待确认片段时可点击跳过（自动跳过提示为纯展示）
+                onSponsorTipClick =
+                    if (uiState.pendingSponsorSkip != null) {
+                        { onConfirmSponsorSkip() }
+                    } else {
+                        null
+                    },
             )
 
             // 播放状态提示
@@ -614,6 +633,8 @@ fun VideoPlayerController(
                 isSeeking = isSeeking,
                 goTime = goTime,
                 seekerState = seekerState.value,
+                sponsorBlockMarks = uiState.sponsorBlockMarks,
+                chapterMarks = uiState.chapterMarks,
                 title = uiState.title,
                 onlineWatching = uiState.onlineWatching,
                 videoShot = uiState.videoShot,
@@ -638,6 +659,7 @@ fun VideoPlayerController(
                 },
                 onShowSettings = { showMenuController = true },
                 onShowRelatedVideos = { showRelatedVideosController = true },
+                onShowChapters = { showChapterListController = true },
                 onGoToVideoInfo = onGoToVideoDetail,
                 onToggleLoop = {
                     onToggleLoop()
@@ -656,6 +678,18 @@ fun VideoPlayerController(
                 onPlayNewVideo = { item ->
                     onPlayNewVideo(item)
                     showListController = false
+                },
+            )
+
+            // 章节列表
+            ChapterListController(
+                show = showChapterListController,
+                chapterMarks = uiState.chapterMarks,
+                currentTimeMs = seekerState.value.currentTime,
+                onSeekToChapter = { chapter ->
+                    onGoTime(chapter.startMs)
+                    if (uiState.playerState != PlayerState.Playing) onPlay()
+                    showChapterListController = false
                 },
             )
 

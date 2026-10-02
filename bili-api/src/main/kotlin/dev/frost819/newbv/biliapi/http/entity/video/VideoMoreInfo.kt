@@ -35,7 +35,7 @@ import kotlinx.serialization.json.JsonArray
  * @param dmMask
  * @param subtitle
  * @param playerIcon
- * @param viewPoints
+ * @param viewPoints 章节（看点）列表，UP 主手动添加，按分 P 独立
  * @param isUgcPayPreview
  * @param previewToast
  * @param pcdnLoader
@@ -95,7 +95,7 @@ data class VideoMoreInfo(
     @SerialName("player_icon")
     val playerIcon: PlayerIcon? = null,
     @SerialName("view_points")
-    val viewPoints: JsonArray,
+    val viewPoints: List<ViewPoint> = emptyList(),
     @SerialName("is_ugc_pay_preview")
     val isUgcPayPreview: Boolean,
     @SerialName("preview_toast")

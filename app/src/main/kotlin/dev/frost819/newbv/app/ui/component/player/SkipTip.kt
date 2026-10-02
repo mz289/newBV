@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FastForward
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.SettingsRemote
 import androidx.compose.material.icons.outlined.SkipNext
+import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,12 +36,15 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.theme.BVTheme
 
 /**
  * 跳转提示覆盖层。
  *
- * 在播放器左下角显示三种提示（可同时显示多个）：
+ * 在播放器左下角显示提示（可同时显示多个）：
+ * - **SponsorBlock 提示**：片段自动跳过结果或待确认片段（点击可跳过）
+ * - **章节提示**：播放进入新章节时短暂显示章节标题
  * - **试看提示**：视频需付费，当前为试看片段
  * - **跳下集提示**：播放结束，即将播放下一集
  * - **回到开头提示**：从上次播放位置继续，按确认键从头播放
@@ -53,6 +58,9 @@ import dev.frost819.newbv.core.theme.BVTheme
  * @param showPreviewTip 是否显示"试看"提示
  * @param shortcutTipText 最近一次快捷键提示文本，为 null 时不显示
  * @param shortcutTipKey 触发按键的显示名，非空时以键帽图标呈现（P2-4）
+ * @param sponsorBlockTip SponsorBlock 提示文本，为 null 时不显示
+ * @param onSponsorTipClick SponsorBlock 提示点击回调（待确认片段时点击跳过），null 时不可点击
+ * @param chapterTip 章节切换提示文本，为 null 时不显示
  */
 @Composable
 fun SkipTips(
@@ -62,6 +70,9 @@ fun SkipTips(
     showPreviewTip: Boolean,
     shortcutTipText: String? = null,
     shortcutTipKey: String? = null,
+    sponsorBlockTip: String? = null,
+    onSponsorTipClick: (() -> Unit)? = null,
+    chapterTip: String? = null,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -71,6 +82,17 @@ fun SkipTips(
                     .padding(bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            PlayerTip(
+                show = sponsorBlockTip != null,
+                text = sponsorBlockTip.orEmpty(),
+                icon = Icons.Outlined.FastForward,
+                onClick = onSponsorTipClick,
+            )
+            PlayerTip(
+                show = chapterTip != null,
+                text = chapterTip.orEmpty(),
+                icon = Icons.Outlined.VideoLibrary,
+            )
             PlayerTip(
                 show = showPreviewTip,
                 text = "视频需付费，当前为试看片段",
@@ -110,6 +132,7 @@ fun SkipTips(
  * @param text 提示文本
  * @param icon 提示图标
  * @param keyCap 键帽文本（触发按键名），非空时在文本前渲染键帽图标
+ * @param onClick 点击回调（触屏），null 时不可点击
  */
 @Composable
 fun PlayerTip(
@@ -117,6 +140,7 @@ fun PlayerTip(
     text: String,
     icon: ImageVector,
     keyCap: String? = null,
+    onClick: (() -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible = show,
@@ -135,6 +159,7 @@ fun PlayerTip(
             modifier =
                 Modifier
                     .height(IntrinsicSize.Min)
+                    .then(if (onClick != null) Modifier.touchClickable(onClick = { onClick() }) else Modifier)
                     .clip(RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
                     .background(Color.Black.copy(alpha = 0.6f)),
             verticalAlignment = Alignment.CenterVertically,

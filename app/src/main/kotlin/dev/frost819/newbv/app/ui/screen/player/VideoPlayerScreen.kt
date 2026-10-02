@@ -280,6 +280,14 @@ fun VideoPlayerScreen(
         },
         onBackToStart = { playerViewModel.backToStart() },
         onCancelSkipToNextEp = { playerViewModel.cancelPlayNext() },
+        onConfirmSponsorSkip = {
+            logger.info { "[PLAYBACK] sponsorSkip confirm aid=${uiState.aid}" }
+            playerViewModel.confirmSponsorSkip()
+        },
+        onDismissSponsorSkip = {
+            logger.info { "[PLAYBACK] sponsorSkip dismiss aid=${uiState.aid}" }
+            playerViewModel.dismissSponsorSkip()
+        },
         onPlayNewVideo = { item: VideoListItem ->
             logger.info { "[PLAYBACK] switch aid=${item.aid}, cid=${item.cid}" }
             playerViewModel.playNewVideo(item)

@@ -66,6 +66,10 @@ internal object PrefKeys {
     val defaultSubtitleBackgroundOpacity = floatPreferencesKey("dsbo")
     val defaultSubtitleBottomPadding = intPreferencesKey("dsbp")
 
+    // ===== 播放器 - SponsorBlock =====
+    val sponsorBlockEnabled = booleanPreferencesKey("sponsor_block_enabled")
+    val sponsorBlockPolicies = stringPreferencesKey("sponsor_block_policies")
+
     // ===== 播放器 - 界面 =====
     val defaultPlaySpeed = intPreferencesKey("dps")
     val showVideoInfo = booleanPreferencesKey("show_video_info")

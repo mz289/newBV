@@ -8,8 +8,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.VideoInfoRepository
+import dev.frost819.newbv.app.entity.player.ChapterMark
 import dev.frost819.newbv.app.entity.player.VideoAspectRatio
 import dev.frost819.newbv.app.entity.player.VideoListItem
+import dev.frost819.newbv.app.sponsorblock.PendingSponsorSkip
+import dev.frost819.newbv.app.sponsorblock.SponsorBlockApi
+import dev.frost819.newbv.app.sponsorblock.SponsorBlockCategoryStyle
+import dev.frost819.newbv.app.sponsorblock.SponsorSegment
+import dev.frost819.newbv.app.sponsorblock.buildSponsorBlockProgressMarks
 import dev.frost819.newbv.app.ui.action.player.MediaProfileSettingAction
 import dev.frost819.newbv.app.ui.component.settings.displayName
 import dev.frost819.newbv.app.ui.state.player.MediaProfileState
@@ -40,6 +46,7 @@ import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.datastore.Resolution
+import dev.frost819.newbv.data.datastore.SkipPolicy
 import dev.frost819.newbv.data.datastore.VideoCodec
 import dev.frost819.newbv.player.AbstractVideoPlayer
 import dev.frost819.newbv.player.CdnSelector
@@ -89,6 +96,7 @@ private const val ONLINE_WATCH_REFRESH_MS = 60_000L
  * @param coinRepository 视频投币仓库
  * @param favoriteRepository 视频收藏仓库
  * @param oneClickTripleActionRepository 一键三连仓库
+ * @param sponsorBlockApi SponsorBlock 片段查询 API（bsbsb.top 社区服务器）
  * @param exoPlayerFactory ExoPlayer 工厂
  * @param videoCapabilityProvider 设备视频解码能力查询器（选流时过滤超能力组合）
  * @param cdnSelector CDN 测速选择器（开启自动选源时用于排序候选地址）
@@ -106,6 +114,7 @@ class PlayerViewModel
         private val coinRepository: CoinRepository,
         private val favoriteRepository: FavoriteRepository,
         private val oneClickTripleActionRepository: OneClickTripleActionRepository,
+        private val sponsorBlockApi: SponsorBlockApi,
         private val cdnSelector: CdnSelector,
     ) : ViewModel() {
         private val logger = Loggers.get("PlayerViewModel")
@@ -166,6 +175,23 @@ class PlayerViewModel
         private var shortcutTipJob: Job? = null
         private var previewTipCountdownJob: Job? = null
         private var onlineWatchJob: Job? = null
+        private var sponsorBlockTipJob: Job? = null
+        private var chapterLoadJob: Job? = null
+        private var chapterTipJob: Job? = null
+
+        /** 当前所在章节下标（-1 表示不在任何章节内），用于章节切换检测。 */
+        private var currentChapterIndex = -1
+
+        // ===== SponsorBlock =====
+
+        /** 当前视频的社区片段（bsbsb.top，按 BVID 查询）。 */
+        private var sponsorSegments: List<SponsorSegment> = emptyList()
+
+        /** 本次播放已处理（自动跳过/确认跳过）的片段，不再重复触发。 */
+        private val handledSponsorSegmentIds = mutableSetOf<String>()
+
+        /** 用户按返回键忽略的片段；移出片段区间后恢复，再次进入会重新提示。 */
+        private val dismissedSponsorSegmentIds = mutableSetOf<String>()
 
         /**
          * 切换视频事件。
@@ -277,6 +303,12 @@ class PlayerViewModel
 
             // 同时观看人数观察者：监听 cid 变化即时拉取，就绪后周期刷新
             startOnlineWatchingObserver()
+
+            // SponsorBlock 片段观察者：详情就绪（拿到 BVID）后拉取片段
+            startSponsorBlockObserver()
+
+            // 章节观察者：cid 就绪后拉取该分 P 的章节看点
+            startChapterObserver()
         }
 
         /**
@@ -408,6 +440,259 @@ class PlayerViewModel
         private fun stopOnlineWatchingPolling() {
             onlineWatchJob?.cancel()
             onlineWatchJob = null
+        }
+
+        // ===== SponsorBlock（片段跳过） =====
+
+        /**
+         * 启动 SponsorBlock 片段观察者（[init] 时启动，随播放器会话存续）。
+         *
+         * 响应式监听视频详情的 BVID 变化：详情就绪（拿到 BVID）后拉取社区片段并
+         * 更新进度条色块。切集时详情重载会触发重新拉取；直进播放器时详情在
+         * [loadVideoDetail] 完成后才就绪，同样能覆盖。
+         *
+         * 详情归属校验（详情 aid 与当前 aid 一致）防止切集瞬间
+         * 旧详情的 BVID 拉出新视频的片段。
+         */
+        private fun startSponsorBlockObserver() {
+            viewModelScope.launch {
+                videoInfoRepository.videoDetail
+                    .map { detail ->
+                        val state = _uiState.value
+                        detail
+                            ?.bvid
+                            .orEmpty()
+                            .takeIf { bvid ->
+                                bvid.isNotEmpty() &&
+                                    !state.isExternalMedia &&
+                                    state.aid > 0L &&
+                                    detail?.aid == state.aid
+                            }.orEmpty()
+                    }.distinctUntilChanged()
+                    .collectLatest { bvid ->
+                        // 片段状态随视频重置
+                        handledSponsorSegmentIds.clear()
+                        dismissedSponsorSegmentIds.clear()
+                        _uiState.update { it.copy(pendingSponsorSkip = null, sponsorBlockTip = null) }
+
+                        sponsorSegments = loadSponsorSegments(bvid)
+                        _uiState.update {
+                            it.copy(sponsorBlockMarks = buildSponsorBlockProgressMarks(sponsorSegments))
+                        }
+                        if (sponsorSegments.isNotEmpty()) {
+                            logger.info { "SponsorBlock loaded ${sponsorSegments.size} segments for $bvid" }
+                        }
+                    }
+            }
+        }
+
+        /**
+         * 拉取当前视频的社区片段。
+         *
+         * 总开关关闭或 BVID 缺失（番剧等）时返回空列表；
+         * 网络失败由 API 层兜底为空列表，绝不影响播放。
+         *
+         * @param bvid 视频 BV 号，空串表示不查询
+         */
+        private suspend fun loadSponsorSegments(bvid: String): List<SponsorSegment> {
+            if (!Prefs.sponsorBlockEnabled || bvid.isEmpty()) return emptyList()
+            return runCatching {
+                withTimeout(PLAYER_ACTION_TIMEOUT_MS) { sponsorBlockApi.getSegments(bvid) }
+            }.onFailure { error ->
+                error.rethrowUnlessTimeout()
+                logger.warn { "Failed to load sponsor segments: $error" }
+            }.getOrDefault(emptyList())
+        }
+
+        /**
+         * 检测当前播放位置是否落入需处理的片段（seeker 更新循环内每 100ms 调用）。
+         *
+         * - 待确认片段：离开片段窗口后自动清除提示
+         * - 策略为自动跳过：seek 到片段结束并短暂提示
+         * - 策略为手动确认：显示提示，等待确认键/返回键
+         *
+         * 仅在播放中检测（暂停/缓冲/出错/结束时不动），且位置超过
+         * [PlayerConstants.SPONSOR_BLOCK_MIN_ACTIVATION_MS] 才激活，
+         * 避免起播瞬间误触发。
+         */
+        private fun checkSponsorBlockSegments() {
+            if (!Prefs.sponsorBlockEnabled || sponsorSegments.isEmpty()) return
+            val player = videoPlayer ?: return
+            val state = _uiState.value
+            if (state.isExternalMedia || state.playerState != PlayerState.Playing) return
+            val positionMs = player.currentPosition.coerceAtLeast(0L)
+
+            // 已忽略的片段移出区间后恢复可提示状态
+            dismissedSponsorSegmentIds.removeAll { id ->
+                sponsorSegments.firstOrNull { it.id == id }?.contains(positionMs) != true
+            }
+
+            state.pendingSponsorSkip?.let { pending ->
+                if (positionMs !in pending.startPositionMs..<pending.targetPositionMs) {
+                    _uiState.update { it.copy(pendingSponsorSkip = null, sponsorBlockTip = null) }
+                }
+                return
+            }
+
+            if (positionMs < PlayerConstants.SPONSOR_BLOCK_MIN_ACTIVATION_MS) return
+
+            val segment =
+                sponsorSegments.firstOrNull {
+                    it.contains(positionMs) &&
+                        it.id !in handledSponsorSegmentIds &&
+                        it.id !in dismissedSponsorSegmentIds
+                } ?: return
+
+            when (Prefs.sponsorBlockPolicy(segment.category)) {
+                SkipPolicy.Auto -> {
+                    handledSponsorSegmentIds += segment.id
+                    logger.info {
+                        "SponsorBlock auto skip ${segment.category} " +
+                            "[${segment.startMs}-${segment.endMs}] at $positionMs"
+                    }
+                    seekToTime(segment.endMs)
+                    showSponsorBlockTip("已跳过${SponsorBlockCategoryStyle.displayName(segment.category)}片段")
+                }
+
+                SkipPolicy.Prompt -> {
+                    _uiState.update {
+                        it.copy(
+                            pendingSponsorSkip =
+                                PendingSponsorSkip(
+                                    segmentId = segment.id,
+                                    startPositionMs = segment.startMs,
+                                    targetPositionMs = segment.endMs,
+                                    category = segment.category,
+                                ),
+                            sponsorBlockTip =
+                                "发现${SponsorBlockCategoryStyle.displayName(segment.category)}片段，按 OK 键跳过",
+                        )
+                    }
+                }
+
+                SkipPolicy.Disabled -> Unit
+            }
+        }
+
+        /**
+         * 显示 SponsorBlock 提示并自动消退；新提示覆盖旧提示并重新计时。
+         */
+        private fun showSponsorBlockTip(text: String) {
+            sponsorBlockTipJob?.cancel()
+            _uiState.update { it.copy(sponsorBlockTip = text, pendingSponsorSkip = null) }
+            sponsorBlockTipJob =
+                viewModelScope.launch {
+                    delay(PlayerConstants.SPONSOR_BLOCK_TIP_DURATION_MS)
+                    _uiState.update { it.copy(sponsorBlockTip = null) }
+                }
+        }
+
+        /** 确认跳过当前待确认片段（确认键触发；无待确认片段时为空操作）。 */
+        fun confirmSponsorSkip() {
+            val pending = _uiState.value.pendingSponsorSkip ?: return
+            handledSponsorSegmentIds += pending.segmentId
+            logger.info { "SponsorBlock manual skip ${pending.category} to ${pending.targetPositionMs}" }
+            seekToTime(pending.targetPositionMs)
+            showSponsorBlockTip("已跳过片段")
+        }
+
+        /** 忽略当前待确认片段（返回键触发）；再次进入片段会重新提示。 */
+        fun dismissSponsorSkip() {
+            val pending = _uiState.value.pendingSponsorSkip ?: return
+            dismissedSponsorSegmentIds += pending.segmentId
+            _uiState.update { it.copy(pendingSponsorSkip = null, sponsorBlockTip = null) }
+        }
+
+        // ===== 章节（view_points 看点） =====
+
+        /**
+         * 启动章节观察者（[init] 时启动，随播放器会话存续）。
+         *
+         * 响应式监听 uiState 的 cid 变化：cid 就绪（直进时详情返回、init 携带有效
+         * cid、播放器内切集/切 P）时拉取该分 P 的章节列表。
+         * [collectLatest] 保证切换瞬间取消旧 cid 的在途请求。
+         * 请求失败静默兜底为空列表，绝不影响播放。
+         */
+        private fun startChapterObserver() {
+            chapterLoadJob?.cancel()
+            chapterLoadJob =
+                viewModelScope.launch {
+                    _uiState
+                        .map { it.cid }
+                        .filter { it > 0L }
+                        .distinctUntilChanged()
+                        .collectLatest { cid ->
+                            val state = _uiState.value
+                            // 章节状态随视频/分 P 重置
+                            currentChapterIndex = -1
+                            _uiState.update { it.copy(chapterMarks = emptyList(), chapterTip = null) }
+                            if (state.isExternalMedia || state.aid <= 0L) return@collectLatest
+                            val marks = loadChapterMarks(state.aid, cid)
+                            _uiState.update { it.copy(chapterMarks = marks) }
+                            if (marks.isNotEmpty()) {
+                                logger.info { "Chapters loaded ${marks.size} for cid=$cid" }
+                            }
+                        }
+                }
+        }
+
+        /**
+         * 拉取章节列表并换算为毫秒标记。
+         *
+         * @param aid 视频 AV 号
+         * @param cid 视频 CID（章节按分 P 独立）
+         */
+        private suspend fun loadChapterMarks(
+            aid: Long,
+            cid: Long,
+        ): List<ChapterMark> =
+            runCatching {
+                withTimeout(PLAYER_ACTION_TIMEOUT_MS) {
+                    videoPlayRepository
+                        .getViewPoints(aid, cid)
+                        .map { point ->
+                            ChapterMark(
+                                startMs = (point.from * 1000).toLong(),
+                                endMs = (point.to * 1000).toLong(),
+                                title = point.content,
+                            )
+                        }.sortedBy { it.startMs }
+                }
+            }.onFailure { error ->
+                error.rethrowUnlessTimeout()
+                logger.warn { "Failed to load chapters: $error" }
+            }.getOrDefault(emptyList())
+
+        /**
+         * 检测当前播放位置所在章节（seeker 更新循环内每 100ms 调用）。
+         *
+         * 章节切换且正在播放时短暂提示新章节标题；暂停/缓冲/出错/结束时不动。
+         */
+        private fun checkCurrentChapter() {
+            val marks = _uiState.value.chapterMarks
+            if (marks.isEmpty()) return
+            val player = videoPlayer ?: return
+            val state = _uiState.value
+            if (state.isExternalMedia || state.playerState != PlayerState.Playing) return
+            val positionMs = player.currentPosition.coerceAtLeast(0L)
+
+            val index = marks.indexOfFirst { positionMs in it }
+            if (index == currentChapterIndex) return
+            currentChapterIndex = index
+            if (index >= 0) {
+                showChapterTip("章节：${marks[index].title}")
+            }
+        }
+
+        /** 显示章节提示并自动消退；新提示覆盖旧提示并重新计时。 */
+        private fun showChapterTip(text: String) {
+            chapterTipJob?.cancel()
+            _uiState.update { it.copy(chapterTip = text) }
+            chapterTipJob =
+                viewModelScope.launch {
+                    delay(PlayerConstants.CHAPTER_TIP_DURATION_MS)
+                    _uiState.update { it.copy(chapterTip = null) }
+                }
         }
 
         /**
@@ -664,6 +949,9 @@ class PlayerViewModel
          * 循环模式回到开头，否则根据 [Prefs.actionAfterPlay] 决定后续动作。
          */
         fun onPlaybackEnded() {
+            // 重播/切集时允许片段重新触发（循环回到开头需要再次跳过）
+            handledSponsorSegmentIds.clear()
+            dismissedSponsorSegmentIds.clear()
             if (_uiState.value.isLooping) {
                 backToStart()
             } else {
@@ -728,6 +1016,10 @@ class PlayerViewModel
             playData = null
             stopSeekerUpdater()
             stopDebugInfoUpdater()
+            handledSponsorSegmentIds.clear()
+            dismissedSponsorSegmentIds.clear()
+            sponsorBlockTipJob?.cancel()
+            chapterTipJob?.cancel()
 
             _uiState.update {
                 it.copy(
@@ -748,6 +1040,10 @@ class PlayerViewModel
                     showBackToStart = false,
                     shortcutTipText = null,
                     shortcutTipKey = null,
+                    pendingSponsorSkip = null,
+                    sponsorBlockTip = null,
+                    chapterMarks = emptyList(),
+                    chapterTip = null,
                     mediaProfileState =
                         MediaProfileState(
                             qualityId = Prefs.defaultQuality.code,
@@ -1307,6 +1603,8 @@ class PlayerViewModel
                 viewModelScope.launch(Dispatchers.Main) {
                     while (isActive) {
                         updateSeekerState()
+                        checkSponsorBlockSegments()
+                        checkCurrentChapter()
                         delay(PlayerConstants.SEEKER_UPDATE_INTERVAL_MS)
                     }
                 }

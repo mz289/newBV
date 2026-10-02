@@ -362,6 +362,27 @@ object Prefs {
     /** 默认字幕底部边距（DP）。 */
     var defaultSubtitleBottomPadding by pref(PrefKeys.defaultSubtitleBottomPadding, 12)
 
+    // --- 播放器 - SponsorBlock ---
+
+    /**
+     * 是否启用 SponsorBlock 片段跳过（默认关闭）。
+     *
+     * 开启后播放时会向 bsbsb.top 社区服务器查询当前视频的
+     * 推广/片头片尾等片段并按分类策略跳过。
+     */
+    var sponsorBlockEnabled by pref(PrefKeys.sponsorBlockEnabled, false)
+
+    /** 各分类的跳过策略（键为 [SponsorBlockDefaults.supportedCategories] 中的分类名）。 */
+    var sponsorBlockPolicies by pref(
+        PrefKeys.sponsorBlockPolicies,
+        SponsorBlockDefaults.policies,
+        save = SponsorBlockDefaults::encode,
+        restore = SponsorBlockDefaults::parse,
+    )
+
+    /** 读取指定分类的跳过策略；未知分类按不跳过处理。 */
+    fun sponsorBlockPolicy(category: String): SkipPolicy = sponsorBlockPolicies[category] ?: SkipPolicy.Disabled
+
     // --- 播放器 - 界面（PRD 7.1/7.2） ---
 
     /** 默认播放速度。 */
@@ -495,8 +516,7 @@ object Prefs {
             ?.map {
                 (it as? Int ?: VIDEO_CARD_WIDTH_DEFAULT)
                     .coerceIn(VIDEO_CARD_WIDTH_MIN, VIDEO_CARD_WIDTH_MAX)
-            }
-            ?.stateIn(scope, SharingStarted.Eagerly, VIDEO_CARD_WIDTH_DEFAULT)
+            }?.stateIn(scope, SharingStarted.Eagerly, VIDEO_CARD_WIDTH_DEFAULT)
             ?: MutableStateFlow(VIDEO_CARD_WIDTH_DEFAULT)
     }
 

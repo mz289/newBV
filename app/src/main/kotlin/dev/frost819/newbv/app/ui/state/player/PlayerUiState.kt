@@ -1,6 +1,9 @@
 package dev.frost819.newbv.app.ui.state.player
 
+import dev.frost819.newbv.app.entity.player.ChapterMark
+import dev.frost819.newbv.app.entity.player.ProgressSegmentMark
 import dev.frost819.newbv.app.entity.player.VideoAspectRatio
+import dev.frost819.newbv.app.sponsorblock.PendingSponsorSkip
 import dev.frost819.newbv.biliapi.entity.video.VideoShot
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.VideoCodec
@@ -36,6 +39,18 @@ data class PlayerUiState(
     val showPreviewTip: Boolean = false,
     val shortcutTipText: String? = null,
     val shortcutTipKey: String? = null,
+    // SponsorBlock
+    /** 进度条上的片段色块（仅策略非"不跳过"的片段）。 */
+    val sponsorBlockMarks: List<ProgressSegmentMark> = emptyList(),
+    /** SponsorBlock 提示（自动跳过结果或待确认片段），null 时不显示。 */
+    val sponsorBlockTip: String? = null,
+    /** 等待用户确认跳过的片段，非 null 时确认键跳过、返回键忽略。 */
+    val pendingSponsorSkip: PendingSponsorSkip? = null,
+    // 章节看点
+    /** 章节（view_points 看点）标记，按开始时间升序，无章节时为空。 */
+    val chapterMarks: List<ChapterMark> = emptyList(),
+    /** 章节切换提示文本，null 时不显示。 */
+    val chapterTip: String? = null,
     // 可用资源
     val availableQuality: Map<Int, String> = emptyMap(),
     val availableVideoCodec: List<VideoCodec> = emptyList(),
