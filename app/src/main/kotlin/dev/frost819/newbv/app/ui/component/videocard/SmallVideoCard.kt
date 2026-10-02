@@ -511,20 +511,25 @@ private fun CardInfo(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_up),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(14.dp),
-            )
-            Text(
-                modifier = Modifier.weight(1f),
-                text = upName,
-                style = labelStyle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // UP 主名可为空（如追番卡片以时间槽位展示进度文案），为空时连同图标一起隐藏
+            if (upName.isNotBlank()) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_up),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text = upName,
+                    style = labelStyle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
             Text(
                 text = pubTime ?: "",
                 style = labelStyle,

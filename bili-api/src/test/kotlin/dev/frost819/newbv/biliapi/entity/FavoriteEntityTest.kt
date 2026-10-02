@@ -131,6 +131,8 @@ class FavoriteEntityTest {
         assertThat(result.link).isEqualTo("http://link.test/555")
         assertThat(result.pubtime).isEqualTo(1000L)
         assertThat(result.bvid).isEqualTo("BV555")
+        assertThat(result.play).isEqualTo(4321)
+        assertThat(result.danmaku).isEqualTo(87)
     }
 
     @Test
@@ -261,7 +263,7 @@ class FavoriteEntityTest {
         attr = 0,
         cntInfo =
             dev.frost819.newbv.biliapi.http.entity.user.favorite
-                .CntInfo(collect = 0, play = 0),
+                .CntInfo(collect = 0, play = 4321, danmaku = 87),
         link = "http://link.test/$id",
         ctime = 0,
         pubtime = 1000L,

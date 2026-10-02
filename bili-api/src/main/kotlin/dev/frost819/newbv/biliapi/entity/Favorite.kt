@@ -103,6 +103,10 @@ data class FavoriteItem(
     val link: String,
     val pubtime: Long,
     val bvid: String,
+    /** 播放数（cnt_info.play）。 */
+    val play: Int = -1,
+    /** 弹幕数（cnt_info.danmaku）。 */
+    val danmaku: Int = -1,
 ) {
     companion object {
         fun fromHttpFavoriteItem(
@@ -120,6 +124,8 @@ data class FavoriteItem(
                 link = httpFavoriteItem.link,
                 pubtime = httpFavoriteItem.pubtime,
                 bvid = httpFavoriteItem.bvid,
+                play = httpFavoriteItem.cntInfo.play,
+                danmaku = httpFavoriteItem.cntInfo.danmaku,
             )
     }
 }

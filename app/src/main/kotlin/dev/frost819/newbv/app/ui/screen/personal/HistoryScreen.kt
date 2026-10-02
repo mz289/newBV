@@ -29,6 +29,7 @@ import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
 import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
 import dev.frost819.newbv.app.ui.navigation.navigateFromVideoCard
 import dev.frost819.newbv.app.util.formatHourMinSec
+import dev.frost819.newbv.app.util.toWanString
 import dev.frost819.newbv.app.viewmodel.common.CollectWatchLaterEffects
 import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
 import dev.frost819.newbv.app.viewmodel.personal.PersonalViewModel
@@ -113,7 +114,7 @@ fun HistoryScreen(
                         epid = item.epid,
                         title = item.title,
                         cover = item.cover,
-                        playString = "",
+                        playString = item.play.toWanString(),
                         danmakuString = "",
                         timeString = timeString,
                         upName = item.author,
