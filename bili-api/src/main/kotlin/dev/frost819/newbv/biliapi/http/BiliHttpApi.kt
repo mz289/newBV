@@ -39,7 +39,9 @@ import dev.frost819.newbv.biliapi.http.entity.user.RelationStat
 import dev.frost819.newbv.biliapi.http.entity.user.UserFollowData
 import dev.frost819.newbv.biliapi.http.entity.user.UserInfoData
 import dev.frost819.newbv.biliapi.http.entity.user.WebSpaceVideoData
+import dev.frost819.newbv.biliapi.http.entity.user.favorite.CollectedFavoriteFoldersData
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteFolderInfoListData
+import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavSeasonContentData
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.UserFavoriteFoldersData
 import dev.frost819.newbv.biliapi.http.entity.video.AddCoin
 import dev.frost819.newbv.biliapi.http.entity.video.CheckSentCoin
@@ -602,6 +604,52 @@ object BiliHttpApi {
                 parameter("pn", pageNumber)
                 parameter("platform", platform)
                 accessKey?.let { parameter("access_key", it) }
+            }.body()
+
+    /**
+     * 获取当前用户[mid]订阅（收藏）的收藏夹/合集列表
+     *
+     * 鉴权：Cookie（injectCookies）；需登录。
+     * 条目 type 为 11（收藏夹）时内容用 [getFavoriteList] 查询，
+     * 为 21（合集）时内容用 [getFavSeasonContent] 查询。
+     *
+     * @param pageSize 每页数量
+     * @param pageNumber 页码 默认为1
+     */
+    suspend fun getCollectedFavoriteFolders(
+        mid: Long,
+        pageSize: Int = 20,
+        pageNumber: Int = 1,
+    ): BiliResponse<CollectedFavoriteFoldersData> =
+        client
+            .get("/x/v3/fav/folder/collected/list") {
+                checkToken(null)
+                parameter("up_mid", mid)
+                parameter("platform", "web")
+                parameter("ps", pageSize)
+                parameter("pn", pageNumber)
+            }.body()
+
+    /**
+     * 获取订阅的合集[seasonId]内容列表
+     *
+     * 鉴权：Cookie（injectCookies）；需登录。
+     *
+     * @param pageSize 每页数量
+     * @param pageNumber 页码 默认为1
+     */
+    suspend fun getFavSeasonContent(
+        seasonId: Long,
+        pageSize: Int = 20,
+        pageNumber: Int = 1,
+    ): BiliResponse<FavSeasonContentData> =
+        client
+            .get("/x/space/fav/season/list") {
+                checkToken(null)
+                parameter("season_id", seasonId)
+                parameter("platform", "web")
+                parameter("ps", pageSize)
+                parameter("pn", pageNumber)
             }.body()
 
     /**

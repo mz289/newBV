@@ -230,6 +230,7 @@ enum class PersonalTopNavItem {
     History,
     Favorite,
     FollowingSeason,
+    Subscription,
     ;
 
     companion object {
