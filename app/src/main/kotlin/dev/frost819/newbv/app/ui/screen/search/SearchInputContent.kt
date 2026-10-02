@@ -75,8 +75,11 @@ fun SearchInputContent(
         modifier =
             modifier
                 .fillMaxSize()
-                .padding(start = 24.dp, top = 24.dp, end = 24.dp)
-                .horizontalScroll(rememberScrollState()),
+                .padding(top = 24.dp)
+                .horizontalScroll(rememberScrollState())
+                // 水平留白放在滚动视口内：内容恰好占满视口时（如 1080p TV），
+                // 搜索历史列的删除按钮仍距视口右缘 24dp，聚焦外描边不会被视口裁切。
+                .padding(start = 24.dp, end = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         // 列 1：搜索框 + 软键盘
@@ -304,7 +307,8 @@ private fun SearchHistoryColumn(
                 text = "搜索历史",
                 style = MaterialTheme.typography.titleLarge,
             )
-            Row {
+            // 按钮间留 4dp：聚焦外描边向外扩 2dp，紧贴时会被相邻按钮背景遮挡。
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (deleteMode && histories.isNotEmpty()) {
                     IconButton(
                         modifier = Modifier.touchClickable(onClick = onDeleteAll),
