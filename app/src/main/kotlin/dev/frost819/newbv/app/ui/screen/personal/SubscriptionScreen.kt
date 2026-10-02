@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,12 +24,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.tv.material3.ClickableSurfaceDefaults
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
@@ -65,7 +61,7 @@ private val folderCoverShape = RoundedCornerShape(8.dp)
  * 订阅页面（我的订阅：订阅的收藏夹与合集）。
  *
  * 默认展示订阅夹网格；点进订阅夹后展示其中视频，
- * 顶部出现返回胶囊，系统返回键同样回到订阅夹列表。
+ * 系统返回键回到订阅夹列表。
  *
  * @param viewModel 个人页 ViewModel。
  * @param navController 导航控制器。
@@ -139,21 +135,12 @@ fun SubscriptionScreen(
         verticalArrangement = Arrangement.spacedBy(videoGridVSpacing()),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (currentFolder != null) {
-                    SubscriptionBackChip(onClick = viewModel::exitSubscriptionFolder)
-                }
-                Text(
-                    text = currentFolder?.title ?: "我的订阅",
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Text(
+                text = currentFolder?.title ?: "我的订阅",
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
 
         if (currentFolder == null) {
@@ -294,46 +281,3 @@ private fun folderSubtitle(folder: CollectedFavoriteFolder): String =
         CollectedFavoriteType.Season -> "${folder.upper.name} · ${folder.mediaCount} 个内容 · 合集"
         CollectedFavoriteType.Folder -> "${folder.upper.name} · ${folder.mediaCount} 个内容 · 收藏夹"
     }
-
-/** 内容列表左上角的返回胶囊。 */
-@Composable
-private fun SubscriptionBackChip(
-    onClick: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.touchClickable(onClick = onClick),
-        shape =
-            ClickableSurfaceDefaults.shape(
-                shape = RoundedCornerShape(50),
-            ),
-        border =
-            ClickableSurfaceDefaults.border(
-                focusedBorder = outerFocusBorder(50.dp),
-            ),
-        scale =
-            ClickableSurfaceDefaults.scale(
-                focusedScale = 1f,
-            ),
-        colors =
-            ControlFocusDefaults.surfaceColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = null,
-            )
-            Text(
-                text = "返回",
-                style = MaterialTheme.typography.labelLarge,
-            )
-        }
-    }
-}
