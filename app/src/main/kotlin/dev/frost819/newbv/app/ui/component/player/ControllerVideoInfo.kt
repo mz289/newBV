@@ -104,7 +104,7 @@ import kotlinx.coroutines.delay
  * @param onDanmakuSwitchChange 弹幕开关回调
  * @param onShowSettings 打开设置回调
  * @param onShowRelatedVideos 打开相关视频回调
- * @param onShowChapters 打开章节列表回调
+ * @param onShowChapters 打开章节列表回调（章节入口按钮点击，或焦点在按钮行时按下键）
  * @param onGoToVideoInfo 跳转视频详情回调
  * @param onToggleLoop 切换循环回调
  * @param onGoToUpPage 跳转 UP 主页面回调
@@ -522,12 +522,23 @@ fun ControllerVideoInfoBottom(
                     .horizontalScroll(rememberScrollState())
                     .focusRequester(buttonsFocusRequester)
                     .onKeyEvent {
-                        if (it.key == Key.DirectionUp) {
-                            if (it.type == KeyEventType.KeyUp) return@onKeyEvent true
-                            seekFocusRequester.requestFocus()
-                            return@onKeyEvent true
+                        when (it.key) {
+                            Key.DirectionUp -> {
+                                if (it.type == KeyEventType.KeyUp) return@onKeyEvent true
+                                seekFocusRequester.requestFocus()
+                                true
+                            }
+
+                            Key.DirectionDown -> {
+                                if (it.type == KeyEventType.KeyUp) return@onKeyEvent true
+                                // 焦点已在按钮行时再按下键：有章节看点则打开章节列表，
+                                // 无章节时返回 false 走默认焦点搜索（保持原行为）
+                                if (chapterMarks.isNotEmpty()) onShowChapters()
+                                chapterMarks.isNotEmpty()
+                            }
+
+                            else -> false
                         }
-                        false
                     }.padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.Start),
         ) {
