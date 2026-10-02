@@ -377,7 +377,7 @@ fun VideoPlayerScreen(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .alpha(if (danmakuState.enabledTypes.isNotEmpty()) danmakuState.alpha else 0f)
+                            .alpha(if (danmakuState.enabled) danmakuState.alpha else 0f)
                             .danmakuMask(
                                 frame = currentDanmakuMaskFrame,
                                 aspectRatio = aspectRatio,

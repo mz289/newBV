@@ -27,7 +27,6 @@ import dev.frost819.newbv.app.viewmodel.live.LivePlayerState
 import dev.frost819.newbv.app.viewmodel.player.DanmakuViewModel
 import dev.frost819.newbv.app.viewmodel.player.PlayerViewModel
 import dev.frost819.newbv.app.viewmodel.player.SubtitleViewModel
-import dev.frost819.newbv.danmaku.entity.DanmakuType
 
 /**
  * 视频播放器页面注册。
@@ -216,21 +215,14 @@ fun NavGraphBuilder.livePlayerScreen(navController: NavController) {
 }
 
 /**
- * 应用投屏指定的弹幕开关（临时生效，不写入用户默认设置）。
+ * 应用投屏指定的弹幕开关（临时生效，不写入用户默认设置；不改动各类型勾选）。
  */
 private fun applyCastDanmakuState(
     danmakuViewModel: DanmakuViewModel,
     enabled: Boolean,
 ) {
-    val current = danmakuViewModel.danmakuState.value.enabledTypes
-    val target =
-        when {
-            enabled && current.isEmpty() -> DanmakuType.entries.toList()
-            !enabled && current.isNotEmpty() -> emptyList()
-            else -> return
-        }
     danmakuViewModel.updateDanmakuState(
-        DanmakuSettingAction.SetEnabledTypes(types = target, persist = false),
+        DanmakuSettingAction.SetEnabled(enabled = enabled, persist = false),
     )
 }
 

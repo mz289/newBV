@@ -55,6 +55,7 @@ class DanmakuViewModelTest {
         every { Prefs.defaultDanmakuArea } returns 0.5f
         every { Prefs.defaultDanmakuSpeedFactor } returns 1f
         every { Prefs.defaultDanmakuMask } returns false
+        every { Prefs.defaultDanmakuEnabled } returns true
         every { Prefs.defaultDanmakuTypes } returns
             listOf(
                 DataDanmakuType.All,
@@ -67,6 +68,7 @@ class DanmakuViewModelTest {
         every { Prefs.defaultDanmakuArea = any() } answers {}
         every { Prefs.defaultDanmakuSpeedFactor = any() } answers {}
         every { Prefs.defaultDanmakuMask = any() } answers {}
+        every { Prefs.defaultDanmakuEnabled = any() } answers {}
         every { Prefs.defaultDanmakuTypes = any() } answers {}
         every { Prefs.apiType } returns ApiType.Web
 
@@ -83,6 +85,7 @@ class DanmakuViewModelTest {
     @Test
     fun `initial danmakuState has default values`() {
         val state = viewModel.danmakuState.value
+        assertThat(state.enabled).isTrue()
         assertThat(state.scale).isEqualTo(1.75f)
         assertThat(state.opacity).isEqualTo(0.7f)
         assertThat(state.area).isEqualTo(0.5f)
@@ -146,29 +149,34 @@ class DanmakuViewModelTest {
         }
 
     @Test
-    fun `toggleDanmaku clears enabledTypes when they are non-empty`() =
+    fun `toggleDanmaku flips enabled and preserves enabledTypes`() =
         runTest(testDispatcher) {
-            viewModel.updateDanmakuState(
-                DanmakuSettingAction.SetEnabledTypes(listOf(DanmakuType.Rolling, DanmakuType.Top, DanmakuType.Bottom)),
-            )
+            // 回归：总开关不应改动各类型勾选（如仅开顶部弹幕），否则用户设置丢失
+            val types = listOf(DanmakuType.Top, DanmakuType.Bottom)
+            viewModel.updateDanmakuState(DanmakuSettingAction.SetEnabledTypes(types))
             advanceUntilIdle()
-            assertThat(viewModel.danmakuState.value.enabledTypes).isNotEmpty()
 
             viewModel.toggleDanmaku()
             advanceUntilIdle()
-            assertThat(viewModel.danmakuState.value.enabledTypes).isEmpty()
+            assertThat(viewModel.danmakuState.value.enabled).isFalse()
+            assertThat(viewModel.danmakuState.value.enabledTypes).containsExactlyElementsIn(types)
+
+            viewModel.toggleDanmaku()
+            advanceUntilIdle()
+            assertThat(viewModel.danmakuState.value.enabled).isTrue()
+            assertThat(viewModel.danmakuState.value.enabledTypes).containsExactlyElementsIn(types)
         }
 
     @Test
-    fun `toggleDanmaku re-enables default types when enabledTypes is empty`() =
+    fun `updateDanmakuState SetEnabled updates enabled`() =
         runTest(testDispatcher) {
-            viewModel.updateDanmakuState(DanmakuSettingAction.SetEnabledTypes(emptyList()))
+            viewModel.updateDanmakuState(DanmakuSettingAction.SetEnabled(false))
             advanceUntilIdle()
-            assertThat(viewModel.danmakuState.value.enabledTypes).isEmpty()
+            assertThat(viewModel.danmakuState.value.enabled).isFalse()
 
-            viewModel.toggleDanmaku()
+            viewModel.updateDanmakuState(DanmakuSettingAction.SetEnabled(true))
             advanceUntilIdle()
-            assertThat(viewModel.danmakuState.value.enabledTypes).isNotEmpty()
+            assertThat(viewModel.danmakuState.value.enabled).isTrue()
         }
 
     @Test
@@ -234,6 +242,39 @@ class DanmakuViewModelTest {
             advanceUntilIdle()
 
             verify { Prefs.defaultDanmakuTypes = any() }
+        }
+
+    @Test
+    fun `updateDanmakuState SetEnabled persists to Prefs`() =
+        runTest(testDispatcher) {
+            viewModel.updateDanmakuState(DanmakuSettingAction.SetEnabled(false))
+            advanceUntilIdle()
+
+            verify { Prefs.defaultDanmakuEnabled = false }
+        }
+
+    @Test
+    fun `updateDanmakuState SetEnabled with persist false skips Prefs`() =
+        runTest(testDispatcher) {
+            // 投屏等临时开关不覆盖用户默认设置
+            viewModel.updateDanmakuState(DanmakuSettingAction.SetEnabled(enabled = false, persist = false))
+            advanceUntilIdle()
+
+            assertThat(viewModel.danmakuState.value.enabled).isFalse()
+            verify(exactly = 0) { Prefs.defaultDanmakuEnabled = any() }
+        }
+
+    @Test
+    fun `legacy empty persisted types migrates to disabled master switch with all types`() =
+        runTest(testDispatcher) {
+            // 旧版本把总开关关闭持久化为空类型列表；升级后应还原类型勾选而不是丢失
+            every { Prefs.defaultDanmakuTypes } returns emptyList()
+            every { Prefs.defaultDanmakuEnabled } returns true
+            val migrated = DanmakuViewModel(videoPlayRepository)
+
+            val state = migrated.danmakuState.value
+            assertThat(state.enabled).isFalse()
+            assertThat(state.enabledTypes).containsExactlyElementsIn(DanmakuType.entries)
         }
 
     // === 分段加载 ===

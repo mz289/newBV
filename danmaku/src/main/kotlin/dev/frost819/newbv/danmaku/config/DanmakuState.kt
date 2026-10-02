@@ -6,6 +6,7 @@ import dev.frost819.newbv.danmaku.entity.DanmakuType
  * 弹幕状态数据类。
  *
  * 包含弹幕播放时的所有配置参数：
+ * - [enabled] 弹幕总开关（默认 true）；关闭不影响 [enabledTypes] 的各类型勾选
  * - [scale] 字体缩放（默认 1.0）
  * - [opacity] 透明度（0.0-1.0，默认 0.7）
  * - [area] 滚动弹幕显示区域比例（0.0-1.0，默认 0.5 = 下半屏）
@@ -14,6 +15,7 @@ import dev.frost819.newbv.danmaku.entity.DanmakuType
  * - [enabledTypes] 启用的弹幕类型列表（默认包含 Rolling + Top + Bottom）
  */
 data class DanmakuState(
+    val enabled: Boolean = true,
     val scale: Float = 1.0f,
     val opacity: Float = 0.7f,
     val area: Float = 0.5f,

@@ -312,7 +312,7 @@ fun VideoPlayerController(
                 onToggleLoop()
             }
             PlayerCustomShortcutAction.ToggleDanmaku -> {
-                status = if (overlayState.danmakuState.enabledTypes.isEmpty()) "开" else "关"
+                status = if (overlayState.danmakuState.enabled) "关" else "开"
                 onToggleDanmaku()
             }
             PlayerCustomShortcutAction.ToggleSubtitle -> {
@@ -640,7 +640,7 @@ fun VideoPlayerController(
                 videoShot = uiState.videoShot,
                 videoShotCache = videoShotCache,
                 isPgc = isPgc,
-                danmakuEnabled = overlayState.danmakuState.enabledTypes.isNotEmpty(),
+                danmakuEnabled = overlayState.danmakuState.enabled,
                 isLooping = isLooping,
                 isPlaying = uiState.playerState == PlayerState.Playing,
                 onDirectionLeft = ::onDirectionLeft,

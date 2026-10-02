@@ -6,7 +6,6 @@ import dev.frost819.newbv.app.viewmodel.live.LivePlayerState
 import dev.frost819.newbv.app.viewmodel.live.LivePlayerViewModel
 import dev.frost819.newbv.app.viewmodel.player.DanmakuViewModel
 import dev.frost819.newbv.app.viewmodel.player.PlayerViewModel
-import dev.frost819.newbv.danmaku.entity.DanmakuType
 
 /**
  * 播放界面侧的 [CastPlaybackSession] 工厂。
@@ -79,14 +78,10 @@ object PlayerCastSessions {
             }
 
             override fun setDanmakuEnabled(enabled: Boolean) {
-                val currentEnabled = danmakuViewModel.danmakuState.value.enabledTypes.isNotEmpty()
-                if (currentEnabled != enabled) {
-                    danmakuViewModel.updateDanmakuState(
-                        DanmakuSettingAction.SetEnabledTypes(
-                            if (enabled) DanmakuType.entries.toList() else emptyList(),
-                        ),
-                    )
-                }
+                // 投屏临时开关：只切总开关，persist=false 避免覆盖用户默认弹幕设置
+                danmakuViewModel.updateDanmakuState(
+                    DanmakuSettingAction.SetEnabled(enabled, persist = false),
+                )
             }
 
             override fun snapshot(): CastPlaybackSnapshot {
@@ -133,7 +128,7 @@ object PlayerCastSessions {
                     title = uiState.title,
                     qualityId = uiState.mediaProfileState.qualityId,
                     availableQuality = uiState.availableQuality,
-                    danmakuEnabled = danmakuViewModel.danmakuState.value.enabledTypes.isNotEmpty(),
+                    danmakuEnabled = danmakuViewModel.danmakuState.value.enabled,
                 )
             }
         }

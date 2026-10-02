@@ -10,6 +10,12 @@ import dev.frost819.newbv.data.datastore.VideoCodec
  * 使用 sealed interface 实现类型安全的状态更新，避免在 ViewModel 中写大量 when 分支。
  */
 sealed interface DanmakuSettingAction {
+    data class SetEnabled(
+        val enabled: Boolean,
+        /** 是否持久化为默认弹幕开关（投屏临时开关传 false，避免覆盖用户默认设置）。 */
+        val persist: Boolean = true,
+    ) : DanmakuSettingAction
+
     data class SetScale(
         val scale: Float,
     ) : DanmakuSettingAction
