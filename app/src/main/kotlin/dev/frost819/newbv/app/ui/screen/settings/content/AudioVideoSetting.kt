@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.entity.player.shortcut.PlayerCustomShortcutsStore
+import dev.frost819.newbv.app.sponsorblock.SponsorBlockCategoryStyle
 import dev.frost819.newbv.app.ui.component.settings.OptionDialog
 import dev.frost819.newbv.app.ui.component.settings.SettingListItem
 import dev.frost819.newbv.app.ui.component.settings.SettingSwitchListItem
@@ -29,12 +30,14 @@ import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.PlaySpeed
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.datastore.Resolution
+import dev.frost819.newbv.data.datastore.SkipPolicy
+import dev.frost819.newbv.data.datastore.SponsorBlockDefaults
 import dev.frost819.newbv.data.datastore.VideoCodec
 
 /**
  * 音视频设置页。
  *
- * 画质/编码/音轨/倍速/播放结束动作/快捷键/软解/FFmpeg 音频。
+ * 画质/编码/音轨/倍速/播放结束动作/快捷键/软解/FFmpeg 音频/SponsorBlock。
  */
 @Composable
 fun AudioVideoSetting(modifier: Modifier = Modifier) {
@@ -46,6 +49,7 @@ fun AudioVideoSetting(modifier: Modifier = Modifier) {
     var showPlaySpeedDialog by remember { mutableStateOf(false) }
     var showActionAfterPlayDialog by remember { mutableStateOf(false) }
     var showPlayerCustomShortcutsDialog by remember { mutableStateOf(false) }
+    var showSponsorPolicyDialog by remember { mutableStateOf(false) }
 
     var selectedResolution by remember { mutableStateOf(Prefs.defaultQuality) }
     var selectedVideoCodec by remember { mutableStateOf(Prefs.defaultVideoCodec) }
@@ -58,6 +62,11 @@ fun AudioVideoSetting(modifier: Modifier = Modifier) {
     var enableSoftwareVideoDecoder by remember { mutableStateOf(Prefs.enableSoftwareVideoDecoder) }
     var showPlayerDebugInfo by remember { mutableStateOf(Prefs.showPlayerDebugInfo) }
     var autoSelectCdn by remember { mutableStateOf(Prefs.autoSelectCdn) }
+
+    // SponsorBlock
+    var sponsorBlockEnabled by remember { mutableStateOf(Prefs.sponsorBlockEnabled) }
+    var sponsorBlockPolicies by remember { mutableStateOf(Prefs.sponsorBlockPolicies) }
+    var selectedSponsorCategory by remember { mutableStateOf(SponsorBlockDefaults.supportedCategories.first()) }
 
     Column(
         modifier =
@@ -139,6 +148,34 @@ fun AudioVideoSetting(modifier: Modifier = Modifier) {
                 Prefs.autoSelectCdn = it
             },
         )
+
+        // --- SponsorBlock（片段跳过） ---
+
+        Text(
+            text = "SponsorBlock（空降助手）",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        SettingSwitchListItem(
+            title = "启用片段跳过",
+            supportText = "播放时从 bsbsb.top 社区查询当前视频的推广、片头片尾等片段并按下方策略跳过",
+            checked = sponsorBlockEnabled,
+            onCheckedChange = {
+                sponsorBlockEnabled = it
+                Prefs.sponsorBlockEnabled = it
+            },
+        )
+        if (sponsorBlockEnabled) {
+            SponsorBlockDefaults.supportedCategories.forEach { category ->
+                SettingListItem(
+                    title = "跳过：${SponsorBlockCategoryStyle.displayName(category)}",
+                    supportText = "当前：${sponsorBlockPolicies[category]?.displayName ?: SkipPolicy.Disabled.displayName}",
+                    onClick = {
+                        selectedSponsorCategory = category
+                        showSponsorPolicyDialog = true
+                    },
+                )
+            }
+        }
     }
 
     if (showResolutionDialog) {
@@ -210,6 +247,20 @@ fun AudioVideoSetting(modifier: Modifier = Modifier) {
         PlayerCustomShortcutsDialog(
             onDismiss = { showPlayerCustomShortcutsDialog = false },
             onShortcutsChanged = { playerCustomShortcuts = it },
+        )
+    }
+
+    if (showSponsorPolicyDialog) {
+        OptionDialog(
+            options = SkipPolicy.entries.toTypedArray(),
+            selectedOption = sponsorBlockPolicies[selectedSponsorCategory] ?: SkipPolicy.Disabled,
+            onDismiss = { showSponsorPolicyDialog = false },
+            onSelect = {
+                val newPolicies = sponsorBlockPolicies + (selectedSponsorCategory to it)
+                Prefs.sponsorBlockPolicies = newPolicies
+                sponsorBlockPolicies = newPolicies
+            },
+            getDisplayName = { it.displayName },
         )
     }
 }

@@ -7,6 +7,7 @@ import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.app.data.VideoInfoRepository
 import dev.frost819.newbv.app.entity.player.VideoAspectRatio
 import dev.frost819.newbv.app.entity.player.VideoListItem
+import dev.frost819.newbv.app.sponsorblock.SponsorBlockApi
 import dev.frost819.newbv.app.ui.action.player.MediaProfileSettingAction
 import dev.frost819.newbv.app.ui.state.player.MediaProfileState
 import dev.frost819.newbv.app.ui.state.player.PlayerState
@@ -80,6 +81,7 @@ class PlayerViewModelTest {
     private lateinit var coinRepository: CoinRepository
     private lateinit var favoriteRepository: FavoriteRepository
     private lateinit var oneClickTripleActionRepository: OneClickTripleActionRepository
+    private lateinit var sponsorBlockApi: SponsorBlockApi
     private lateinit var cdnSelector: CdnSelector
     private lateinit var viewModel: PlayerViewModel
     private lateinit var mockPlayer: AbstractVideoPlayer
@@ -98,6 +100,7 @@ class PlayerViewModelTest {
         coinRepository = mockk(relaxed = true)
         favoriteRepository = mockk(relaxed = true)
         oneClickTripleActionRepository = mockk(relaxed = true)
+        sponsorBlockApi = mockk(relaxed = true)
         cdnSelector = mockk(relaxed = true)
 
         mockkObject(Prefs)
@@ -111,12 +114,14 @@ class PlayerViewModelTest {
         every { Prefs.enableFfmpegAudioRenderer } returns false
         every { Prefs.enableSoftwareVideoDecoder } returns false
         every { Prefs.autoSelectCdn } returns false
+        every { Prefs.sponsorBlockEnabled } returns false
 
         mockPlayer = mockk(relaxed = true)
 
         every { videoInfoRepository.videoList } returns MutableStateFlow(emptyList())
         every { videoInfoRepository.relatedVideos } returns MutableStateFlow(emptyList())
         every { videoInfoRepository.videoSharedState } returns MutableStateFlow(null)
+        every { videoInfoRepository.videoDetail } returns MutableStateFlow(null)
 
         viewModel =
             PlayerViewModel(
@@ -129,6 +134,7 @@ class PlayerViewModelTest {
                 coinRepository = coinRepository,
                 favoriteRepository = favoriteRepository,
                 oneClickTripleActionRepository = oneClickTripleActionRepository,
+                sponsorBlockApi = sponsorBlockApi,
                 cdnSelector = cdnSelector,
             )
     }
@@ -1147,7 +1153,8 @@ class PlayerViewModelTest {
     // ── loadVideoDetail cid tests ────────────────────────────
 
     private fun fakeVideoDetail(cid: Long): VideoDetail {
-        val detail = mockk<VideoDetail>()
+        // relaxed：SponsorBlock 观察者会读取 aid/bvid 做归属校验
+        val detail = mockk<VideoDetail>(relaxed = true)
         every { detail.cid } returns cid
         every { detail.author } returns Author(mid = 42L, name = "UP", face = "face")
         return detail

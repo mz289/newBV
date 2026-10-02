@@ -18,6 +18,7 @@ import dev.frost819.newbv.biliapi.entity.video.VideoShot
 import dev.frost819.newbv.biliapi.grpc.utils.handleGrpcException
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
+import dev.frost819.newbv.biliapi.http.entity.video.ViewPoint
 import dev.frost819.newbv.biliapi.util.BiliLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -149,6 +150,29 @@ class VideoPlayRepository(
                     ?: emptyList()
             }
         }
+
+    /**
+     * 获取视频章节（看点）列表。
+     *
+     * 固定走 Web playerinfo 通道（/x/player/wbi/v2，已有 WBI 签名拦截器自动处理）：
+     * App gRPC 的 PlayArc 不含 view_points 字段；该接口未登录可用，单一数据源最简。
+     * 章节按分 P（cid）独立，多 P 视频需按当前 cid 查询。
+     *
+     * @param aid 视频 AV 号
+     * @param cid 视频 CID
+     * @return 章节列表，无章节时为空列表
+     * @throws Exception 网络失败或响应解析失败时抛出，由调用方决定兜底策略
+     */
+    suspend fun getViewPoints(
+        aid: Long,
+        cid: Long,
+    ): List<ViewPoint> =
+        BiliHttpApi
+            .getVideoMoreInfo(
+                avid = aid,
+                cid = cid,
+            ).getResponseData()
+            .viewPoints
 
     suspend fun sendHeartbeat(
         aid: Long,

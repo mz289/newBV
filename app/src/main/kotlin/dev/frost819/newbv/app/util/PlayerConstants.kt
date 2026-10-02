@@ -68,4 +68,13 @@ object PlayerConstants {
 
     /** 返回键退出确认窗口（毫秒）。 */
     const val BACK_EXIT_WINDOW_MS = 3_000L
+
+    /** SponsorBlock 片段检测的最小激活位置（毫秒），避免视频开头误触发。 */
+    const val SPONSOR_BLOCK_MIN_ACTIVATION_MS = 5_000L
+
+    /** SponsorBlock 自动跳过提示展示时长（毫秒）。 */
+    const val SPONSOR_BLOCK_TIP_DURATION_MS = 2_500L
+
+    /** 章节切换提示展示时长（毫秒）。 */
+    const val CHAPTER_TIP_DURATION_MS = 2_000L
 }

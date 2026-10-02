@@ -63,6 +63,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dev.frost819.newbv.R
+import dev.frost819.newbv.app.entity.player.ChapterMark
+import dev.frost819.newbv.app.entity.player.ProgressSegmentMark
 import dev.frost819.newbv.app.ui.state.player.SeekerState
 import dev.frost819.newbv.app.util.VideoShotImageCache
 import dev.frost819.newbv.app.util.formatHourMinSec
@@ -91,6 +93,7 @@ import kotlinx.coroutines.delay
  * @param danmakuEnabled 弹幕是否开启
  * @param isLooping 是否循环播放
  * @param isPlaying 是否正在播放，用于切换播放/暂停图标
+ * @param chapterMarks 章节标记（进度条刻度 + 章节列表入口，为空时隐藏入口）
  * @param onDirectionLeft seek 左移回调
  * @param onDirectionRight seek 右移回调
  * @param onSeekGoTime 确认 seek 回调
@@ -101,6 +104,7 @@ import kotlinx.coroutines.delay
  * @param onDanmakuSwitchChange 弹幕开关回调
  * @param onShowSettings 打开设置回调
  * @param onShowRelatedVideos 打开相关视频回调
+ * @param onShowChapters 打开章节列表回调
  * @param onGoToVideoInfo 跳转视频详情回调
  * @param onToggleLoop 切换循环回调
  * @param onGoToUpPage 跳转 UP 主页面回调
@@ -114,6 +118,7 @@ fun ControllerVideoInfo(
     isSeeking: Boolean,
     goTime: Long,
     seekerState: SeekerState,
+    sponsorBlockMarks: List<ProgressSegmentMark> = emptyList(),
     title: String,
     onlineWatching: String,
     videoShot: VideoShot?,
@@ -122,6 +127,7 @@ fun ControllerVideoInfo(
     danmakuEnabled: Boolean,
     isLooping: Boolean,
     isPlaying: Boolean,
+    chapterMarks: List<ChapterMark> = emptyList(),
     onDirectionLeft: () -> Unit,
     onDirectionRight: () -> Unit,
     onSeekGoTime: () -> Unit,
@@ -132,6 +138,7 @@ fun ControllerVideoInfo(
     onDanmakuSwitchChange: () -> Unit,
     onShowSettings: () -> Unit,
     onShowRelatedVideos: () -> Unit,
+    onShowChapters: () -> Unit = {},
     onGoToVideoInfo: () -> Unit,
     onToggleLoop: () -> Unit,
     onGoToUpPage: () -> Unit,
@@ -164,6 +171,8 @@ fun ControllerVideoInfo(
                 isSeeking = isSeeking,
                 goTime = goTime,
                 seekerState = seekerState,
+                sponsorBlockMarks = sponsorBlockMarks,
+                chapterMarks = chapterMarks,
                 videoShot = videoShot,
                 videoShotCache = videoShotCache,
                 isPgc = isPgc,
@@ -180,6 +189,7 @@ fun ControllerVideoInfo(
                 onDanmakuSwitchChange = onDanmakuSwitchChange,
                 onShowSettings = onShowSettings,
                 onShowRelatedVideos = onShowRelatedVideos,
+                onShowChapters = onShowChapters,
                 onGoToVideoInfo = onGoToVideoInfo,
                 onToggleLoop = onToggleLoop,
                 onGoToUpPage = onGoToUpPage,
@@ -279,12 +289,14 @@ fun ControllerVideoInfoBottom(
     isSeeking: Boolean,
     goTime: Long,
     seekerState: SeekerState,
+    sponsorBlockMarks: List<ProgressSegmentMark>,
     videoShot: VideoShot?,
     videoShotCache: VideoShotImageCache,
     isPgc: Boolean,
     danmakuEnabled: Boolean,
     isLooping: Boolean,
     isPlaying: Boolean,
+    chapterMarks: List<ChapterMark> = emptyList(),
     onDirectionLeft: () -> Unit,
     onDirectionRight: () -> Unit,
     onSeekGoTime: () -> Unit,
@@ -295,6 +307,7 @@ fun ControllerVideoInfoBottom(
     onDanmakuSwitchChange: () -> Unit,
     onShowSettings: () -> Unit,
     onShowRelatedVideos: () -> Unit,
+    onShowChapters: () -> Unit = {},
     onGoToVideoInfo: () -> Unit,
     onToggleLoop: () -> Unit,
     onGoToUpPage: () -> Unit,
@@ -440,6 +453,8 @@ fun ControllerVideoInfoBottom(
                 position = if (isSeeking) goTime else seekerState.currentTime,
                 bufferedPercentage = seekerState.bufferedPercentage,
                 isPersistentSeek = false,
+                segmentMarks = sponsorBlockMarks,
+                chapterMarks = chapterMarks,
             )
         }
 
@@ -471,6 +486,10 @@ fun ControllerVideoInfoBottom(
                     add(ControllerIcon(R.drawable.ic_player_action_info, "视频信息", onGoToVideoInfo))
                     add(ControllerIcon(R.drawable.ic_player_action_person, "up主页", onGoToUpPage))
                     add(ControllerIcon(R.drawable.ic_player_action_related, "相关视频", onShowRelatedVideos))
+                }
+                // 章节入口数据驱动：仅当当前视频有章节看点时显示
+                if (chapterMarks.isNotEmpty()) {
+                    add(ControllerIcon(R.drawable.ic_player_action_chapter, "章节列表", onShowChapters))
                 }
                 add(
                     ControllerIcon(
@@ -530,9 +549,11 @@ fun ControllerVideoInfoBottom(
                                 pressedBorder = Border.None,
                             ),
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f, pressedScale = 0.94f),
+                        // 未聚焦时参考 Compose for TV 官方示例（JetStream）的
+                        // 半透明圆底，避免白色图标直接叠在画面上看不清
                         colors =
                             ClickableSurfaceDefaults.colors(
-                                containerColor = Color.Transparent,
+                                containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
                                 contentColor = Color.White,
                                 focusedContainerColor = Color.White,
                                 focusedContentColor = Color(0xFF171717),
