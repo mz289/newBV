@@ -14,6 +14,7 @@ import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,8 +41,9 @@ class CastReceiverService : Service() {
     override fun onCreate() {
         super.onCreate()
         val requestLogger = CastRequestLogger(applicationContext)
+        // 官方电视端 UDN 为 35 位随机字母数字（非标准 UUID 形态），对齐其特征
         val uuid = Prefs.castReceiverUuid.ifBlank {
-            UUID.randomUUID().toString().also { Prefs.castReceiverUuid = it }
+            generateDeviceUuid().also { Prefs.castReceiverUuid = it }
         }
         acquireMulticastLock()
         httpServer = CastHttpServer(
@@ -94,6 +96,8 @@ class CastReceiverService : Service() {
     }
 
     companion object {
+        private const val UUID_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
         fun start(context: Context) {
             runCatching {
                 context.startService(Intent(context, CastReceiverService::class.java))
@@ -103,5 +107,9 @@ class CastReceiverService : Service() {
         fun stop(context: Context) {
             context.stopService(Intent(context, CastReceiverService::class.java))
         }
+
+        /** 35 位随机字母数字设备 ID（对齐官方电视端 UDN 形态）。 */
+        private fun generateDeviceUuid(): String =
+            (1..35).map { UUID_CHARS[Random.nextInt(UUID_CHARS.length)] }.joinToString("")
     }
 }

@@ -7,48 +7,41 @@ import dev.frost819.newbv.app.cast.CastPlaybackLauncher
 import dev.frost819.newbv.app.cast.CastTransportState
 import dev.frost819.newbv.app.cast.protocol.CastContent
 import dev.frost819.newbv.app.cast.protocol.CastContentParser
+import dev.frost819.newbv.app.cast.protocol.NvaExtDecoder
 import dev.frost819.newbv.core.log.Loggers
-import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.encodeURLParameter
-import io.ktor.http.withCharset
-import io.ktor.server.application.Application
-import io.ktor.server.application.ApplicationCall
-import io.ktor.server.cio.CIO
-import io.ktor.server.cio.CIOApplicationEngine
-import io.ktor.server.engine.EmbeddedServer
-import io.ktor.server.engine.embeddedServer
-import io.ktor.server.request.httpMethod
-import io.ktor.server.request.path
-import io.ktor.server.request.receiveText
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.Routing
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
-import io.ktor.server.routing.head
-import io.ktor.server.routing.options
-import io.ktor.server.routing.post
-import io.ktor.server.routing.put
-import io.ktor.server.routing.route
-import io.ktor.server.routing.routing
-import java.net.InetAddress
+import io.ktor.http.Parameters
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.IOException
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.util.Locale
+import java.util.concurrent.CopyOnWriteArraySet
 
 /**
- * 投屏接收端 HTTP 服务：托管 UPnP 描述文档、标准 DLNA SOAP 控制端点与
- * B 站私有 NirvanaControl 端点。
+ * 投屏接收端网络服务（原生 TCP，端口 9958），同一端口承载三类通道：
  *
- * 控制请求的处理流程：
- * 1. SOAP `SetAVTransportURI` 记录当前媒体；
- * 2. 所有请求（含 catch-all）都尝试 [CastContentParser.parse] 提取投屏内容，
- *    解析出有效内容即交给 [CastPlaybackLauncher] 启动播放——部分客户端
- *    不走标准 SOAP 端点，投递姿势无法穷举，catch-all 是兼容性兜底；
- * 3. 按服务类型返回对应 SOAP 响应；播放控制命令转发到当前
- *    [CastPlaybackSession]（主线程执行，播放器实例仅在主线程安全）。
+ * 1. **HTTP/SOAP**：UPnP 设备描述、SCPD、标准 DLNA 控制端点与 B 站私有
+ *    NirvanaControl SOAP 端点（通用 DLNA 控制点与官方客户端 SOAP 流程）；
+ * 2. **哔哩必连（NVA Socket）**：手机端以 HTTP `SETUP /projection` 请求升级，
+ *    之后同一 TCP 连接走 NVA 二进制帧协议（协议细节源自社区对官方
+ *    云视听小电视的逆向，见 [NvaSession]），是官方客户端的首选控制通道；
+ * 3. **catch-all**：任意未匹配路径都尝试解析投屏内容并触发播放，兼容
+ *    各类非标准投递姿势。
+ *
+ * 不用 Ktor 的原因：`SETUP` 升级需要把 HTTP 连接劫持为裸 TCP 长连接，
+ * Ktor 服务端引擎不暴露 socket hijack 能力。
  */
 class CastHttpServer(
     private val uuid: String,
@@ -57,7 +50,14 @@ class CastHttpServer(
     private val scope: CoroutineScope,
 ) {
     private val logger = Loggers.get("CastHttpServer")
-    private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
+    private var serverSocket: ServerSocket? = null
+
+    @Volatile
+    private var running = false
+
+    private val connections = CopyOnWriteArraySet<Socket>()
+    private val nvaSessions = CopyOnWriteArraySet<NvaSession>()
+    private var statusPushJob: Job? = null
 
     @Volatile
     private var currentUri: String = ""
@@ -66,179 +66,604 @@ class CastHttpServer(
     private var currentMetaData: String = ""
 
     fun start() {
-        if (server != null) return
-        val newServer =
-            embeddedServer(CIO, port = CastReceiverConfig.HTTP_PORT) {
-                castModule()
+        if (serverSocket != null) return
+        val server =
+            ServerSocket().apply {
+                reuseAddress = true
+                bind(InetSocketAddress(CastReceiverConfig.HTTP_PORT))
             }
         try {
-            newServer.start(wait = false)
-            server = newServer
-            requestLogger.log("HTTP cast receiver started on ${CastReceiverConfig.HTTP_PORT}")
+            serverSocket = server
+            running = true
+            scope.launch(Dispatchers.IO) { acceptLoop(server) }
+            statusPushJob = scope.launch { statusPushLoop() }
+            requestLogger.log("Cast HTTP/NVA server started on ${CastReceiverConfig.HTTP_PORT}")
         } catch (t: Throwable) {
-            runCatching { newServer.stop(gracePeriodMillis = 0, timeoutMillis = 0) }
-            logger.warn(t) { "Start HTTP cast receiver failed" }
+            runCatching { server.close() }
+            serverSocket = null
+            logger.warn(t) { "Start cast server failed" }
             throw t
         }
     }
 
     fun stop() {
-        server?.stop(gracePeriodMillis = 500, timeoutMillis = 1500)
-        server = null
+        running = false
+        statusPushJob?.cancel()
+        statusPushJob = null
+        runCatching { serverSocket?.close() }
+        serverSocket = null
+        connections.toList().forEach { runCatching { it.close() } }
+        connections.clear()
+        nvaSessions.clear()
     }
 
-    private fun Application.castModule() {
-        routing {
-            get("/") {
-                call.respondText(
-                    text = "newBV cast receiver",
-                    contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                )
+    private suspend fun acceptLoop(server: ServerSocket) {
+        while (running) {
+            val client =
+                try {
+                    server.accept()
+                } catch (_: IOException) {
+                    break
+                }
+            connections.add(client)
+            scope.launch(Dispatchers.IO) {
+                try {
+                    handleConnection(client)
+                } catch (e: IOException) {
+                    requestLogger.log("connection closed: ${e.message}")
+                } catch (e: Exception) {
+                    logger.warn(e) { "Handle cast connection failed" }
+                } finally {
+                    connections.remove(client)
+                    runCatching { client.close() }
+                }
             }
-            registerServiceRoutes()
-            registerCatchAll()
         }
     }
 
-    private fun Routing.registerServiceRoutes() {
-        get("/description.xml") {
-            call.respondXml(CastXmlDocuments.deviceDescription(call.localDescriptionHost(), uuid))
-        }
-        head("/description.xml") { call.respondText("", contentType = ContentType.Application.Xml) }
+    // ── 连接处理 ──────────────────────────────────────────────
 
-        get("/AVTransport.xml") { call.respondXml(CastXmlDocuments.avTransportScpd()) }
-        get("/RenderingControl.xml") { call.respondXml(CastXmlDocuments.renderingControlScpd()) }
-        get("/ConnectionManager.xml") { call.respondXml(CastXmlDocuments.connectionManagerScpd()) }
-        get("/NirvanaControl.xml") { call.respondXml(CastXmlDocuments.nirvanaControlScpd()) }
-        head("/AVTransport.xml") { call.respondText("", contentType = ContentType.Application.Xml) }
-        head("/RenderingControl.xml") { call.respondText("", contentType = ContentType.Application.Xml) }
-        head("/ConnectionManager.xml") { call.respondText("", contentType = ContentType.Application.Xml) }
-        head("/NirvanaControl.xml") { call.respondText("", contentType = ContentType.Application.Xml) }
-
-        post("/AVTransport/control") { call.handleControlCall() }
-        post("/RenderingControl/control") { call.handleControlCall() }
-        post("/ConnectionManager/control") { call.handleControlCall() }
-        post("/NirvanaControl/control") { call.handleControlCall() }
-
-        registerEventRoutes("/AVTransport/event")
-        registerEventRoutes("/RenderingControl/event")
-        registerEventRoutes("/ConnectionManager/event")
-        registerEventRoutes("/NirvanaControl/event")
-    }
-
-    /** GENA 订阅：投屏端只要求订阅成功（SID + TIMEOUT），不推送事件也能正常工作。 */
-    private fun Routing.registerEventRoutes(path: String) {
-        put(path) { call.respondEventSubscription() }
-        route(path, HttpMethod("SUBSCRIBE")) { handle { call.respondEventSubscription() } }
-        delete(path) { call.respondText("", status = HttpStatusCode.OK) }
-        route(path, HttpMethod("UNSUBSCRIBE")) { handle { call.respondText("", status = HttpStatusCode.OK) } }
-    }
-
-    private fun Routing.registerCatchAll() {
-        get("{path...}") { call.handleGenericCall(body = null) }
-        post("{path...}") { call.handleGenericCall(body = call.receiveText()) }
-        put("{path...}") { call.handleGenericCall(body = call.receiveText()) }
-        delete("{path...}") { call.handleGenericCall(body = call.receiveText()) }
-        options("{path...}") {
-            call.respondText("", status = HttpStatusCode.OK)
+    private fun handleConnection(socket: Socket) {
+        socket.tcpNoDelay = true
+        val input = DataInputStream(BufferedInputStream(socket.getInputStream()))
+        while (running) {
+            val request = readHttpRequest(input) ?: return
+            requestLogger.logRequest(
+                method = request.method,
+                path = request.target,
+                remoteHost = socket.inetAddress?.hostAddress,
+                headers = request.headers.mapValues { listOf(it.value) },
+                body = request.body,
+            )
+            if (request.method.equals("SETUP", ignoreCase = true) &&
+                request.path.startsWith(CastReceiverConfig.NVA_PROJECTION_PATH)
+            ) {
+                // 必连：劫持连接为 NVA 二进制帧会话
+                nvaSessionLoop(socket, request)
+                return
+            }
+            val keepAlive = respond(socket, request)
+            if (!keepAlive) return
         }
     }
 
-    private suspend fun ApplicationCall.handleControlCall() {
-        val body = receiveText()
-        logRequest(body)
-        handleControlBody(
+    private fun readHttpRequest(input: DataInputStream): HttpRequest? {
+        val head = ByteArrayOutputStream()
+        // matched = 已连续匹配 "\r\n\r\n" 前缀的字节数（0..3），-1 表示完整收到请求头
+        var matched = 0
+        while (true) {
+            val b = input.read()
+            if (b < 0) return null
+            head.write(b)
+            matched =
+                when {
+                    b == '\r'.code && (matched == 0 || matched == 2) -> matched + 1
+                    b == '\n'.code && matched == 1 -> 2
+                    b == '\n'.code && matched == 3 -> -1
+                    else -> 0
+                }
+            if (matched == -1) break
+            if (head.size() > MAX_HEAD_BYTES) return null
+        }
+        val headText = head.toString("UTF-8")
+        val lines = headText.split("\r\n").filter { it.isNotBlank() }
+        if (lines.isEmpty()) return null
+        val parts = lines[0].split(" ")
+        if (parts.size < 2) return null
+        val headers = LinkedHashMap<String, String>()
+        lines.drop(1).forEach { line ->
+            val idx = line.indexOf(':')
+            if (idx > 0) {
+                headers[line.substring(0, idx).trim().lowercase(Locale.ROOT)] =
+                    line.substring(idx + 1).trim()
+            }
+        }
+        val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
+        val body =
+            if (contentLength > 0) {
+                if (contentLength > MAX_BODY_BYTES) return null
+                val bodyBytes = ByteArray(contentLength)
+                input.readFully(bodyBytes)
+                String(bodyBytes, Charsets.UTF_8)
+            } else {
+                ""
+            }
+        val target = parts[1]
+        return HttpRequest(
+            method = parts[0].uppercase(Locale.ROOT),
+            path = target.substringBefore("?"),
+            target = target,
+            version = parts.getOrElse(2) { "HTTP/1.1" },
+            headers = headers,
             body = body,
-            path = request.path(),
-            soapAction = request.headers["SOAPAction"].orEmpty(),
         )
     }
 
-    private suspend fun ApplicationCall.handleControlBody(
+    private fun respond(
+        socket: Socket,
+        request: HttpRequest,
+    ): Boolean {
+        val out = BufferedOutputStream(socket.getOutputStream())
+        val keepAlive = request.isKeepAlive
+        val result = route(socket, request)
+        writeResponse(out, result.status, result.contentType, result.body, result.extraHeaders, keepAlive)
+        return keepAlive
+    }
+
+    private fun route(
+        socket: Socket,
+        request: HttpRequest,
+    ): RouteResult {
+        val path = request.path.lowercase(Locale.ROOT).trimEnd('/')
+        val method = request.method
+
+        // GENA 订阅：投屏端只要求订阅成功（SID + TIMEOUT），不推送事件也能工作
+        if (method == "SUBSCRIBE" || method == "UNSUBSCRIBE" || method == "PUT" && path.endsWith("/event")) {
+            return RouteResult(
+                status = "200 OK",
+                contentType = "text/xml; charset=\"utf-8\"",
+                extraHeaders =
+                    if (method == "UNSUBSCRIBE") {
+                        emptyList()
+                    } else {
+                        listOf("SID" to "uuid:$uuid", "TIMEOUT" to "Second-1800")
+                    },
+                body = "",
+            )
+        }
+
+        if (method == "GET" || method == "HEAD") {
+            return when {
+                path == "/description.xml" -> xmlResult(CastXmlDocuments.deviceDescription(localDescriptionHost(socket), uuid))
+                path == "/dlna/avtransport.xml" || path == "/avtransport.xml" ->
+                    xmlResult(CastXmlDocuments.avTransportScpd())
+                path == "/dlna/nirvanacontrol.xml" || path == "/nirvanacontrol.xml" ->
+                    xmlResult(CastXmlDocuments.nirvanaControlScpd())
+                path == "/renderingcontrol.xml" -> xmlResult(CastXmlDocuments.renderingControlScpd())
+                path == "/connectionmanager.xml" -> xmlResult(CastXmlDocuments.connectionManagerScpd())
+                path == "" || path == "/" ->
+                    RouteResult("200 OK", "text/plain; charset=\"utf-8\"", emptyList(), "newBV cast receiver")
+                path.endsWith("/event") ->
+                    RouteResult(
+                        "200 OK",
+                        "text/xml; charset=\"utf-8\"",
+                        listOf("SID" to "uuid:$uuid", "TIMEOUT" to "Second-1800"),
+                        "",
+                    )
+                else -> {
+                    val content = parseContent(request, null)
+                    val launched = content?.let { maybeLaunch(it) } ?: false
+                    RouteResult(
+                        "200 OK",
+                        "application/json; charset=\"utf-8\"",
+                        emptyList(),
+                        """{"code":0,"message":"ok","launched":$launched}""",
+                    )
+                }
+            }
+        }
+
+        // POST/PUT/DELETE
+        val soapAction = request.headers["soapaction"].orEmpty()
+        val action = soapActionName(soapAction, request.body)
+        val isControlPath =
+            path.contains("/control") || path.endsWith("/action") || path.contains("nirvanacontrol")
+        return if (action.isNotBlank() && isControlPath) {
+            if (action == "SetAVTransportURI") updateCurrentMedia(request.body)
+            parseContent(request, request.body)?.let { maybeLaunch(it) }
+            val serviceType = soapServiceType(path, soapAction)
+            val response =
+                when (serviceType) {
+                    CastReceiverConfig.AV_TRANSPORT_SERVICE_TYPE -> handleAvTransportAction(action, request.body)
+                    CastReceiverConfig.RENDERING_CONTROL_SERVICE_TYPE -> handleRenderingControlAction(action)
+                    CastReceiverConfig.CONNECTION_MANAGER_SERVICE_TYPE -> handleConnectionManagerAction(action)
+                    CastReceiverConfig.NIRVANA_SERVICE_TYPE -> handleNirvanaAction(action, request.body)
+                    else -> soapResponse(serviceType, action)
+                }
+            RouteResult("200 OK", "text/xml; charset=\"utf-8\"", emptyList(), response)
+        } else {
+            val content = parseContent(request, request.body)
+            val launched = content?.let { maybeLaunch(it) } ?: false
+            RouteResult(
+                "200 OK",
+                "application/json; charset=\"utf-8\"",
+                emptyList(),
+                """{"code":0,"message":"ok","launched":$launched}""",
+            )
+        }
+    }
+
+    private fun parseContent(
+        request: HttpRequest,
+        body: String?,
+    ): CastContent? =
+        CastContentParser.parse(
+            path = request.target,
+            queryParameters = Parameters.Empty,
+            body = body?.takeIf { it.isNotBlank() },
+            headers = request.headers,
+        )
+
+    /** 解析独立 JSON 载荷（NVA 命令 body / nva_ext 解密结果）。 */
+    private fun parseContentJson(body: String): CastContent? =
+        CastContentParser.parse(
+            path = "",
+            queryParameters = Parameters.Empty,
+            body = body.takeIf { it.isNotBlank() },
+        )
+
+    private fun localDescriptionHost(socket: Socket): String {
+        val remote = socket.inetAddress ?: return CastNetworkUtil.localIpv4Address()
+        return CastNetworkUtil.localIpv4AddressFor(remote)
+    }
+
+    private fun writeResponse(
+        out: BufferedOutputStream,
+        status: String,
+        contentType: String,
         body: String,
-        path: String,
-        soapAction: String,
+        extraHeaders: List<Pair<String, String>>,
+        keepAlive: Boolean,
     ) {
-        val action = soapActionName(soapAction, body)
-        if (action == "SetAVTransportURI") updateCurrentMedia(body)
-
-        val content = CastContentParser.parse(
-            path = path,
-            queryParameters = request.queryParameters,
-            body = body,
-            headers = request.headers.entries().associate { it.key to it.value.joinToString(";") },
-        )
-        if (content != null) maybeLaunch(content)
-
-        val serviceType = soapServiceType(path, soapAction)
-        val response =
-            when (serviceType) {
-                CastReceiverConfig.AV_TRANSPORT_SERVICE_TYPE -> handleAvTransportAction(action, body)
-                CastReceiverConfig.RENDERING_CONTROL_SERVICE_TYPE -> handleRenderingControlAction(action)
-                CastReceiverConfig.CONNECTION_MANAGER_SERVICE_TYPE -> handleConnectionManagerAction(action)
-                CastReceiverConfig.NIRVANA_SERVICE_TYPE -> handleNirvanaAction(action, body)
-                else -> soapResponse(serviceType, action)
+        val bodyBytes = body.toByteArray(Charsets.UTF_8)
+        val head =
+            buildString {
+                append("HTTP/1.1 ").append(status).append("\r\n")
+                append("DATE: ").append(DateHeader.now()).append("\r\n")
+                append("SERVER: ").append(CastReceiverConfig.SERVER_TOKEN).append("\r\n")
+                append("Content-Type: ").append(contentType).append("\r\n")
+                append("Content-Length: ").append(bodyBytes.size).append("\r\n")
+                extraHeaders.forEach { (name, value) -> append(name).append(": ").append(value).append("\r\n") }
+                append("Connection: ").append(if (keepAlive) "keep-alive" else "close").append("\r\n")
+                append("\r\n")
             }
-        respondText(
-            text = response,
-            contentType = ContentType.Application.Xml.withCharset(Charsets.UTF_8),
-        )
+        out.write(head.toByteArray(Charsets.UTF_8))
+        if (bodyBytes.isNotEmpty()) out.write(bodyBytes)
+        out.flush()
     }
 
-    private suspend fun ApplicationCall.handleGenericCall(body: String?) {
-        logRequest(body)
-        val path = request.path()
-        val soapAction = request.headers["SOAPAction"].orEmpty()
-        val action = soapActionName(soapAction, body.orEmpty())
-        if (!body.isNullOrBlank() && isKnownSoapControlPath(path, action)) {
-            handleControlBody(body = body, path = path, soapAction = soapAction)
+    private fun xmlResult(xml: String): RouteResult =
+        RouteResult("200 OK", "text/xml; charset=\"utf-8\"", emptyList(), xml)
+
+    // ── 哔哩必连（NVA Socket） ─────────────────────────────────
+
+    /**
+     * NVA 二进制帧协议（源自官方云视听小电视逆向）。
+     *
+     * 帧结构（客户端→服务端命令帧）：
+     * `0xE0 | paramCount(1) | version(4, BE) | 0x01 | cmdLen(1) + cmd |
+     *  actionLen(1) + action | [bodyLen(4, BE) + body(JSON)]`
+     * `paramCount`：0 = 心跳；2 = 无 body；3 = 有 body。
+     * 服务端应答帧：`0xC0 | 0x00 + version`（空应答）或
+     * `0xC0 | 0x01 + version + len(4) + body`；服务端命令把首字节换回 `0xE0`。
+     */
+    private inner class NvaSession(private val socket: Socket) {
+        private val input = DataInputStream(BufferedInputStream(socket.getInputStream()))
+        private val output = BufferedOutputStream(socket.getOutputStream())
+
+        /** 帧版本单调递增，随收到的客户端帧版本推进。 */
+        private var currentVersion = 1L
+
+        fun readLoop() {
+            while (running && !socket.isClosed) {
+                val fst = input.read()
+                if (fst < 0) return
+                val paramCount = input.read()
+                if (paramCount < 0) return
+                currentVersion = readInt32(input).toLong() and 0xFFFFFFFFL
+                if (paramCount == 0) {
+                    // 心跳，无需应答
+                    continue
+                }
+                input.read() // 0x01 分隔
+                val command = readShortString(input)
+                if (fst != 0xE0 || paramCount == 1) {
+                    requestLogger.log("NVA reply frame: $command")
+                    continue
+                }
+                val action = readShortString(input)
+                val body =
+                    if (paramCount >= 3) {
+                        val bodyLength = readInt32(input)
+                        if (bodyLength <= 0 || bodyLength > MAX_BODY_BYTES) "" else readString(input, bodyLength)
+                    } else {
+                        ""
+                    }
+                requestLogger.log("NVA command action=$action body=$body")
+                handleCommand(action = action, body = body)
+            }
+        }
+
+        private fun handleCommand(
+            action: String,
+            body: String,
+        ) {
+            when (action) {
+                "GetVolume" -> sendReply(content = mapOf("volume" to 30))
+
+                "Play" -> {
+                    parseContentJson(body)?.let { maybeLaunch(it) }
+                    sendEmpty()
+                }
+
+                "PlayUrl" -> {
+                    parsePlayUrlContent(body)?.let { maybeLaunch(it) }
+                    sendEmpty()
+                }
+
+                "Pause" -> {
+                    launchPlaybackAction(action) { pause() }
+                    sendEmpty()
+                }
+
+                "Resume" -> {
+                    launchPlaybackAction(action) { play() }
+                    sendEmpty()
+                }
+
+                "Seek" -> {
+                    val seekSeconds = extractJsonNumber(body, "seekTs")
+                    if (seekSeconds != null) {
+                        launchPlaybackAction(action) { seekTo((seekSeconds * 1000).toLong()) }
+                    }
+                    sendEmpty()
+                }
+
+                "Stop" -> {
+                    launchPlaybackAction(action) { stop() }
+                    sendEmpty()
+                }
+
+                "SwitchDanmaku" -> {
+                    val open = extractJsonBoolean(body, "open")
+                    if (open != null) {
+                        launchPlaybackAction(action) { setDanmakuEnabled(open) }
+                    }
+                    sendEmpty()
+                }
+
+                "SetSpeed", "SwitchSpeed" -> {
+                    extractJsonNumber(body, "speed")?.let { speed ->
+                        if (speed > 0f) launchPlaybackAction(action) { setSpeed(speed) }
+                    }
+                    sendEmpty()
+                }
+
+                "SwitchQuality", "SetQuality" -> {
+                    extractJsonNumber(body, "qn")?.let { qn ->
+                        if (qn > 0) launchPlaybackAction(action) { setQuality(qn.toInt()) }
+                    }
+                    sendEmpty()
+                }
+
+                else -> {
+                    requestLogger.log("NVA unhandled action=$action")
+                    sendEmpty()
+                }
+            }
+        }
+
+        private fun launchPlaybackAction(
+            action: String,
+            block: CastPlaybackSession.() -> Unit,
+        ) {
+            scope.launch {
+                withPlaybackSession(action, block)
+            }
+        }
+
+        private val writeLock = Any()
+
+        /** 应答帧：`0xC0 0x01 + version(4) + len(4) + JSON`。 */
+        private fun sendReply(content: Map<String, Any?>) {
+            val json = jsonBody(content).toByteArray(Charsets.UTF_8)
+            writeLockedFrame { out ->
+                out.write(0xC0)
+                out.write(0x01)
+                writeInt32(out, bumpVersion())
+                writeInt32(out, json.size)
+                out.write(json)
+            }
+        }
+
+        /** 空应答帧：`0xC0 0x00 + version(4)`。 */
+        private fun sendEmpty() {
+            writeLockedFrame { out ->
+                out.write(0xC0)
+                out.write(0x00)
+                writeInt32(out, bumpVersion())
+            }
+        }
+
+        /** 服务端命令帧：`0xE0 0x03 + version(4) + 0x01 + cmdLen+cmd + actionLen+action + len(4) + JSON`。 */
+        fun sendCommand(
+            action: String,
+            content: Map<String, Any?>,
+        ) {
+            val command = "Command".toByteArray(Charsets.US_ASCII)
+            val actionBytes = action.toByteArray(Charsets.US_ASCII)
+            val json = jsonBody(content).toByteArray(Charsets.UTF_8)
+            writeLockedFrame { out ->
+                out.write(0xE0)
+                out.write(0x03)
+                writeInt32(out, bumpVersion())
+                out.write(0x01)
+                out.write(command.size)
+                out.write(command)
+                out.write(actionBytes.size)
+                out.write(actionBytes)
+                writeInt32(out, json.size)
+                out.write(json)
+            }
+        }
+
+        private inline fun writeLockedFrame(write: (ByteArrayOutputStream) -> Unit) {
+            val out = ByteArrayOutputStream()
+            synchronized(writeLock) {
+                write(out)
+                try {
+                    output.write(out.toByteArray())
+                    output.flush()
+                } catch (e: IOException) {
+                    requestLogger.log("NVA write failed: ${e.message}")
+                }
+            }
+        }
+
+        /** 仅在 writeLock 内调用；帧版本随每次写入单调递增。 */
+        private fun bumpVersion(): Int {
+            currentVersion += 1
+            return currentVersion.toInt()
+        }
+
+        private fun readShortString(input: DataInputStream): String {
+            val length = input.read()
+            if (length <= 0) return ""
+            return readString(input, length)
+        }
+
+        private fun readString(
+            input: DataInputStream,
+            length: Int,
+        ): String {
+            val bytes = ByteArray(length)
+            input.readFully(bytes)
+            return String(bytes, Charsets.UTF_8)
+        }
+
+        private fun readInt32(input: DataInputStream): Int {
+            val bytes = ByteArray(4)
+            input.readFully(bytes)
+            return ((bytes[0].toInt() and 0xFF) shl 24) or
+                ((bytes[1].toInt() and 0xFF) shl 16) or
+                ((bytes[2].toInt() and 0xFF) shl 8) or
+                (bytes[3].toInt() and 0xFF)
+        }
+
+        private fun writeInt32(
+            out: ByteArrayOutputStream,
+            value: Int,
+        ) {
+            out.write((value ushr 24) and 0xFF)
+            out.write((value ushr 16) and 0xFF)
+            out.write((value ushr 8) and 0xFF)
+            out.write(value and 0xFF)
+        }
+
+        private fun jsonBody(content: Map<String, Any?>): String =
+            content.entries.joinToString(prefix = "{", postfix = "}") { (key, value) ->
+                val rendered =
+                    when (value) {
+                        is String -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+                        else -> value.toString()
+                    }
+                "\"$key\":$rendered"
+            }
+    }
+
+    private fun nvaSessionLoop(
+        socket: Socket,
+        request: HttpRequest,
+    ) {
+        val session = request.headers["session"]
+        if (session.isNullOrBlank()) {
+            requestLogger.log("NVA setup without session header, reject")
             return
         }
-
-        val content = CastContentParser.parse(
-            path = path,
-            queryParameters = request.queryParameters,
-            body = body,
-            headers = request.headers.entries().associate { it.key to it.value.joinToString(";") },
-        )
-        val launched = content?.let { maybeLaunch(it) } ?: false
-        respondText(
-            text = """{"code":0,"message":"ok","launched":$launched}""",
-            contentType = ContentType.Application.Json.withCharset(Charsets.UTF_8),
-        )
-    }
-
-    private fun isKnownSoapControlPath(
-        path: String,
-        action: String,
-    ): Boolean =
-        action.isNotBlank() && (
-            path.contains("AVTransport/control", ignoreCase = true) ||
-                path.contains("RenderingControl/control", ignoreCase = true) ||
-                path.contains("ConnectionManager/control", ignoreCase = true) ||
-                path.contains("NirvanaControl/control", ignoreCase = true)
-            )
-
-    private fun ApplicationCall.logRequest(body: String?) {
-        requestLogger.logRequest(
-            method = request.httpMethod.value,
-            path = buildString {
-                append(request.path())
-                val query = request.queryParameters.toLogQueryString()
-                if (query.isNotBlank()) append("?").append(query)
-            },
-            remoteHost = request.headers["X-Forwarded-For"] ?: request.headers["Host"],
-            headers = request.headers.entries().associate { it.key to it.value },
-            body = body,
-        )
-    }
-
-    private fun io.ktor.http.Parameters.toLogQueryString(): String =
-        names().flatMap { name ->
-            getAll(name).orEmpty().map { value ->
-                "${name.encodeURLParameter()}=${value.encodeURLParameter()}"
+        val out = BufferedOutputStream(socket.getOutputStream())
+        val head =
+            buildString {
+                append("HTTP/1.1 200 OK\r\n")
+                append("Session: ").append(session).append("\r\n")
+                append("NvaVersion: 1\r\n")
+                append("Connection: Keep-Alive\r\n")
+                append("UUID: ").append(uuid).append("\r\n")
+                append("User-Agent: ").append(CastReceiverConfig.NVA_USER_AGENT).append("\r\n")
+                append("\r\n")
             }
-        }.joinToString("&")
+        out.write(head.toByteArray(Charsets.UTF_8))
+        out.flush()
+        requestLogger.log("NVA session connected session=$session")
+
+        val nva = NvaSession(socket)
+        nvaSessions.add(nva)
+        try {
+            nva.readLoop()
+        } finally {
+            nvaSessions.remove(nva)
+            requestLogger.log("NVA session disconnected session=$session")
+        }
+    }
+
+    /**
+     * 状态推送：官方客户端在 NVA 通道上被动接收 `OnPlayState`/`OnProgress`，
+     * 这里按 1s 轮询当前会话快照，状态/进度变化时广播给所有已连接手机端。
+     */
+    private suspend fun statusPushLoop() {
+        var lastState: CastTransportState? = null
+        var lastPositionSec = Long.MIN_VALUE
+        var lastDurationSec = Long.MIN_VALUE
+        while (scope.isActive && running) {
+            delay(STATUS_PUSH_INTERVAL_MS)
+            val sessions = nvaSessions.toList()
+            if (sessions.isEmpty()) {
+                lastState = null
+                lastPositionSec = Long.MIN_VALUE
+                lastDurationSec = Long.MIN_VALUE
+                continue
+            }
+            val snapshot =
+                withContext(Dispatchers.Main.immediate) {
+                    CastPlaybackSessionRegistry.current()?.snapshot()
+                } ?: continue
+            val positionSec = snapshot.positionMs / 1000
+            val durationSec = snapshot.durationMs / 1000
+            if (snapshot.state != lastState) {
+                sessions.forEach { it.sendCommand("OnPlayState", mapOf("playState" to snapshot.state.toNvaPlayState())) }
+            }
+            if (positionSec != lastPositionSec || durationSec != lastDurationSec) {
+                sessions.forEach {
+                    it.sendCommand(
+                        "OnProgress",
+                        mapOf("duration" to durationSec, "position" to positionSec),
+                    )
+                }
+            }
+            lastState = snapshot.state
+            lastPositionSec = positionSec
+            lastDurationSec = durationSec
+        }
+    }
+
+    private fun CastTransportState.toNvaPlayState(): Int =
+        when (this) {
+            CastTransportState.TRANSITIONING -> 3
+            CastTransportState.PLAYING -> 4
+            CastTransportState.PAUSED_PLAYBACK -> 5
+            CastTransportState.STOPPED -> 7
+        }
+
+    // ── 投屏内容解析与播放启动 ────────────────────────────────
 
     private fun maybeLaunch(content: CastContent): Boolean {
         requestLogger.log("parsed cast content=$content")
@@ -249,26 +674,112 @@ class CastHttpServer(
         return true
     }
 
+    /**
+     * `PlayUrl` 命令：body 形如 `{"url": "...?nva_ext=<编码内容>"}`，
+     * 官方客户端把真实播放信息放在 URL 的 `nva_ext` 查询参数里
+     * （与 DLNA 元数据中的 `_nva_ext_` 同源，AES 加密或明文 JSON）。
+     */
+    private fun parsePlayUrlContent(body: String): CastContent? {
+        val url = extractXmlText(body, "url") ?: extractJsonStringField(body, "url") ?: return null
+        val nvaExt = uriQueryParameter(url, "nva_ext") ?: return null
+        val jsonText =
+            if (nvaExt.trim().startsWith("{")) {
+                nvaExt
+            } else {
+                NvaExtDecoder.decode(nvaExt)
+            } ?: return null
+        return CastContentParser.parse(
+            path = "",
+            queryParameters = Parameters.Empty,
+            body = jsonText,
+        )
+    }
+
+    private fun uriQueryParameter(
+        url: String,
+        name: String,
+    ): String? {
+        val query = url.substringAfter("?", missingDelimiterValue = "").ifBlank { url }
+        return query.split("&")
+            .firstOrNull { it.substringBefore("=").equals(name, ignoreCase = true) }
+            ?.substringAfter("=")
+            ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
+    }
+
+    private fun extractJsonStringField(
+        body: String,
+        name: String,
+    ): String? {
+        val quoted = Regex("\"$name\"\\s*:\\s*\"([^\"]*)\"").find(body)?.groupValues?.getOrNull(1)
+        return quoted?.replace("\\/", "/")
+    }
+
+    private fun extractJsonNumber(
+        body: String,
+        name: String,
+    ): Float? {
+        val quoted = Regex("\"$name\"\\s*:\\s*(\"?-?\\d+(?:\\.\\d+)?\"?)").find(body) ?: return null
+        return quoted.groupValues[1].trim('"').toFloatOrNull()
+    }
+
+    private fun extractJsonBoolean(
+        body: String,
+        name: String,
+    ): Boolean? =
+        when (Regex("\"$name\"\\s*:\\s*(\"?(?:true|false|1|0)\"?)", RegexOption.IGNORE_CASE).find(body)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.trim('"')
+            ?.lowercase()) {
+            "true", "1" -> true
+            "false", "0" -> false
+            else -> null
+        }
+
+    // ── SOAP 控制处理（标准 DLNA + NirvanaControl） ──────────
+
     private fun updateCurrentMedia(body: String) {
         currentUri = extractXmlText(body, "CurrentURI")?.decodeXmlEntities().orEmpty()
         currentMetaData = extractXmlText(body, "CurrentURIMetaData")?.decodeXmlEntities().orEmpty()
     }
 
-    private suspend fun handleAvTransportAction(
+    private suspend fun withPlaybackSession(
+        action: String,
+        block: CastPlaybackSession.() -> Unit,
+    ) {
+        val session = CastPlaybackSessionRegistry.current()
+        if (session == null) {
+            requestLogger.log("no active cast playback session for action=$action")
+            return
+        }
+        withContext(Dispatchers.Main.immediate) {
+            requestLogger.log("execute playback action=$action")
+            runCatching { session.block() }
+                .onSuccess { requestLogger.log("completed playback action=$action") }
+                .onFailure { logger.warn(it) { "Cast playback command failed: $action" } }
+        }
+    }
+
+    private suspend fun currentSnapshot(): CastPlaybackSnapshot =
+        withContext(Dispatchers.Main.immediate) {
+            CastPlaybackSessionRegistry.current()?.snapshot()
+        } ?: CastPlaybackSnapshot()
+
+    private fun handleAvTransportAction(
         action: String,
         body: String,
     ): String {
         when (action) {
-            "Play" -> withPlaybackSession(action) { play() }
-            "Pause" -> withPlaybackSession(action) { pause() }
-            "Stop" -> withPlaybackSession(action) { stop() }
+            "Play" -> withPlaybackSessionBlocking { play() }
+            "Pause" -> withPlaybackSessionBlocking { pause() }
+            "Stop" -> withPlaybackSessionBlocking { stop() }
             "Seek" -> {
                 val unit = extractXmlText(body, "Unit")?.decodeXmlEntities().orEmpty()
                 val target = extractXmlText(body, "Target")?.decodeXmlEntities().orEmpty()
                 val positionMs = parseDlnaTimeMillis(target)
                 requestLogger.log("AVTransport Seek unit=$unit target=$target parsedMs=$positionMs")
                 if (positionMs != null && (unit.isBlank() || unit == "REL_TIME" || unit == "ABS_TIME")) {
-                    withPlaybackSession(action) { seekTo(positionMs) }
+                    withPlaybackSessionBlocking { seekTo(positionMs) }
                 } else {
                     requestLogger.log("ignore unsupported Seek unit=$unit target=$target")
                 }
@@ -277,7 +788,7 @@ class CastHttpServer(
 
         return when (action) {
             "GetTransportInfo" -> {
-                val snapshot = currentSnapshot()
+                val snapshot = currentSnapshotBlocking()
                 soapResponse(
                     serviceType = CastReceiverConfig.AV_TRANSPORT_SERVICE_TYPE,
                     action = action,
@@ -290,7 +801,7 @@ class CastHttpServer(
             }
 
             "GetPositionInfo" -> {
-                val snapshot = currentSnapshot()
+                val snapshot = currentSnapshotBlocking()
                 soapResponse(
                     serviceType = CastReceiverConfig.AV_TRANSPORT_SERVICE_TYPE,
                     action = action,
@@ -308,7 +819,7 @@ class CastHttpServer(
             }
 
             "GetMediaInfo" -> {
-                val snapshot = currentSnapshot()
+                val snapshot = currentSnapshotBlocking()
                 soapResponse(
                     serviceType = CastReceiverConfig.AV_TRANSPORT_SERVICE_TYPE,
                     action = action,
@@ -416,21 +927,21 @@ class CastHttpServer(
             else -> soapResponse(CastReceiverConfig.CONNECTION_MANAGER_SERVICE_TYPE, action)
         }
 
-    private suspend fun handleNirvanaAction(
+    private fun handleNirvanaAction(
         action: String,
         body: String,
     ): String {
         when (action) {
-            "Play" -> withPlaybackSession("Nirvana.$action") { play() }
-            "Pause" -> withPlaybackSession("Nirvana.$action") { pause() }
-            "Stop" -> withPlaybackSession("Nirvana.$action") { stop() }
+            "Play" -> withPlaybackSessionBlocking { play() }
+            "Pause" -> withPlaybackSessionBlocking { pause() }
+            "Stop" -> withPlaybackSessionBlocking { stop() }
             "Seek" -> {
                 val target =
                     extractXmlText(body, "Target")?.decodeXmlEntities()
                         ?: extractXmlText(body, "Position")?.decodeXmlEntities().orEmpty()
                 val positionMs = parseDlnaTimeMillis(target)
                 requestLogger.log("Nirvana Seek target=$target parsedMs=$positionMs")
-                positionMs?.let { withPlaybackSession("Nirvana.$action") { seekTo(it) } }
+                positionMs?.let { withPlaybackSessionBlocking { seekTo(it) } }
             }
 
             "SetSpeed", "SwitchSpeed" -> (
@@ -439,13 +950,13 @@ class CastHttpServer(
                     ?: extractXmlText(body, "CurrSpeed")?.decodeXmlEntities()?.toFloatOrNull()
                     ?: extractXmlText(body, "Rate")?.decodeXmlEntities()?.toFloatOrNull()
                 )
-                ?.let { speed -> withPlaybackSession("Nirvana.$action") { setSpeed(speed) } }
+                ?.let { speed -> withPlaybackSessionBlocking { setSpeed(speed) } }
 
             "SwitchQuality", "SetQuality" -> {
                 val qualityId =
                     extractXmlText(body, "Qn")?.decodeXmlEntities()?.toIntOrNull()
                         ?: extractXmlText(body, "Quality")?.decodeXmlEntities()?.toIntOrNull()
-                qualityId?.let { withPlaybackSession("Nirvana.$action") { setQuality(it) } }
+                qualityId?.let { withPlaybackSessionBlocking { setQuality(it) } }
             }
 
             "SetDanmakuSwitch", "SwitchDanmaku", "SetDanmaku" -> (
@@ -453,7 +964,7 @@ class CastHttpServer(
                     ?: parseSoapBoolean(extractXmlText(body, "Open")?.decodeXmlEntities())
                     ?: parseSoapBoolean(extractXmlText(body, "DanmakuState")?.decodeXmlEntities())
                 )
-                ?.let { enabled -> withPlaybackSession("Nirvana.$action") { setDanmakuEnabled(enabled) } }
+                ?.let { enabled -> withPlaybackSessionBlocking { setDanmakuEnabled(enabled) } }
         }
 
         return when (action) {
@@ -485,7 +996,7 @@ class CastHttpServer(
             )
 
             "GetPlayInfo" -> {
-                val snapshot = currentSnapshot()
+                val snapshot = currentSnapshotBlocking()
                 requestLogger.log(
                     "GetPlayInfo snapshot state=${snapshot.state} " +
                         "positionMs=${snapshot.positionMs} durationMs=${snapshot.durationMs} " +
@@ -503,48 +1014,32 @@ class CastHttpServer(
         }
     }
 
-    private suspend fun withPlaybackSession(
-        action: String,
-        block: CastPlaybackSession.() -> Unit,
-    ) {
-        val session = CastPlaybackSessionRegistry.current()
-        if (session == null) {
-            requestLogger.log("no active cast playback session for action=$action")
-            return
-        }
-        withContext(Dispatchers.Main.immediate) {
-            requestLogger.log("execute playback action=$action")
-            runCatching { session.block() }
-                .onSuccess { requestLogger.log("completed playback action=$action") }
-                .onFailure { logger.warn(it) { "Cast playback command failed: $action" } }
+    /**
+     * SOAP 处理运行在连接线程（阻塞模型），播放控制在主线程执行并
+     * 等待完成后返回（大多数 SOAP 客户端期望应答即结果已生效）。
+     */
+    private fun withPlaybackSessionBlocking(block: CastPlaybackSession.() -> Unit) {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                withPlaybackSession("SOAP", block)
+            }
         }
     }
 
-    private suspend fun currentSnapshot(): CastPlaybackSnapshot =
-        withContext(Dispatchers.Main.immediate) {
-            CastPlaybackSessionRegistry.current()?.snapshot()
-        } ?: CastPlaybackSnapshot()
+    private fun currentSnapshotBlocking(): CastPlaybackSnapshot =
+        runCatching {
+            kotlinx.coroutines.runBlocking { currentSnapshot() }
+        }.getOrDefault(CastPlaybackSnapshot())
 
-    private suspend fun ApplicationCall.respondXml(xml: String) {
-        respondText(
-            text = xml,
-            contentType = ContentType.Application.Xml.withCharset(Charsets.UTF_8),
-        )
-    }
+    private fun CastTransportState.toNirvanaPlayerState(): Int =
+        when (this) {
+            CastTransportState.PLAYING -> 4
+            CastTransportState.PAUSED_PLAYBACK -> 5
+            CastTransportState.TRANSITIONING -> 2
+            CastTransportState.STOPPED -> 7
+        }
 
-    private suspend fun ApplicationCall.respondEventSubscription() {
-        response.headers.append("SID", "uuid:$uuid")
-        response.headers.append("TIMEOUT", "Second-1800")
-        respondText("", status = HttpStatusCode.OK)
-    }
-
-    /** 按请求的来源地址选择本机 IP，避免 description.xml 返回不可达地址。 */
-    private fun ApplicationCall.localDescriptionHost(): String {
-        val remote = request.local.remoteHost
-            .takeIf { it.isNotBlank() }
-            ?.let { runCatching { InetAddress.getByName(it) }.getOrNull() }
-        return remote?.let(CastNetworkUtil::localIpv4AddressFor) ?: CastNetworkUtil.localIpv4Address()
-    }
+    // ── SOAP/XML 工具 ─────────────────────────────────────────
 
     private fun soapResponse(
         serviceType: String,
@@ -623,7 +1118,6 @@ class CastHttpServer(
         ).find(xml)?.groupValues?.getOrNull(1)
     }
 
-    /** 解析 DLNA 时间（`H:MM:SS` / `M:SS` / 秒数）为毫秒。 */
     private fun parseDlnaTimeMillis(value: String?): Long? {
         val text = value?.trim()?.takeIf { it.isNotBlank() } ?: return null
         if (!text.contains(":")) {
@@ -670,11 +1164,33 @@ class CastHttpServer(
 
     private fun Float.cleanSpeed(): String = if (this % 1f == 0f) toInt().toString() else toString()
 
-    private fun CastTransportState.toNirvanaPlayerState(): Int =
-        when (this) {
-            CastTransportState.PLAYING -> 4
-            CastTransportState.PAUSED_PLAYBACK -> 5
-            CastTransportState.TRANSITIONING -> 2
-            CastTransportState.STOPPED -> 7
-        }
+    private class HttpRequest(
+        val method: String,
+        val path: String,
+        val target: String,
+        val version: String,
+        val headers: Map<String, String>,
+        val body: String,
+    ) {
+        val isKeepAlive: Boolean
+            get() =
+                if (version == "HTTP/1.0") {
+                    headers["connection"]?.lowercase() == "keep-alive"
+                } else {
+                    headers["connection"]?.lowercase() != "close"
+                }
+    }
+
+    private data class RouteResult(
+        val status: String,
+        val contentType: String,
+        val extraHeaders: List<Pair<String, String>>,
+        val body: String,
+    )
+
+    private companion object {
+        const val MAX_HEAD_BYTES = 64 * 1024
+        const val MAX_BODY_BYTES = 4 * 1024 * 1024
+        const val STATUS_PUSH_INTERVAL_MS = 1_000L
+    }
 }

@@ -43,6 +43,8 @@ class LogViewerViewModelTest {
         every { crashHandler.listManualLogs() } returns emptyList()
         every { crashHandler.listCrashLogs() } returns emptyList()
         val app = mockk<Application>(relaxed = true)
+        // 投屏请求日志读取自 filesDir，桩到临时目录避免 mock 链式调用
+        every { app.filesDir } returns tempDir
         viewModel = LogViewerViewModel(app, httpServer, crashHandler)
 
         Thread.sleep(300)
