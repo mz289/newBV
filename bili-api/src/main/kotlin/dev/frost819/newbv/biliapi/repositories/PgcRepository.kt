@@ -5,6 +5,7 @@ import dev.frost819.newbv.biliapi.entity.pgc.PgcFeedData
 import dev.frost819.newbv.biliapi.entity.pgc.PgcPageTab
 import dev.frost819.newbv.biliapi.entity.pgc.PgcRankData
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
+import dev.frost819.newbv.biliapi.entity.pgc.PgcWebPage
 import dev.frost819.newbv.biliapi.entity.pgc.index.Area
 import dev.frost819.newbv.biliapi.entity.pgc.index.Copyright
 import dev.frost819.newbv.biliapi.entity.pgc.index.IndexOrder
@@ -27,6 +28,14 @@ class PgcRepository {
         val carouselData = CarouselData.fromPgcWebInitialStateData(initialStateData)
         return carouselData
     }
+
+    /**
+     * 获取 PGC 分区页数据（轮播 + 索引快捷筛选 + 服务端下发的板块列表）。
+     *
+     * 板块标题与内容均来自分区页 `__INITIAL_STATE__`，页面按板块数据驱动渲染。
+     */
+    suspend fun getPgcWebPage(pgcType: PgcType): PgcWebPage =
+        PgcWebPage.fromPgcWebInitialStateData(BiliHttpApi.getPgcWebInitialStateData(pgcType))
 
     suspend fun getFeed(
         pgcType: PgcType,

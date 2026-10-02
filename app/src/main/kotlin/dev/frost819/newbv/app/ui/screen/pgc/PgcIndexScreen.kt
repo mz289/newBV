@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -17,6 +18,9 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
@@ -69,9 +73,6 @@ import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import androidx.compose.material3.Scaffold as Material3Scaffold
 
-/** 结果网格前的表头 item 数量（10 个筛选行 + 1 个命中数行），用于无限滚动阈值换算。 */
-private const val INDEX_HEADER_ITEM_COUNT = 11
-
 /**
  * 番剧索引筛选页路由注册。
  *
@@ -86,8 +87,8 @@ fun NavGraphBuilder.pgcIndexScreen(navController: NavController) {
 /**
  * 番剧索引筛选页。
  *
- * 顶栏标题 + 多维度筛选行（排序/风格/地区/年份/状态/付费/版本/
- * 配音/月度/版权）+ 6 列结果网格 + 无限滚动。菜单键等同于返回。
+ * 顶栏标题 + 筛选区（排序/风格/地区/年份常驻，状态/付费/版本/配音/月度/版权
+ * 折叠进「更多筛选」开关） + 6 列结果网格 + 无限滚动。菜单键等同于返回。
  *
  * @param navController 导航控制器。
  */
@@ -135,10 +136,14 @@ private fun IndexBody(
 ) {
     val gridState = rememberLazyGridState()
 
+    // 次要筛选维度默认折叠，让结果网格进首屏；展开状态跨重建保留
+    var filterExpanded by rememberSaveable { mutableStateOf(false) }
+    val filterLayout = indexFilterLayout(state, viewModel, filterExpanded)
+
     // 距离底部 10 条时触发加载更多
     InfiniteScrollEffect(
         state = gridState,
-        itemCount = { INDEX_HEADER_ITEM_COUNT + state.items.size },
+        itemCount = { filterLayout.headerItemCount + state.items.size },
         threshold = 10,
         onLoadMore = { viewModel.loadMore() },
     )
@@ -158,101 +163,25 @@ private fun IndexBody(
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_order") {
-            IndexFilterRow(
-                spec = IndexFilterSpec("排序", IndexOrder.getList(viewModel.pgcType), state.order, viewModel::setOrder),
-                focusSaver = focusSaver,
-            )
+        filterLayout.fixedRows.forEach { spec ->
+            item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_${spec.key}") {
+                IndexFilterRow(spec = spec, focusSaver = focusSaver)
+            }
         }
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_style") {
-            IndexFilterRow(
-                spec = IndexFilterSpec("风格", Style.getList(viewModel.pgcType), state.style, viewModel::setStyle),
-                focusSaver = focusSaver,
-            )
+        if (filterLayout.toggleVisible) {
+            item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_toggle") {
+                IndexFilterToggleRow(
+                    expanded = filterExpanded,
+                    hiddenCount = filterLayout.hiddenSecondaryCount,
+                    onToggle = { filterExpanded = !filterExpanded },
+                    focusSaver = focusSaver,
+                )
+            }
         }
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_area") {
-            IndexFilterRow(
-                spec = IndexFilterSpec("地区", Area.getList(viewModel.pgcType), state.area, viewModel::setArea),
-                focusSaver = focusSaver,
-            )
-        }
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_year") {
-            IndexFilterRow(
-                spec = IndexFilterSpec("年份", Year.getList(viewModel.pgcType), state.year, viewModel::setYear),
-                focusSaver = focusSaver,
-            )
-        }
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_is_finish") {
-            IndexFilterRow(
-                spec =
-                    IndexFilterSpec(
-                        "状态",
-                        IsFinish.getList(viewModel.pgcType),
-                        state.isFinish,
-                        viewModel::setIsFinish,
-                    ),
-                focusSaver = focusSaver,
-            )
-        }
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_status") {
-            IndexFilterRow(
-                spec =
-                    IndexFilterSpec(
-                        "付费",
-                        SeasonStatus.getList(viewModel.pgcType),
-                        state.seasonStatus,
-                        viewModel::setSeasonStatus,
-                    ),
-                focusSaver = focusSaver,
-            )
-        }
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_version") {
-            IndexFilterRow(
-                spec =
-                    IndexFilterSpec(
-                        "版本",
-                        SeasonVersion.getList(viewModel.pgcType),
-                        state.seasonVersion,
-                        viewModel::setSeasonVersion,
-                    ),
-                focusSaver = focusSaver,
-            )
-        }
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_language") {
-            IndexFilterRow(
-                spec =
-                    IndexFilterSpec(
-                        "配音",
-                        SpokenLanguage.getList(viewModel.pgcType),
-                        state.spokenLanguage,
-                        viewModel::setSpokenLanguage,
-                    ),
-                focusSaver = focusSaver,
-            )
-        }
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_month") {
-            IndexFilterRow(
-                spec =
-                    IndexFilterSpec(
-                        "月度",
-                        SeasonMonth.getList(viewModel.pgcType),
-                        state.seasonMonth,
-                        viewModel::setSeasonMonth,
-                    ),
-                focusSaver = focusSaver,
-            )
-        }
-        item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_copyright") {
-            IndexFilterRow(
-                spec =
-                    IndexFilterSpec(
-                        "版权",
-                        Copyright.getList(viewModel.pgcType),
-                        state.copyright,
-                        viewModel::setCopyright,
-                    ),
-                focusSaver = focusSaver,
-            )
+        filterLayout.secondaryRows.forEach { spec ->
+            item(span = { GridItemSpan(maxLineSpan) }, key = "index_filter_${spec.key}") {
+                IndexFilterRow(spec = spec, focusSaver = focusSaver)
+            }
         }
         item(span = { GridItemSpan(maxLineSpan) }, key = "index_summary") {
             Text(
@@ -325,28 +254,147 @@ private fun IndexBody(
 }
 
 /**
- * 筛选维度描述。
+ * 索引筛选区布局结果。
  *
- * @param T 筛选枚举类型。
+ * @property fixedRows 常驻维度行（排序/风格/地区/年份，分区无该维度时剔除）。
+ * @property secondaryRows 当前需渲染的次要维度行（展开态全部显示；收起态仅保留
+ *   有非默认选中的行，提示结果被过滤的原因；可折叠维度不足 2 个时并入常驻行，此处为空）。
+ * @property toggleVisible 是否显示「更多筛选」折叠开关行。
+ * @property hiddenSecondaryCount 收起状态下被隐藏的次要维度数，用于开关文案提示。
+ */
+private data class IndexFilterLayout(
+    val fixedRows: List<IndexFilterSpec>,
+    val secondaryRows: List<IndexFilterSpec>,
+    val toggleVisible: Boolean,
+    val hiddenSecondaryCount: Int,
+) {
+    /** 结果网格前的表头 item 数（维度行 + 开关行 + 命中数行），供无限滚动阈值换算。 */
+    val headerItemCount: Int
+        get() = fixedRows.size + secondaryRows.size + (if (toggleVisible) 1 else 0) + 1
+}
+
+/**
+ * 组装索引筛选区布局：前 4 个常用维度（排序/风格/地区/年份）常驻，
+ * 其余低频维度（状态/付费/版本/配音/月度/版权）折叠进「更多筛选」；
+ * 选项为空的维度不渲染（电影/纪录片等分区本身没有这些维度）。
+ */
+private fun indexFilterLayout(
+    state: PgcIndexUiState,
+    viewModel: PgcIndexViewModel,
+    expanded: Boolean,
+): IndexFilterLayout {
+    val pgcType = viewModel.pgcType
+
+    val fixedRows =
+        listOf(
+            filterSpec("order", "排序", IndexOrder.getList(pgcType), state.order, viewModel::setOrder),
+            filterSpec("style", "风格", Style.getList(pgcType), state.style, viewModel::setStyle),
+            filterSpec("area", "地区", Area.getList(pgcType), state.area, viewModel::setArea),
+            filterSpec("year", "年份", Year.getList(pgcType), state.year, viewModel::setYear),
+        ).filter { it.options.isNotEmpty() }
+
+    // 次要维度及是否处于非默认选中：收起时仍保留非默认选中的行，避免用户忘记已生效的筛选条件
+    val secondaryCandidates =
+        listOf(
+            filterSpec(
+                "is_finish",
+                "状态",
+                IsFinish.getList(pgcType),
+                state.isFinish,
+                viewModel::setIsFinish,
+            ) to (state.isFinish != IsFinish.All),
+            filterSpec(
+                "status",
+                "付费",
+                SeasonStatus.getList(pgcType),
+                state.seasonStatus,
+                viewModel::setSeasonStatus,
+            ) to (state.seasonStatus != SeasonStatus.All),
+            filterSpec(
+                "version",
+                "版本",
+                SeasonVersion.getList(pgcType),
+                state.seasonVersion,
+                viewModel::setSeasonVersion,
+            ) to (state.seasonVersion != SeasonVersion.All),
+            filterSpec(
+                "language",
+                "配音",
+                SpokenLanguage.getList(pgcType),
+                state.spokenLanguage,
+                viewModel::setSpokenLanguage,
+            ) to (state.spokenLanguage != SpokenLanguage.All),
+            filterSpec(
+                "month",
+                "月度",
+                SeasonMonth.getList(pgcType),
+                state.seasonMonth,
+                viewModel::setSeasonMonth,
+            ) to (state.seasonMonth != SeasonMonth.All),
+            filterSpec(
+                "copyright",
+                "版权",
+                Copyright.getList(pgcType),
+                state.copyright,
+                viewModel::setCopyright,
+            ) to (state.copyright != Copyright.All),
+        )
+    val secondary = secondaryCandidates.filter { it.first.options.isNotEmpty() }
+
+    // 可折叠的次要维度不足 2 个时，折叠省不下空间，直接全部常驻
+    if (secondary.size < 2) {
+        return IndexFilterLayout(
+            fixedRows = fixedRows + secondary.map { it.first },
+            secondaryRows = emptyList(),
+            toggleVisible = false,
+            hiddenSecondaryCount = 0,
+        )
+    }
+    return IndexFilterLayout(
+        fixedRows = fixedRows,
+        secondaryRows = secondary.filter { expanded || it.second }.map { it.first },
+        toggleVisible = true,
+        hiddenSecondaryCount = if (expanded) 0 else secondary.count { !it.second },
+    )
+}
+
+/**
+ * 筛选维度描述（渲染用，类型经 [filterSpec] 擦除）。
+ *
+ * @property key 稳定标识（网格 item key）。
  * @property label 维度名（排序/风格/地区…）。
  * @property options 可选项。
  * @property selected 当前选中项。
- * @property onSelect 选中回调。
+ * @property onSelect 选中回调，只会收到 [options] 中的实例。
  */
-private data class IndexFilterSpec<T : PgcIndexParam>(
+private class IndexFilterSpec(
+    val key: String,
     val label: String,
-    val options: List<T>,
-    val selected: T,
-    val onSelect: (T) -> Unit,
+    val options: List<PgcIndexParam>,
+    val selected: PgcIndexParam,
+    val onSelect: (PgcIndexParam) -> Unit,
 )
+
+/**
+ * 构造筛选维度描述并擦除类型：[options] 元素与 [onSelect] 参数同型，
+ * 回调入参必然来自 [options]，擦除后的强转不会失败。
+ */
+@Suppress("UNCHECKED_CAST")
+private fun <T : PgcIndexParam> filterSpec(
+    key: String,
+    label: String,
+    options: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+): IndexFilterSpec = IndexFilterSpec(key, label, options, selected) { onSelect(it as T) }
 
 /**
  * 单个筛选维度行：维度名 + 横向滚动 chip 列表。
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun <T : PgcIndexParam> IndexFilterRow(
-    spec: IndexFilterSpec<T>,
+private fun IndexFilterRow(
+    spec: IndexFilterSpec,
     focusSaver: FocusSaver,
 ) {
     Row(
@@ -395,6 +443,58 @@ private fun <T : PgcIndexParam> IndexFilterRow(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * 「更多筛选」折叠开关行：空出维度名列宽与维度行左对齐。
+ *
+ * 收起时以普通 chip 样式标注被隐藏的维度数；展开后用选中底色提示当前处于展开态。
+ */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun IndexFilterToggleRow(
+    expanded: Boolean,
+    hiddenCount: Int,
+    onToggle: () -> Unit,
+    focusSaver: FocusSaver,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 40.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(modifier = Modifier.width(56.dp))
+        val label =
+            when {
+                expanded -> "收起筛选"
+                hiddenCount > 0 -> "更多筛选 · $hiddenCount"
+                else -> "更多筛选"
+            }
+        FilterChip(
+            selected = expanded,
+            onClick = onToggle,
+            modifier =
+                Modifier
+                    .touchClickable(onClick = onToggle)
+                    .focusSaverItem(focusSaver, "index_filter_toggle"),
+            shape = FilterChipDefaults.shape(shape = ControlFocusDefaults.shape),
+            scale = FilterChipDefaults.scale(focusedScale = 1f),
+            colors = ControlFocusDefaults.filterColors(),
+            border = ControlFocusDefaults.filterBorder(),
+        ) {
+            Text(
+                text = label,
+                color =
+                    if (expanded) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            )
         }
     }
 }
