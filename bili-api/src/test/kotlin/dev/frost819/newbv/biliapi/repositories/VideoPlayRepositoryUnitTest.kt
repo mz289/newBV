@@ -692,41 +692,6 @@ class VideoPlayRepositoryUnitTest {
             supportFormats = emptyList(),
         )
 
-    private fun fakeVideoMoreInfoWithSubtitles(): VideoMoreInfo =
-        fakeVideoMoreInfoNoSubtitle().copy(
-            subtitle =
-                VideoMoreInfo.Subtitle(
-                    allowSubmit = false,
-                    lan = "",
-                    lanDoc = "",
-                    subtitles =
-                        listOf(
-                            VideoMoreInfo.SubtitleItem(
-                                id = 1L,
-                                lan = "zh-Hans",
-                                lanDoc = "中文（简体）",
-                                isLock = false,
-                                subtitleUrl = "https://subtitle.example.com/zh-Hans.json",
-                                type = 0,
-                                idStr = "1",
-                                aiType = 0,
-                                aiStatus = 0,
-                            ),
-                            VideoMoreInfo.SubtitleItem(
-                                id = 2L,
-                                lan = "ai-zh",
-                                lanDoc = "AI中文",
-                                isLock = false,
-                                subtitleUrl = "https://subtitle.example.com/ai-zh.json",
-                                type = 1,
-                                idStr = "2",
-                                aiType = 1,
-                                aiStatus = 1,
-                            ),
-                        ),
-                ),
-        )
-
     private fun fakeVideoMoreInfoNoSubtitle(): VideoMoreInfo =
         VideoMoreInfo(
             aid = AID,
@@ -792,7 +757,7 @@ class VideoPlayRepositoryUnitTest {
             dmMask = null,
             subtitle = null,
             playerIcon = null,
-            viewPoints = kotlinx.serialization.json.JsonArray(emptyList()),
+            viewPoints = emptyList(),
             isUgcPayPreview = false,
             previewToast = "",
             pcdnLoader = null,
