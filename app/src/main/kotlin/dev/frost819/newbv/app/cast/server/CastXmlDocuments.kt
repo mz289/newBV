@@ -40,36 +40,58 @@ object CastXmlDocuments {
             "http-get:*:image/jpeg:*," +
             "http-get:*:image/png:*"
 
+    /**
+     * 设备描述，字段形态对齐官方云视听小电视（社区逆向验证）：
+     * - `X_brandName/hostVersion/ottVersion/channelName/capability` 为官方
+     *   电视端特征字段，手机端「必连」会据此识别；
+     * - 无 URLBase，服务地址为相对路径（相对 description.xml 的 URL 解析）；
+     * - 在官方双服务（AVTransport + NirvanaControl）之外附加
+     *   RenderingControl/ConnectionManager，兼容通用 DLNA 控制点。
+     */
     fun deviceDescription(
         host: String,
         uuid: String,
     ): String {
-        val baseUrl = "http://$host:${CastReceiverConfig.HTTP_PORT}"
         return xml(
             """
             <?xml version="1.0" encoding="utf-8"?>
-            <root xmlns="urn:schemas-upnp-org:device-1-0">
+            <root xmlns:dlna="urn:schemas-dlna-org:device-1-0" xmlns="urn:schemas-upnp-org:device-1-0">
               <specVersion>
                 <major>1</major>
                 <minor>0</minor>
               </specVersion>
-              <URLBase>$baseUrl/</URLBase>
               <device>
                 <deviceType>${CastReceiverConfig.MEDIA_RENDERER_DEVICE_TYPE}</deviceType>
                 <friendlyName>${CastReceiverConfig.DEVICE_NAME}</friendlyName>
                 <manufacturer>${CastReceiverConfig.MANUFACTURER}</manufacturer>
-                <manufacturerURL>https://www.bilibili.com/</manufacturerURL>
-                <modelDescription>newBV Bilibili projection receiver</modelDescription>
+                <manufacturerURL>https://bilibili.com/</manufacturerURL>
+                <modelDescription>云视听小电视</modelDescription>
                 <modelName>${CastReceiverConfig.MODEL_NAME}</modelName>
                 <modelNumber>${CastReceiverConfig.MODEL_NUMBER}</modelNumber>
+                <modelURL>https://app.bilibili.com/</modelURL>
+                <serialNumber>${CastReceiverConfig.MODEL_NUMBER}</serialNumber>
                 <UDN>uuid:$uuid</UDN>
+                <X_brandName>${CastReceiverConfig.DEVICE_NAME}</X_brandName>
+                <hostVersion>25</hostVersion>
+                <ottVersion>${CastReceiverConfig.OTT_VERSION}</ottVersion>
+                <channelName>master</channelName>
+                <capability>255</capability>
+                <dlna:X_DLNADOC xmlns:dlna="urn:schemas-dlna-org:device-1-0">DMR-1.50</dlna:X_DLNADOC>
+                <dlna:X_DLNACAP xmlns:dlna="urn:schemas-dlna-org:device-1-0">playcontainer-1-0</dlna:X_DLNACAP>
                 <serviceList>
                   <service>
                     <serviceType>${CastReceiverConfig.AV_TRANSPORT_SERVICE_TYPE}</serviceType>
                     <serviceId>urn:upnp-org:serviceId:AVTransport</serviceId>
-                    <SCPDURL>/AVTransport.xml</SCPDURL>
-                    <controlURL>/AVTransport/control</controlURL>
+                    <SCPDURL>/dlna/AVTransport.xml</SCPDURL>
+                    <controlURL>/AVTransport/action</controlURL>
                     <eventSubURL>/AVTransport/event</eventSubURL>
+                  </service>
+                  <service>
+                    <serviceType>${CastReceiverConfig.NIRVANA_SERVICE_TYPE}</serviceType>
+                    <serviceId>urn:app-bilibili-com:serviceId:NirvanaControl</serviceId>
+                    <SCPDURL>/dlna/NirvanaControl.xml</SCPDURL>
+                    <controlURL>/NirvanaControl/action</controlURL>
+                    <eventSubURL>/NirvanaControl/event</eventSubURL>
                   </service>
                   <service>
                     <serviceType>${CastReceiverConfig.RENDERING_CONTROL_SERVICE_TYPE}</serviceType>
@@ -84,13 +106,6 @@ object CastXmlDocuments {
                     <SCPDURL>/ConnectionManager.xml</SCPDURL>
                     <controlURL>/ConnectionManager/control</controlURL>
                     <eventSubURL>/ConnectionManager/event</eventSubURL>
-                  </service>
-                  <service>
-                    <serviceType>${CastReceiverConfig.NIRVANA_SERVICE_TYPE}</serviceType>
-                    <serviceId>urn:app-bilibili-com:serviceId:NirvanaControl</serviceId>
-                    <SCPDURL>/NirvanaControl.xml</SCPDURL>
-                    <controlURL>/NirvanaControl/control</controlURL>
-                    <eventSubURL>/NirvanaControl/event</eventSubURL>
                   </service>
                 </serviceList>
               </device>

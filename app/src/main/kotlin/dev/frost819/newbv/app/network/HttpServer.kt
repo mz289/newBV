@@ -243,7 +243,8 @@ class HttpServer(
     private fun isAllowedLogFilename(filename: String): Boolean {
         val allowedPrefix =
             filename.startsWith(CrashHandler.MANUAL_LOG_PREFIX) ||
-                filename.startsWith(CrashHandler.CRASH_LOG_PREFIX)
+                filename.startsWith(CrashHandler.CRASH_LOG_PREFIX) ||
+                filename.startsWith(CAST_LOG_PREFIX)
         val allowedSuffix = filename.endsWith(".log")
         return allowedPrefix && allowedSuffix
     }
@@ -261,7 +262,10 @@ class HttpServer(
             else -> ContentType.Application.OctetStream
         }
 
-    companion object {
+    private companion object {
         private val json = Json { ignoreUnknownKeys = true }
+
+        /** 投屏接收端请求日志前缀（CastReceiverConfig.LOG_FILE_NAME / LOG_ROTATED_FILE_NAME）。 */
+        const val CAST_LOG_PREFIX = "cast_receiver_requests"
     }
 }

@@ -3,9 +3,11 @@ package dev.frost819.newbv.app.cast.server
 import dev.frost819.newbv.core.log.Loggers
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.MulticastSocket
+import java.net.NetworkInterface
 import java.net.SocketTimeoutException
 import java.util.Locale
 import kotlin.random.Random
@@ -18,6 +20,12 @@ import kotlinx.coroutines.launch
 /**
  * SSDP 服务：监听 M-SEARCH 单播/组播并周期性 NOTIFY ssdp:alive，
  * 让投屏端（B 站官方客户端、Macast 等标准 DLNA 控制点）发现本机 MediaRenderer。
+ *
+ * 电视/盒子普遍存在多网卡（Wi-Fi + 有线 + 虚拟接口）以及系统自带 DLNA
+ * 服务占用 1900 端口的情况，因此：
+ * - 组播「加入」在所有可用 IPv4 接口上执行，避免只加入默认路由接口收不到搜索；
+ * - ssdp:alive 按接口逐个发送，避免只从默认接口发出；
+ * - M-SEARCH 应答固定以 1900 为源端口（带 SO_REUSEADDR），兼容校验源端口的控制点。
  */
 class CastSsdpServer(
     private val uuid: String,
@@ -51,10 +59,25 @@ class CastSsdpServer(
             MulticastSocket(null).use { socket ->
                 socket.reuseAddress = true
                 socket.bind(InetSocketAddress(CastReceiverConfig.SSDP_PORT))
-                socket.joinGroup(InetAddress.getByName(CastReceiverConfig.SSDP_ADDRESS))
+                val group = InetAddress.getByName(CastReceiverConfig.SSDP_ADDRESS)
+                val interfaces = upMulticastInterfaces()
+                val joined =
+                    interfaces.mapNotNull { ni ->
+                        runCatching {
+                            socket.joinGroup(InetSocketAddress(group, CastReceiverConfig.SSDP_PORT), ni)
+                            ni.name
+                        }.onFailure {
+                            logger.warn(it) { "SSDP join group failed on ${ni.name}" }
+                        }.getOrNull()
+                    }
+                if (joined.isEmpty()) {
+                    socket.joinGroup(group)
+                    requestLogger.log("SSDP listener started, joined interface=default(fallback)")
+                } else {
+                    requestLogger.log("SSDP listener started, joined interfaces=$joined")
+                }
                 socket.soTimeout = 1000
                 val buffer = ByteArray(8192)
-                requestLogger.log("SSDP listener started")
                 while (running && scope.coroutineContext.isActive) {
                     val packet = DatagramPacket(buffer, buffer.size)
                     try {
@@ -120,7 +143,8 @@ class CastSsdpServer(
                         (requestedTarget.contains("renderingcontrol") && lowerTarget.contains("renderingcontrol")) ||
                         (requestedTarget.contains("connectionmanager") && lowerTarget.contains("connectionmanager")) ||
                         (requestedTarget.contains("nirvanacontrol") && lowerTarget.contains("nirvanacontrol")) ||
-                        (requestedTarget.contains("app-bilibili-com") && lowerTarget.contains("app-bilibili-com"))
+                        // 官方客户端私有变体（如 urn:bilibili-com:...）统一按 bilibili 关键字匹配
+                        (requestedTarget.contains("bilibili") && lowerTarget.contains("bilibili"))
                 }
         }
     }
@@ -145,17 +169,23 @@ class CastSsdpServer(
 
     private fun sendAliveNotifications() {
         val group = InetAddress.getByName(CastReceiverConfig.SSDP_ADDRESS)
-        val host = CastNetworkUtil.localIpv4Address()
-        ssdpTargets().forEach { target ->
-            val payload = aliveNotify(target, host)
-            sendUdp(payload, group, CastReceiverConfig.SSDP_PORT)
+        val interfaces = upMulticastInterfaces().ifEmpty { listOf<NetworkInterface?>(null) }
+        interfaces.forEach { ni ->
+            val host =
+                ni?.let(::firstIpv4Of) ?: CastNetworkUtil.localIpv4Address()
+            ssdpTargets().forEach { target ->
+                sendMulticast(aliveNotify(target, host), group, ni)
+            }
         }
     }
 
     private fun sendByeByeNotifications() {
         val group = InetAddress.getByName(CastReceiverConfig.SSDP_ADDRESS)
-        ssdpTargets().forEach { target ->
-            sendUdp(byeByeNotify(target), group, CastReceiverConfig.SSDP_PORT)
+        val interfaces = upMulticastInterfaces().ifEmpty { listOf<NetworkInterface?>(null) }
+        interfaces.forEach { ni ->
+            ssdpTargets().forEach { target ->
+                sendMulticast(byeByeNotify(target), group, ni)
+            }
         }
     }
 
@@ -176,13 +206,15 @@ class CastSsdpServer(
     ): String =
         """
             HTTP/1.1 200 OK
-            CACHE-CONTROL: max-age=1800
+            CACHE-CONTROL: max-age=${CastReceiverConfig.SSDP_MAX_AGE_SECONDS}
             DATE: ${DateHeader.now()}
             EXT:
             LOCATION: http://$host:${CastReceiverConfig.HTTP_PORT}/description.xml
-            SERVER: Android/1.0 UPnP/1.0 newBV/1.0
+            SERVER: ${CastReceiverConfig.SERVER_TOKEN}
             ST: $st
             USN: ${usnFor(st)}
+            BOOTID.UPNP.ORG: 1669443520
+            CONFIGID.UPNP.ORG: 10177363
 
         """.trimIndent().replace("\n", "\r\n")
 
@@ -193,11 +225,11 @@ class CastSsdpServer(
         """
             NOTIFY / HTTP/1.1
             HOST: ${CastReceiverConfig.SSDP_ADDRESS}:${CastReceiverConfig.SSDP_PORT}
-            CACHE-CONTROL: max-age=1800
+            CACHE-CONTROL: max-age=${CastReceiverConfig.SSDP_MAX_AGE_SECONDS}
             LOCATION: http://$host:${CastReceiverConfig.HTTP_PORT}/description.xml
             NT: $nt
             NTS: ssdp:alive
-            SERVER: Android/1.0 UPnP/1.0 newBV/1.0
+            SERVER: ${CastReceiverConfig.SERVER_TOKEN}
             USN: ${usnFor(nt)}
 
         """.trimIndent().replace("\n", "\r\n")
@@ -224,15 +256,67 @@ class CastSsdpServer(
         address: InetAddress,
         port: Int,
     ) {
-        runCatching {
-            DatagramSocket().use { socket ->
-                val bytes = payload.toByteArray(Charsets.UTF_8)
-                socket.send(DatagramPacket(bytes, bytes.size, address, port))
+        val bytes = payload.toByteArray(Charsets.UTF_8)
+        // 优先以 1900 为源端口发送应答（部分控制点会校验），端口被占则退回临时端口
+        val bound =
+            runCatching {
+                DatagramSocket(null).apply {
+                    reuseAddress = true
+                    bind(InetSocketAddress(CastReceiverConfig.SSDP_PORT))
+                }.use { socket ->
+                    socket.send(DatagramPacket(bytes, bytes.size, address, port))
+                }
+            }.isSuccess
+        if (!bound) {
+            runCatching {
+                DatagramSocket().use { socket ->
+                    socket.send(DatagramPacket(bytes, bytes.size, address, port))
+                }
+            }.onFailure {
+                logger.warn(it) { "Send SSDP packet failed to ${address.hostAddress}:$port" }
             }
-        }.onFailure {
-            logger.warn(it) { "Send SSDP packet failed to ${address.hostAddress}:$port" }
         }
     }
+
+    /** 按指定网卡发送组播（ssdp:alive/byebye），未指定时走默认路由。 */
+    private fun sendMulticast(
+        payload: String,
+        group: InetAddress,
+        ni: NetworkInterface?,
+    ) {
+        runCatching {
+            MulticastSocket().use { socket ->
+                if (ni != null) socket.networkInterface = ni
+                val bytes = payload.toByteArray(Charsets.UTF_8)
+                socket.send(DatagramPacket(bytes, bytes.size, group, CastReceiverConfig.SSDP_PORT))
+            }
+        }.onFailure {
+            logger.warn(it) {
+                "Send SSDP notify failed${ni?.let { n -> " on ${n.name}" } ?: ""}"
+            }
+        }
+    }
+
+    /** 可用组播接口：已启用、非回环/点对点、支持组播且含有效 IPv4 地址。 */
+    private fun upMulticastInterfaces(): List<NetworkInterface> =
+        runCatching {
+            NetworkInterface.getNetworkInterfaces()
+                .asSequence()
+                .filter { it.isUp && !it.isLoopback && !it.isPointToPoint }
+                .filter { it.supportsMulticast() }
+                .filter { firstIpv4Of(it) != null }
+                .toList()
+        }.getOrDefault(emptyList())
+
+    private fun firstIpv4Of(ni: NetworkInterface): String? =
+        runCatching {
+            ni.inetAddresses
+                .asSequence()
+                .filterIsInstance<Inet4Address>()
+                .firstOrNull {
+                    !it.isLoopbackAddress && !it.hostAddress.orEmpty().startsWith("169.254.")
+                }?.hostAddress
+        }.getOrNull()
 
     private fun String.oneLine(): String =
         replace('\r', ' ').replace('\n', ' ').take(2048)
@@ -241,7 +325,9 @@ class CastSsdpServer(
         const val STARTUP_ALIVE_DELAY_MS = 200L
         const val STARTUP_NOTIFY_BURSTS = 3
         const val STARTUP_NOTIFY_INTERVAL_MS = 1_000L
-        const val REGULAR_NOTIFY_INTERVAL_MS = 30_000L
+
+        /** 官方电视端以 1s 间隔持续广播 alive（ATV-Bilibili-demo 逆向验证），手机端搜索窗口短，依赖高频 NOTIFY。 */
+        const val REGULAR_NOTIFY_INTERVAL_MS = 1_000L
         const val SEARCH_RESPONSE_REPEAT_DELAY_MS = 80L
         const val SEARCH_RESPONSE_JITTER_MS = 120L
     }

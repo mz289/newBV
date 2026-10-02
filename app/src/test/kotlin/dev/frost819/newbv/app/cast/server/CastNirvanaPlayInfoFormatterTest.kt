@@ -91,14 +91,16 @@ class CastNirvanaPlayInfoFormatterTest {
     }
 
     @Test
-    fun `device description contains all four services`() {
+    fun `device description mirrors official yst shape`() {
         val description = CastXmlDocuments.deviceDescription(host = "192.168.1.2", uuid = "test-uuid")
 
         assertThat(description).contains(CastReceiverConfig.AV_TRANSPORT_SERVICE_TYPE)
-        assertThat(description).contains(CastReceiverConfig.RENDERING_CONTROL_SERVICE_TYPE)
-        assertThat(description).contains(CastReceiverConfig.CONNECTION_MANAGER_SERVICE_TYPE)
         assertThat(description).contains(CastReceiverConfig.NIRVANA_SERVICE_TYPE)
         assertThat(description).contains("<UDN>uuid:test-uuid</UDN>")
-        assertThat(description).contains("http://192.168.1.2:${CastReceiverConfig.HTTP_PORT}")
+        assertThat(description).contains("<capability>255</capability>")
+        assertThat(description).contains("<ottVersion>")
+        assertThat(description).contains("DMR-1.50")
+        assertThat(description).contains("/AVTransport/action")
+        assertThat(description).contains("/NirvanaControl/action")
     }
 }

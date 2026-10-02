@@ -7,6 +7,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.frost819.newbv.BuildConfig
+import dev.frost819.newbv.app.cast.server.CastRequestLogger
 import dev.frost819.newbv.app.data.AccountRepositoryImpl
 import dev.frost819.newbv.app.network.HttpServer
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
@@ -379,7 +380,9 @@ object NetworkModule {
         }
 
         val logFileProvider: () -> List<File> = {
-            crashHandler.listManualLogs() + crashHandler.listCrashLogs()
+            crashHandler.listManualLogs() +
+                crashHandler.listCrashLogs() +
+                CastRequestLogger.listLogFiles(context)
         }
 
         val manualLogCreator: () -> File? = { crashHandler.createManualLog() }

@@ -55,9 +55,23 @@ class CastRequestLogger(context: Context) {
 
     private fun rotateIfNeeded() {
         if (logFile.exists() && logFile.length() > CastReceiverConfig.MAX_LOG_BYTES) {
-            val rotated = File(logFile.parentFile, "${CastReceiverConfig.LOG_FILE_NAME}.old")
+            val rotated = File(logFile.parentFile, CastReceiverConfig.LOG_ROTATED_FILE_NAME)
             if (rotated.exists()) rotated.delete()
             logFile.renameTo(rotated)
+        }
+    }
+
+    companion object {
+        /** 投屏请求日志文件名公共前缀（当前 + 轮转文件共用）。 */
+        const val LOG_FILE_PREFIX = "cast_receiver_requests"
+
+        /** 当前与轮转后的投屏请求日志（供日志查看页与局域网日志服务列出）。 */
+        fun listLogFiles(context: Context): List<File> {
+            val dir = context.filesDir
+            return listOf(
+                File(dir, CastReceiverConfig.LOG_FILE_NAME),
+                File(dir, CastReceiverConfig.LOG_ROTATED_FILE_NAME),
+            ).filter { it.exists() && it.length() > 0 }
         }
     }
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.cast.server.CastRequestLogger
 import dev.frost819.newbv.app.network.HttpServer
 import dev.frost819.newbv.core.log.CrashHandler
 import dev.frost819.newbv.core.log.Loggers
@@ -67,14 +68,15 @@ class LogViewerViewModel
         /**
          * 刷新日志文件列表。
          *
-         * 合并崩溃日志和手动日志，按最后修改时间降序排列。
+         * 合并崩溃日志、手动日志和投屏请求日志，按最后修改时间降序排列。
          */
         fun refreshLogs() {
             viewModelScope.launch(Dispatchers.IO) {
                 val logs =
                     (
                         crashHandler.listManualLogs() +
-                            crashHandler.listCrashLogs()
+                            crashHandler.listCrashLogs() +
+                            CastRequestLogger.listLogFiles(getApplication())
                     ).sortedByDescending { it.lastModified() }
                 _uiState.value = _uiState.value.copy(logFiles = logs)
             }
@@ -142,6 +144,7 @@ class LogViewerViewModel
             when {
                 file.name.startsWith(CrashHandler.MANUAL_LOG_PREFIX) -> "手动日志"
                 file.name.startsWith(CrashHandler.CRASH_LOG_PREFIX) -> "崩溃日志"
+                file.name.startsWith(CastRequestLogger.LOG_FILE_PREFIX) -> "投屏日志"
                 else -> "未知"
             }
     }
