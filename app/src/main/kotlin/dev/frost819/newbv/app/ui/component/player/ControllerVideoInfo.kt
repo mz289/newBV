@@ -549,11 +549,11 @@ fun ControllerVideoInfoBottom(
                                 pressedBorder = Border.None,
                             ),
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f, pressedScale = 0.94f),
-                        // 未聚焦时参考 Compose for TV 官方示例（JetStream）的
-                        // 半透明圆底，避免白色图标直接叠在画面上看不清
+                        // 未聚焦时用黑色半透明圆底：白色图标在亮、暗画面下都保持
+                        // 可读（白色磨砂底在纯白画面上会隐形）；聚焦仍为白色实底
                         colors =
                             ClickableSurfaceDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                containerColor = Color.Black.copy(alpha = 0.5f),
                                 contentColor = Color.White,
                                 focusedContainerColor = Color.White,
                                 focusedContentColor = Color(0xFF171717),
