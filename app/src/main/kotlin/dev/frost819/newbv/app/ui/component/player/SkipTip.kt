@@ -24,7 +24,6 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.SettingsRemote
 import androidx.compose.material.icons.outlined.SkipNext
-import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,7 +43,6 @@ import dev.frost819.newbv.core.theme.BVTheme
  *
  * 在播放器左下角显示提示（可同时显示多个）：
  * - **SponsorBlock 提示**：片段自动跳过结果或待确认片段（点击可跳过）
- * - **章节提示**：播放进入新章节时短暂显示章节标题
  * - **试看提示**：视频需付费，当前为试看片段
  * - **跳下集提示**：播放结束，即将播放下一集
  * - **回到开头提示**：从上次播放位置继续，按确认键从头播放
@@ -60,7 +58,6 @@ import dev.frost819.newbv.core.theme.BVTheme
  * @param shortcutTipKey 触发按键的显示名，非空时以键帽图标呈现（P2-4）
  * @param sponsorBlockTip SponsorBlock 提示文本，为 null 时不显示
  * @param onSponsorTipClick SponsorBlock 提示点击回调（待确认片段时点击跳过），null 时不可点击
- * @param chapterTip 章节切换提示文本，为 null 时不显示
  */
 @Composable
 fun SkipTips(
@@ -72,7 +69,6 @@ fun SkipTips(
     shortcutTipKey: String? = null,
     sponsorBlockTip: String? = null,
     onSponsorTipClick: (() -> Unit)? = null,
-    chapterTip: String? = null,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -87,11 +83,6 @@ fun SkipTips(
                 text = sponsorBlockTip.orEmpty(),
                 icon = Icons.Outlined.FastForward,
                 onClick = onSponsorTipClick,
-            )
-            PlayerTip(
-                show = chapterTip != null,
-                text = chapterTip.orEmpty(),
-                icon = Icons.Outlined.VideoLibrary,
             )
             PlayerTip(
                 show = showPreviewTip,

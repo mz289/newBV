@@ -595,7 +595,6 @@ fun VideoPlayerController(
                 shortcutTipText = uiState.shortcutTipText,
                 shortcutTipKey = uiState.shortcutTipKey,
                 sponsorBlockTip = uiState.sponsorBlockTip,
-                chapterTip = uiState.chapterTip,
                 // 仅待确认片段时可点击跳过（自动跳过提示为纯展示）
                 onSponsorTipClick =
                     if (uiState.pendingSponsorSkip != null) {
