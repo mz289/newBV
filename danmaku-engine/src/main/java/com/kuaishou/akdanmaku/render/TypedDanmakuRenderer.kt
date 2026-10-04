@@ -51,6 +51,12 @@ open class TypedDanmakuRenderer(
         renderers[type] = renderer
     }
 
+    override fun layoutMode(
+        item: DanmakuItem,
+        displayer: DanmakuDisplayer,
+        config: DanmakuConfig,
+    ): Int = (renderers[getDanmakuType(item)] ?: defaultRenderer).layoutMode(item, displayer, config)
+
     override fun updatePaint(
         item: DanmakuItem,
         displayer: DanmakuDisplayer,

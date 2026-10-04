@@ -15,7 +15,7 @@ import dev.frost819.newbv.danmaku.entity.DanmakuType
  * - [enabledTypes] 启用的弹幕类型列表（默认包含 Rolling + Top + Bottom）
  * - [blockEnabled] 弹幕屏蔽总开关（默认 false）；关闭不影响 [blockRules] 的保留
  * - [blockRules] 弹幕屏蔽规则列表（关键词/正则/用户/颜色，默认为空）
- * - [mergeMode] 重复弹幕合并模式（默认不合并）；相同/相似文本在时间窗口内合并为一条并显示 ×N
+ * - [mergeMode] 重复弹幕合并开关（默认不合并），开启后使用相似文本方案
  */
 data class DanmakuState(
     val enabled: Boolean = true,
@@ -33,6 +33,7 @@ data class DanmakuState(
     val blockEnabled: Boolean = false,
     val blockRules: List<DanmakuBlockRule> = emptyList(),
     val mergeMode: DanmakuMergeMode = DanmakuMergeMode.Off,
+    val mergeConfig: DanmakuMergeConfig = DanmakuMergeConfig(),
 ) {
     /**
      * 返回要传给 akdanmaku 的屏幕显示区域比例。

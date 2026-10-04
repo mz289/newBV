@@ -41,6 +41,7 @@ import dev.frost819.newbv.biliapi.entity.video.SubtitleAiStatus
 import dev.frost819.newbv.biliapi.entity.video.SubtitleAiType
 import dev.frost819.newbv.biliapi.entity.video.SubtitleType
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
+import dev.frost819.newbv.danmaku.config.DanmakuMergeConfig
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.DanmakuType
@@ -92,6 +93,7 @@ fun MenuController(
     onBlockEnabledChange: (Boolean) -> Unit = {},
     onBlockRulesChange: (List<DanmakuBlockRule>) -> Unit = {},
     onMergeModeChange: (DanmakuMergeMode) -> Unit = {},
+    onMergeConfigChange: (DanmakuMergeConfig) -> Unit = {},
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (Int) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
@@ -135,6 +137,7 @@ fun MenuController(
                 onBlockEnabledChange = onBlockEnabledChange,
                 onBlockRulesChange = onBlockRulesChange,
                 onMergeModeChange = onMergeModeChange,
+                onMergeConfigChange = onMergeConfigChange,
                 onSubtitleChange = onSubtitleChange,
                 onSubtitleSizeChange = onSubtitleSizeChange,
                 onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,
@@ -166,6 +169,7 @@ private fun MenuControllerContent(
     onBlockEnabledChange: (Boolean) -> Unit,
     onBlockRulesChange: (List<DanmakuBlockRule>) -> Unit,
     onMergeModeChange: (DanmakuMergeMode) -> Unit,
+    onMergeConfigChange: (DanmakuMergeConfig) -> Unit,
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (Int) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
@@ -206,6 +210,7 @@ private fun MenuControllerContent(
                     onBlockEnabledChange = onBlockEnabledChange,
                     onBlockRulesChange = onBlockRulesChange,
                     onMergeModeChange = onMergeModeChange,
+                    onMergeConfigChange = onMergeConfigChange,
                     onFocusStateChange = { focusState = it },
                     onSubtitleChange = onSubtitleChange,
                     onSubtitleSizeChange = onSubtitleSizeChange,
@@ -259,6 +264,7 @@ private fun MenuList(
     onBlockEnabledChange: (Boolean) -> Unit,
     onBlockRulesChange: (List<DanmakuBlockRule>) -> Unit,
     onMergeModeChange: (DanmakuMergeMode) -> Unit,
+    onMergeConfigChange: (DanmakuMergeConfig) -> Unit,
     onFocusStateChange: (MenuFocusState) -> Unit,
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (Int) -> Unit,
@@ -302,6 +308,7 @@ private fun MenuList(
                     currentBlockEnabled = overlayState.danmakuState.blockEnabled,
                     currentBlockRules = overlayState.danmakuState.blockRules,
                     currentMergeMode = overlayState.danmakuState.mergeMode,
+                    currentMergeConfig = overlayState.danmakuState.mergeConfig,
                     onDanmakuSwitchChange = onDanmakuSwitchChange,
                     onDanmakuSizeChange = onDanmakuSizeChange,
                     onDanmakuOpacityChange = onDanmakuOpacityChange,
@@ -312,6 +319,7 @@ private fun MenuList(
                     onBlockEnabledChange = onBlockEnabledChange,
                     onBlockRulesChange = onBlockRulesChange,
                     onMergeModeChange = onMergeModeChange,
+                    onMergeConfigChange = onMergeConfigChange,
                 )
             }
 

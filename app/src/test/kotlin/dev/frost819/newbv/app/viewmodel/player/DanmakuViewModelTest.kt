@@ -1,12 +1,18 @@
 package dev.frost819.newbv.app.viewmodel.player
 
 import com.google.common.truth.Truth.assertThat
+import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
+import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
+import dev.frost819.newbv.app.data.DanmakuMergeConfigStore
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMeta
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
+import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
+import dev.frost819.newbv.danmaku.config.DanmakuBlockRuleType
+import dev.frost819.newbv.danmaku.config.DanmakuMergeConfig
 import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
@@ -18,6 +24,7 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -540,4 +547,54 @@ class DanmakuViewModelTest {
         verify { player.seekTo(1_200_000) }
         verify(exactly = 0) { player.pause() }
     }
+
+    @Test
+    fun `共享屏蔽规则变化重载原始数据且关闭屏蔽恢复数量`() =
+        runTest(testDispatcher) {
+            val blockState =
+                MutableStateFlow(
+                    DanmakuBlockRuleStore.State(
+                        enabled = true,
+                        rules = listOf(DanmakuBlockRule(DanmakuBlockRuleType.User, "ab")),
+                    ),
+                )
+            mockkObject(DanmakuBlockRuleStore)
+            every { DanmakuBlockRuleStore.state } returns blockState
+            mockkObject(DanmakuMergeConfigStore)
+            every { DanmakuMergeConfigStore.load() } returns DanmakuMergeConfig(filterBeforeMerge = true)
+            every { DanmakuMergeConfigStore.save(any()) } answers {}
+            every { Prefs.danmakuMergeMode } returns 2
+            val vm = DanmakuViewModel(videoPlayRepository)
+            val player = mockk<DanmakuPlayer>(relaxed = true)
+            val outputs = mutableListOf<List<DanmakuItemData>>()
+            every { player.updateData(any()) } answers {
+                outputs.add(firstArg())
+                emptyList()
+            }
+            vm.danmakuPlayer = player
+            coEvery { videoPlayRepository.getDanmakuMeta(any(), any()) } returns DanmakuMeta(360_000, 1, false, 3)
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) } returns
+                listOf(
+                    fakeDanmakuData(1, 0f).copy(text = "same", midHash = "ab"),
+                    fakeDanmakuData(2, 0f).copy(text = "same", midHash = "cd"),
+                    fakeDanmakuData(3, 0f).copy(text = "same", midHash = "cd"),
+                )
+            vm.loadDanmaku(1, 2)
+            advanceUntilIdle()
+            assertThat(outputs.last().single().mergedCount).isEqualTo(2)
+            blockState.value = blockState.value.copy(enabled = false)
+            advanceUntilIdle()
+            assertThat(outputs.last().single().mergedCount).isEqualTo(3)
+            blockState.value =
+                blockState.value.copy(
+                    enabled = true,
+                    rules =
+                        listOf(
+                            DanmakuBlockRule(DanmakuBlockRuleType.User, "cd"),
+                        ),
+                )
+            advanceUntilIdle()
+            assertThat(outputs.last().single().mergedCount).isEqualTo(1)
+            coVerify(exactly = 3) { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) }
+        }
 }

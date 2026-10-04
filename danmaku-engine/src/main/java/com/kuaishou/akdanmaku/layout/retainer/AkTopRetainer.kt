@@ -51,7 +51,7 @@ internal class AkTopRetainer(
         val drawState = drawItem.drawState
         val danmaku = drawItem.data
         val duration =
-            if (danmaku.mode == DanmakuItemData.DANMAKU_MODE_ROLLING) {
+            if (drawItem.layoutMode == DanmakuItemData.DANMAKU_MODE_ROLLING) {
                 config.rollingDurationMs
             } else {
                 config.durationMs

@@ -73,6 +73,27 @@ open class SimpleRenderer : DanmakuRenderer {
             strokeWidth = 6f
         }
 
+    override fun layoutMode(
+        item: DanmakuItem,
+        displayer: DanmakuDisplayer,
+        config: DanmakuConfig,
+    ): Int {
+        val data = item.data
+        if (config.scrollThreshold <= 0 || data.mode !in listOf(4, 5)) return data.mode
+        // 独立画笔避免与缓存线程的 measure/draw 共享可变画笔。
+        val paint =
+            TextPaint().apply {
+                isAntiAlias = true
+                textSize = clamp(data.textSize.toFloat(), 12f, 25f) * (displayer.density - 0.6f) * config.textSizeScale
+                typeface = if (config.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            }
+        return if (paint.measureText(data.content) > config.scrollThreshold) {
+            DanmakuItemData.DANMAKU_MODE_ROLLING
+        } else {
+            data.mode
+        }
+    }
+
     override fun updatePaint(
         item: DanmakuItem,
         displayer: DanmakuDisplayer,

@@ -64,8 +64,9 @@ internal object PrefKeys {
     val danmakuBlockEnabled = booleanPreferencesKey("danmaku_block_enabled")
     val danmakuBlockRules = stringPreferencesKey("danmaku_block_rules")
 
-    /** 合并模式序号（DanmakuMergeMode.ordinal，0=关闭 1=相同 2=相似），枚举顺序不可变。 */
+    /** 合并模式固定编码：0=关闭，1=旧版相同（迁移为相似），2=相似。 */
     val danmakuMergeMode = intPreferencesKey("danmaku_merge_mode")
+    val danmakuMergeConfig = stringPreferencesKey("danmaku_merge_config")
 
     // ===== 播放器 - 字幕 =====
     val defaultSubtitleFontSize = intPreferencesKey("dsfs")

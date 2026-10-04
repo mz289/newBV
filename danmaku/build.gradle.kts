@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.androidsvg)
+    implementation("com.github.promeg:tinypinyin:2.0.3")
 
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

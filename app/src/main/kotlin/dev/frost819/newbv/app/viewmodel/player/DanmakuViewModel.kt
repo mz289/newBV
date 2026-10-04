@@ -15,6 +15,7 @@ import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
 import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
+import dev.frost819.newbv.app.data.DanmakuMergeConfigStore
 import dev.frost819.newbv.app.data.toDanmakuEntity
 import dev.frost819.newbv.app.data.toDataDanmakuType
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
@@ -28,7 +29,7 @@ import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.danmaku.config.DanmakuState
 import dev.frost819.newbv.danmaku.filter.DanmakuBlockFilter
-import dev.frost819.newbv.danmaku.util.DanmakuMerger
+import dev.frost819.newbv.danmaku.util.DanmakuPreprocessor
 import dev.frost819.newbv.data.datastore.Prefs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -124,7 +125,8 @@ class DanmakuViewModel
                 blockEnabled = DanmakuBlockRuleStore.state.value.enabled,
                 blockRules = DanmakuBlockRuleStore.state.value.rules,
                 mergeMode =
-                    DanmakuMergeMode.entries.getOrNull(Prefs.danmakuMergeMode) ?: DanmakuMergeMode.Off,
+                    DanmakuMergeMode.fromPreference(Prefs.danmakuMergeMode),
+                mergeConfig = DanmakuMergeConfigStore.load(),
             )
         }
 
@@ -137,8 +139,15 @@ class DanmakuViewModel
             // 任意一端的修改都会同步到状态并触发引擎重过滤
             viewModelScope.launch {
                 DanmakuBlockRuleStore.state.collect { blockState ->
+                    val old = _danmakuState.value
                     _danmakuState.update { it.copy(blockEnabled = blockState.enabled, blockRules = blockState.rules) }
-                    updateDanmakuConfigBlockFilter(_danmakuState.value)
+                    val new = _danmakuState.value
+                    updateDanmakuConfigBlockFilter(new)
+                    if (new.mergeConfig.filterBeforeMerge &&
+                        (old.blockEnabled != new.blockEnabled || old.blockRules != new.blockRules)
+                    ) {
+                        reloadDanmakuSegments()
+                    }
                 }
             }
         }
@@ -412,13 +421,12 @@ class DanmakuViewModel
                                 )
                             }
                         val rawItems = dataList.map { it.toDanmakuItemData() }
-                        // 按合并模式在数据层合并（时间窗口内相同/相似文本 ×N），引擎侧零改动
                         val items =
-                            when (_danmakuState.value.mergeMode) {
-                                DanmakuMergeMode.Off -> rawItems
-                                DanmakuMergeMode.Exact -> DanmakuMerger.mergeDuplicate(rawItems)
-                                DanmakuMergeMode.Similar -> DanmakuMerger.mergeSimilar(rawItems)
-                            }
+                            DanmakuPreprocessor.process(
+                                rawItems,
+                                _danmakuState.value,
+                                DanmakuBlockHitStats::record,
+                            )
                         // akdanmaku 内部维护有序数据并懒排序，无需预先排序
                         danmakuPlayer?.updateData(items)
                         loadedSegments.add(segmentIndex)
@@ -468,6 +476,8 @@ class DanmakuViewModel
                 textColor = Color(color).toArgb(),
                 // midHash 为 crc32 十六进制串，供按用户（发送者）屏蔽匹配
                 userId = midHash.toLongOrNull(16),
+                pool = pool,
+                originalMode = type,
             )
 
         /**
@@ -543,6 +553,7 @@ class DanmakuViewModel
                     is DanmakuSettingAction.SetBlockEnabled -> old.copy(blockEnabled = action.enabled)
                     is DanmakuSettingAction.SetBlockRules -> old.copy(blockRules = action.rules)
                     is DanmakuSettingAction.SetMergeMode -> old.copy(mergeMode = action.mode)
+                    is DanmakuSettingAction.SetMergeConfig -> old.copy(mergeConfig = action.config.sanitized())
                 }
             if (old == new) return
 
@@ -581,8 +592,19 @@ class DanmakuViewModel
                 // 经共享仓库写入（Prefs + StateFlow），引擎重过滤由 init 中的 collect 回流执行
                 DanmakuBlockRuleStore.setBlockState(new.blockEnabled, new.blockRules)
             }
-            if (new.mergeMode != old.mergeMode) {
-                Prefs.danmakuMergeMode = new.mergeMode.ordinal
+            if (new.mergeConfig != old.mergeConfig) {
+                DanmakuMergeConfigStore.save(new.mergeConfig)
+                danmakuConfig = danmakuConfig.copy(scrollThreshold = new.mergeConfig.scrollThreshold)
+                updateDanmakuConfigBlockFilter(new)
+            }
+            if (new.mergeMode != old.mergeMode ||
+                new.mergeConfig != old.mergeConfig ||
+                (
+                    new.mergeConfig.filterBeforeMerge &&
+                        (new.blockEnabled != old.blockEnabled || new.blockRules != old.blockRules)
+                )
+            ) {
+                Prefs.danmakuMergeMode = new.mergeMode.preferenceValue
                 // 合并发生在数据加载阶段且不可逆，切换模式需清空已加载分段并重载
                 reloadDanmakuSegments()
             }
@@ -615,7 +637,13 @@ class DanmakuViewModel
                     density = 120,
                     textSizeScale = Prefs.defaultDanmakuScale,
                     screenPart = Prefs.defaultDanmakuArea,
-                    dataFilter = listOf(danmakuTypeFilter, danmakuBlockFilter),
+                    scrollThreshold = _danmakuState.value.mergeConfig.scrollThreshold,
+                    dataFilter =
+                        if (_danmakuState.value.mergeConfig.filterBeforeMerge) {
+                            listOf(danmakuTypeFilter)
+                        } else {
+                            listOf(danmakuTypeFilter, danmakuBlockFilter)
+                        },
                     rollingSpeedFactor = Prefs.defaultDanmakuSpeedFactor,
                 )
             danmakuConfig.updateFilter()
@@ -636,6 +664,15 @@ class DanmakuViewModel
         private fun updateDanmakuConfigBlockFilter(state: DanmakuState) {
             danmakuBlockFilter.enable = state.blockEnabled
             danmakuBlockFilter.setRules(state.blockRules)
+            danmakuConfig =
+                danmakuConfig.copy(
+                    dataFilter =
+                        if (state.mergeConfig.filterBeforeMerge) {
+                            listOf(danmakuTypeFilter)
+                        } else {
+                            listOf(danmakuTypeFilter, danmakuBlockFilter)
+                        },
+                )
             danmakuConfig.updateFilter()
             danmakuPlayer?.updateConfig(danmakuConfig)
         }
@@ -648,6 +685,7 @@ class DanmakuViewModel
         private fun updateDanmakuScale(scale: Float) {
             danmakuConfig = danmakuConfig.copy(textSizeScale = scale)
             danmakuPlayer?.updateConfig(danmakuConfig)
+            if (_danmakuState.value.mergeConfig.scrollThreshold > 0) reloadDanmakuSegments()
         }
 
         companion object {

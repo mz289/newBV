@@ -1,6 +1,7 @@
 package dev.frost819.newbv.app.ui.action.player
 
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
+import dev.frost819.newbv.danmaku.config.DanmakuMergeConfig
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.data.datastore.Audio
@@ -59,6 +60,10 @@ sealed interface DanmakuSettingAction {
     /** 设置重复弹幕合并模式。 */
     data class SetMergeMode(
         val mode: DanmakuMergeMode,
+    ) : DanmakuSettingAction
+
+    data class SetMergeConfig(
+        val config: DanmakuMergeConfig,
     ) : DanmakuSettingAction
 }
 

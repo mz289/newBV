@@ -90,6 +90,10 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     packaging {
         resources {
             // Protobuf source files and desktop-only Jansi natives are not used at runtime on Android.
@@ -196,6 +200,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation("androidx.test:core:1.6.1")
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2")
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.compiler)

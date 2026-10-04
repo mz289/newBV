@@ -76,11 +76,13 @@ class DanmakuBlockFilter : DanmakuDataFilter(FILTER_TYPE_BLOCK) {
         item: DanmakuItem,
         timer: DanmakuTimer,
         config: DanmakuConfig,
-    ): Boolean {
-        val data = item.data
-        val hitKey = matchedRuleKey(data.content, data.userId, data.textColor)
-        if (hitKey != null) onHit?.invoke(hitKey)
-        return hitKey != null
+    ): Boolean = blocks(item.data)
+
+    /** 数据预处理与引擎过滤共用相同匹配及命中统计。 */
+    fun blocks(data: com.kuaishou.akdanmaku.data.DanmakuItemData): Boolean {
+        val key = matchedRuleKey(data.content, data.userId, data.textColor) ?: return false
+        onHit?.invoke(key)
+        return true
     }
 
     /**

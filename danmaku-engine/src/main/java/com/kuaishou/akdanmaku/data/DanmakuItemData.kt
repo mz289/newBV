@@ -78,6 +78,10 @@ class DanmakuItemData(
      */
     var userId: Long? = null,
     var mergedType: Int = MERGED_TYPE_NORMAL,
+    /** B 站弹幕池：1 为字幕池，供合并豁免使用。 */
+    val pool: Int = 0,
+    val originalMode: Int = mode,
+    val mergedCount: Int = 1,
 ) : Comparable<DanmakuItemData> {
     val isImportant: Boolean
         get() = score > 0

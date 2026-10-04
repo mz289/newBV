@@ -46,6 +46,7 @@ open class DanmakuItem(
 ) : Comparable<DanmakuItem> {
     var state = ItemState.Uninitialized
     var duration: Long = 0
+    var layoutMode: Int = data.mode
 
     internal var timer = player?.engine?.timer ?: NONE_CONTEXT.timer
 
