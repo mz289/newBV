@@ -5,7 +5,10 @@ import bilibili.app.playerunite.v1.playViewUniteReq
 import bilibili.community.service.dm.v1.DMGrpcKt
 import bilibili.community.service.dm.v1.dmSegMobileReq
 import bilibili.community.service.dm.v1.dmViewReq
+import bilibili.pgc.gateway.player.v2.PlayURLGrpcKt
+import bilibili.pgc.gateway.player.v2.playViewReq
 import bilibili.playershared.videoVod
+import bilibili.pgc.gateway.player.v2.CodeType as PgcCodeType
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.CodeType
 import dev.frost819.newbv.biliapi.entity.PlayData
@@ -20,6 +23,7 @@ import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
 import dev.frost819.newbv.biliapi.http.entity.video.ViewPoint
 import dev.frost819.newbv.biliapi.util.BiliLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -34,6 +38,13 @@ class VideoPlayRepository(
             runCatching {
                 PlayerGrpcKt.PlayerCoroutineStub(channelRepository.requireDefaultChannel())
             }.getOrNull()
+
+    private val pgcPlayerStub
+        get() =
+            runCatching {
+                PlayURLGrpcKt.PlayURLCoroutineStub(channelRepository.requireDefaultChannel())
+            }.getOrNull()
+
     private val danmakuStub
         get() =
             runCatching {
@@ -41,6 +52,39 @@ class VideoPlayRepository(
             }.getOrNull()
 
     suspend fun getPlayData(
+        aid: Long,
+        cid: Long,
+        preferApiType: ApiType,
+        epid: Int = 0,
+    ): PlayData =
+        if (epid != 0) {
+            try {
+                getPgcPlayData(cid = cid, epid = epid, preferApiType = preferApiType)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (isPermissionError(e.message)) throw e
+                // PGC 通道技术性失败（网络/风控/解析）时回退 UGC 通道兜底，保证免费剧集仍可播；
+                // 权限类错误携带引导信息（会员/充电/付费），直接抛出供 UI 分类展示
+                BiliLogger.error(e) { "pgc play data failed, fallback to ugc channel: [epid=$epid, cid=$cid]" }
+                getUgcPlayData(aid = aid, cid = cid, preferApiType = preferApiType)
+            }
+        } else {
+            getUgcPlayData(aid = aid, cid = cid, preferApiType = preferApiType)
+        }
+
+    /** 错误消息是否携带权限引导信息（会员/充电/付费），此类错误直接抛出供 UI 引导。 */
+    private fun isPermissionError(message: String?): Boolean {
+        val text = message ?: return false
+        return text.contains("会员") || text.contains("充电") || text.contains("付费") || text.contains("购买")
+    }
+
+    /**
+     * 获取 UGC（普通投稿）播放数据。
+     *
+     * Web 走 /x/player/playurl 单请求；App 走 playViewUnite 三编码并发合并。
+     */
+    private suspend fun getUgcPlayData(
         aid: Long,
         cid: Long,
         preferApiType: ApiType,
@@ -111,6 +155,75 @@ class VideoPlayRepository(
                     result
                 }
             }
+        }
+
+    /**
+     * 获取 PGC（番剧/影视）播放数据。
+     *
+     * PGC 内容走专用播放通道（Web /pgc/player/web/v2/playurl、App pgc.gateway PlayView）：
+     * 会员专享剧集在无权限时返回试看流或明确的权限错误（如“大会员专享限制”）；
+     * UGC 通道对会员专享剧集一律返回 -404“啥都木有”，无法区分权限与内容缺失。
+     *
+     * @param cid 视频 CID
+     * @param epid 剧集 EP ID（非 0 时启用本通道）
+     * @param preferApiType 接口类型
+     */
+    private suspend fun getPgcPlayData(
+        cid: Long,
+        epid: Int,
+        preferApiType: ApiType,
+    ): PlayData =
+        when (preferApiType) {
+            ApiType.Web ->
+                PlayData.fromPgcWebPlayUrlData(
+                    BiliHttpApi
+                        .getPgcPlayUrl(
+                            epId = epid,
+                            cid = cid,
+                        ).getResponseData(),
+                )
+
+            ApiType.App ->
+                withContext(Dispatchers.IO) {
+                    // PGC 编码枚举仅 264/265，无 AV1
+                    val codecTypes = listOf(PgcCodeType.CODE264, PgcCodeType.CODE265)
+                    val results =
+                        codecTypes
+                            .map { codecType ->
+                                async {
+                                    runCatching {
+                                        val reply =
+                                            pgcPlayerStub?.playView(
+                                                playViewReq {
+                                                    this.epid = epid.toLong()
+                                                    this.cid = cid
+                                                    qn = 127
+                                                    fnval = 4048
+                                                    fnver = 0
+                                                    fourk = true
+                                                    forceHost = 2
+                                                    preferCodecType = codecType
+                                                },
+                                            ) ?: throw IllegalStateException("PGC player stub is not initialized")
+                                        PlayData.fromPgcPlayViewReply(reply)
+                                    }.recoverCatching { error ->
+                                        // 统一转换为带 B 站业务消息的异常（如“大会员专享限制”），
+                                        // 供播放器的无权限引导按关键词分类
+                                        if (error is CancellationException) throw error
+                                        throw runCatching { handleGrpcException(error) }.exceptionOrNull() ?: error
+                                    }
+                                }
+                            }.awaitAll()
+
+                    val playDataList = results.mapNotNull { it.getOrNull() }
+                    if (playDataList.isNotEmpty()) {
+                        playDataList.reduce { acc, playData -> acc + playData }
+                    } else {
+                        // 全部失败时抛首个业务异常，保留 B 站原始错误消息
+                        throw results.firstNotNullOfOrNull { it.exceptionOrNull() }
+                            ?: IllegalStateException("All codec types are failed to get pgc play data")
+                    }
+                }
         }
 
     suspend fun getSubtitle(

@@ -11,6 +11,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -132,6 +133,10 @@ fun VideoPlayerController(
     // Seek 加速状态
     var goTime by remember { mutableLongStateOf(0L) }
     var isSeeking by remember { mutableStateOf(false) }
+
+    // 进度条焦点重抓取激励：章节/分集面板点击关闭后，原焦点节点随面板一起移除，
+    // 窗口内焦点悬空导致方向键无人接收；递增此计数让进度条重新请求焦点恢复响应
+    var seekFocusKick by remember { mutableIntStateOf(0) }
 
     /** 触摸拖拽 seek 进行中（手指未抬起）。拖拽期间只更新预览位置，不触发真实 seek。 */
     var isSeekDragActive by remember { mutableStateOf(false) }
@@ -633,6 +638,7 @@ fun VideoPlayerController(
                 isSeeking = isSeeking,
                 goTime = goTime,
                 seekerState = seekerState.value,
+                seekFocusKick = seekFocusKick,
                 sponsorBlockMarks = uiState.sponsorBlockMarks,
                 chapterMarks = uiState.chapterMarks,
                 title = uiState.title,
@@ -678,6 +684,10 @@ fun VideoPlayerController(
                 onPlayNewVideo = { item ->
                     onPlayNewVideo(item)
                     showListController = false
+                    // 面板关闭会带走焦点，重新唤出控制栏并把焦点交还进度条
+                    showInfoSeekController = true
+                    startControllerAutoHide()
+                    seekFocusKick++
                 },
             )
 
@@ -690,6 +700,10 @@ fun VideoPlayerController(
                     onGoTime(chapter.startMs)
                     if (uiState.playerState != PlayerState.Playing) onPlay()
                     showChapterListController = false
+                    // 面板关闭会带走焦点，重新唤出控制栏并把焦点交还进度条
+                    showInfoSeekController = true
+                    startControllerAutoHide()
+                    seekFocusKick++
                 },
             )
 

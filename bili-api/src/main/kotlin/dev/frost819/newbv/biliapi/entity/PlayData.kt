@@ -224,6 +224,98 @@ data class PlayData(
                 dolby = dolby,
                 flac = null,
                 codec = codecs,
+                needPay = isPreview || (dashVideoStreams.isEmpty() && segmentVideoStreams.isNotEmpty()),
+            )
+        }
+
+        /**
+         * 由 PGC Web 播放地址（/pgc/player/web/v2/playurl）构造。
+         *
+         * 会员专享剧集在无权限时返回试看流（video_info.is_preview = 1 + durl 分段），
+         * 据此置 [needPay] 供 UI 提示“当前为试看片段”。
+         */
+        fun fromPgcWebPlayUrlData(pgcPlayUrlData: dev.frost819.newbv.biliapi.http.entity.video.PgcPlayUrlData): PlayData {
+            val videoInfo =
+                pgcPlayUrlData.videoInfo
+                    ?: throw IllegalStateException("PGC play url response is empty")
+            if (videoInfo.code != 0) {
+                // 外层 code=0 时错误封装在 video_info 内（如“大会员专享限制”），透出供权限引导分类
+                throw IllegalStateException(videoInfo.message.ifBlank { "PGC play url error: code=${videoInfo.code}" })
+            }
+            val dash = videoInfo.dash
+            val hasDash = dash?.video?.isNotEmpty() == true
+            val durl = videoInfo.durl
+            val isPreview = videoInfo.isPreview == 1 || (!hasDash && durl.isNotEmpty())
+
+            val codec =
+                videoInfo.supportFormats
+                    .mapNotNull { it.codecs?.let { c -> it.quality to c } }
+                    .toMap()
+
+            val dashVideos =
+                if (hasDash) {
+                    dash!!.video.map {
+                        DashVideo(
+                            quality = it.id,
+                            baseUrl = it.baseUrl,
+                            bandwidth = it.bandwidth,
+                            codecId = it.codecId,
+                            width = it.width,
+                            height = it.height,
+                            frameRate = it.frameRate,
+                            backUrl = it.backupUrl,
+                            codecs = it.codecs,
+                        )
+                    }
+                } else {
+                    // 试看流只有 durl 分段，转成 DASH 结构
+                    durl.map {
+                        DashVideo(
+                            quality = videoInfo.quality,
+                            baseUrl = it.url,
+                            backUrl = it.backupUrl,
+                            codecId = videoInfo.videoCodecId,
+                            bandwidth = 0,
+                            width = 0,
+                            height = 0,
+                            frameRate = "",
+                            codecs = "",
+                        )
+                    }
+                }
+            val dashAudios =
+                dash?.audio?.map {
+                    DashAudio(
+                        baseUrl = it.baseUrl,
+                        bandwidth = it.bandwidth,
+                        codecId = it.id,
+                        backUrl = it.backupUrl,
+                    )
+                } ?: emptyList()
+            val dolby =
+                dash?.dolby?.audio?.firstOrNull()?.let {
+                    DashAudio(
+                        baseUrl = it.baseUrl,
+                        bandwidth = it.bandwidth,
+                        codecId = it.id,
+                        backUrl = it.backupUrl,
+                    )
+                }
+            val flac = dash?.flac?.audio?.let {
+                DashAudio(
+                    baseUrl = it.baseUrl,
+                    bandwidth = it.bandwidth,
+                    codecId = it.id,
+                    backUrl = it.backupUrl,
+                )
+            }
+
+            return PlayData(
+                dashVideos = dashVideos,
+                dashAudios = dashAudios,
+                dolby = dolby,
+                flac = flac,
+                codec = codec,
                 needPay = isPreview,
             )
         }

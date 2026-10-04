@@ -9,14 +9,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -29,16 +32,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -49,7 +56,6 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
 import dev.frost819.newbv.app.network.DanmakuBlockServer
-import dev.frost819.newbv.app.ui.component.search.SoftKeyboard
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
@@ -58,19 +64,12 @@ import dev.frost819.newbv.danmaku.config.DanmakuBlockRuleType
 import dev.frost819.newbv.danmaku.filter.DanmakuBlockFilter
 import io.github.g0dkar.qrcode.QRCode
 
-/** 正则符号补充键位，供添加规则对话框的软键盘渲染。 */
-private val symbolKeyRows: List<List<String>> =
-    listOf(
-        listOf("/", ".", "*", "+", "?", "("),
-        listOf(")", "[", "]", "^", "$", "|"),
-    )
-
 /**
  * 弹幕屏蔽管理面板（弹幕设置菜单"屏蔽"子项的值面板）。
  *
  * 从上到下：屏蔽总开关、添加规则入口、已有规则列表。
  * 规则行点击切换启用/停用，右侧按钮删除；"添加规则"打开
- * [DanmakuBlockAddDialog]（内含类型选择与 TV 软键盘）。
+ * [DanmakuBlockAddDialog]（直接输入 + 远程管理二维码）。
  *
  * @param modifier 修饰符
  * @param blockEnabled 屏蔽总开关
@@ -181,16 +180,7 @@ fun DanmakuBlockPanel(
  */
 @Composable
 private fun DanmakuBlockQrDialog(onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    var url by remember { mutableStateOf<String?>(null) }
     var showUrlText by remember { mutableStateOf(false) }
-
-    // 弹窗生命周期即服务器生命周期：进入启动、离开停止
-    DisposableEffect(Unit) {
-        DanmakuBlockServer.start(context)
-        url = DanmakuBlockServer.getUrl()
-        onDispose { DanmakuBlockServer.stop() }
-    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -220,39 +210,10 @@ private fun DanmakuBlockQrDialog(onDismiss: () -> Unit) {
                         text = "远程管理弹幕屏蔽",
                         style = MaterialTheme.typography.titleLarge,
                     )
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(220.dp)
-                                .clip(MaterialTheme.shapes.large)
-                                .background(Color.White),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val qrImage =
-                            url?.let {
-                                remember(it) { generateQrImage(it) }
-                            }
-                        if (qrImage != null) {
-                            Image(
-                                modifier = Modifier.size(200.dp),
-                                bitmap = qrImage,
-                                contentDescription = "管理页二维码",
-                            )
-                        } else {
-                            Text(
-                                text = "正在启动服务器…",
-                                color = Color.Black,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                    if (showUrlText) {
-                        Text(
-                            text = url ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    DanmakuBlockQrContent(
+                        qrSize = 200.dp,
+                        showUrl = showUrlText,
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         androidx.tv.material3.Button(
                             modifier =
@@ -270,6 +231,70 @@ private fun DanmakuBlockQrDialog(onDismiss: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * 远程管理二维码内容（可嵌入各弹窗复用）。
+ *
+ * 组合期间持有 [DanmakuBlockServer] 的一次引用（服务器按引用计数启停，
+ * 多个展示组件共存时不会互相中断），显示管理页地址二维码，
+ * 手机扫码即可管理屏蔽规则。
+ *
+ * @param qrSize 二维码边长
+ * @param showUrl 是否显示文字地址
+ */
+@Composable
+private fun DanmakuBlockQrContent(
+    qrSize: Dp = 200.dp,
+    showUrl: Boolean = false,
+) {
+    val context = LocalContext.current
+    var url by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(Unit) {
+        DanmakuBlockServer.start(context)
+        url = DanmakuBlockServer.getUrl()
+        onDispose { DanmakuBlockServer.stop() }
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(qrSize + 20.dp)
+                    .clip(MaterialTheme.shapes.large)
+                    .background(Color.White),
+            contentAlignment = Alignment.Center,
+        ) {
+            val qrImage =
+                url?.let {
+                    remember(it) { generateQrImage(it) }
+                }
+            if (qrImage != null) {
+                Image(
+                    modifier = Modifier.size(qrSize),
+                    bitmap = qrImage,
+                    contentDescription = "管理页二维码",
+                )
+            } else {
+                Text(
+                    text = "正在启动服务器…",
+                    color = Color.Black,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+        if (showUrl) {
+            Text(
+                text = url ?: "",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -383,8 +408,12 @@ private fun DanmakuBlockRuleType.displayLabel(): String =
 /**
  * 添加屏蔽规则对话框。
  *
- * 左侧 TV 软键盘（含正则符号补充键位），右侧类型选择、输入预览与操作按钮。
- * 添加时校验：空白值拒绝；正则类型实时校验合法性；与已有规则（类型+值相同）去重。
+ * 左侧为规则编辑区：类型选择、直接可输入的文本框（遥控器/实体键盘输入，
+ * 输入法确认键或"添加"按钮提交）、类型说明与错误提示。
+ * 右侧内嵌远程管理二维码——电视端输入不便时可扫码在手机上输入并导入屏蔽串。
+ *
+ * 添加时校验：空白值拒绝；正则类型实时校验合法性；颜色须为 6 位十六进制；
+ * 与已有规则（类型+值相同）去重。
  *
  * @param existingRules 已有规则（用于去重）
  * @param onAdd 添加成功回调（携带新规则）
@@ -399,10 +428,40 @@ private fun DanmakuBlockAddDialog(
     var selectedType by remember { mutableStateOf(DanmakuBlockRuleType.Keyword) }
     var input by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val keyboardFirstKeyFocusRequester = remember { FocusRequester() }
+    val inputFocusRequester = remember { FocusRequester() }
 
+    fun tryAdd() {
+        val value = input.trim()
+        when {
+            value.isEmpty() -> {}
+            existingRules.any { it.type == selectedType && it.value.trim() == value } ->
+                errorMessage = "规则已存在"
+
+            selectedType == DanmakuBlockRuleType.Regex &&
+                DanmakuBlockFilter.parseBlockRegex(value) == null ->
+                errorMessage = "正则表达式无效"
+
+            selectedType == DanmakuBlockRuleType.Color && !value.isHexColor() ->
+                errorMessage = "颜色须为 6 位十六进制（如 FF6699）"
+
+            else ->
+                onAdd(
+                    DanmakuBlockRule(
+                        type = selectedType,
+                        value =
+                            if (selectedType == DanmakuBlockRuleType.Color) {
+                                value.removePrefix("#").uppercase()
+                            } else {
+                                value
+                            },
+                    ),
+                )
+        }
+    }
+
+    // 打开即聚焦输入框，直接开始输入
     LaunchedEffect(Unit) {
-        runCatching { keyboardFirstKeyFocusRequester.requestFocus() }
+        runCatching { inputFocusRequester.requestFocus() }
     }
 
     Dialog(
@@ -425,51 +484,13 @@ private fun DanmakuBlockAddDialog(
                 shape = MaterialTheme.shapes.large,
             ) {
                 Row(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier.padding(24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    SoftKeyboard(
-                        firstButtonFocusRequester = keyboardFirstKeyFocusRequester,
-                        extraRows = symbolKeyRows,
-                        onSearchLabel = "添加",
-                        onClick = { input += it },
-                        onClear = { input = "" },
-                        onDelete = {
-                            if (input.isNotEmpty()) input = input.dropLast(1)
-                        },
-                        onSearch = {
-                            val value = input.trim()
-                            when {
-                                value.isEmpty() -> {}
-                                existingRules.any { it.type == selectedType && it.value.trim() == value } ->
-                                    errorMessage = "规则已存在"
-
-                                selectedType == DanmakuBlockRuleType.Regex &&
-                                    DanmakuBlockFilter.parseBlockRegex(value) == null ->
-                                    errorMessage = "正则表达式无效"
-
-                                selectedType == DanmakuBlockRuleType.Color && !value.isHexColor() ->
-                                    errorMessage = "颜色须为 6 位十六进制（如 FF6699）"
-
-                                else ->
-                                    onAdd(
-                                        DanmakuBlockRule(
-                                            type = selectedType,
-                                            value =
-                                                if (selectedType == DanmakuBlockRuleType.Color) {
-                                                    value.removePrefix("#").uppercase()
-                                                } else {
-                                                    value
-                                                },
-                                        ),
-                                    )
-                            }
-                        },
-                    )
-
+                    // 左列：规则编辑
                     Column(
-                        modifier = Modifier.width(320.dp),
+                        modifier = Modifier.width(360.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
@@ -488,6 +509,43 @@ private fun DanmakuBlockAddDialog(
                                 )
                             }
                         }
+                        OutlinedTextField(
+                            modifier =
+                                Modifier
+                                    .width(360.dp)
+                                    .focusRequester(inputFocusRequester),
+                            value = input,
+                            onValueChange = {
+                                input = it
+                                errorMessage = null
+                            },
+                            singleLine = true,
+                            shape = MaterialTheme.shapes.large,
+                            colors =
+                                OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.border,
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            placeholder = {
+                                Text(
+                                    text =
+                                        when (selectedType) {
+                                            DanmakuBlockRuleType.Keyword -> "输入关键词"
+                                            DanmakuBlockRuleType.Regex -> "输入正则，如 /^\\d+秒/"
+                                            DanmakuBlockRuleType.User -> "输入 midHash 或数字 UID"
+                                            DanmakuBlockRuleType.Color -> "输入颜色，如 FF6699"
+                                        },
+                                )
+                            },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions =
+                                KeyboardActions(
+                                    onDone = { tryAdd() },
+                                ),
+                        )
                         Text(
                             text =
                                 when (selectedType) {
@@ -500,30 +558,6 @@ private fun DanmakuBlockAddDialog(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Surface(
-                            modifier = Modifier.height(52.dp),
-                            shape = MaterialTheme.shapes.small,
-                            colors =
-                                androidx.tv.material3.SurfaceDefaults.colors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                ),
-                        ) {
-                            Box(contentAlignment = Alignment.CenterStart) {
-                                Text(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                    text = input.ifEmpty { "用左侧键盘输入…" },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color =
-                                        if (input.isEmpty()) {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        },
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
                         errorMessage?.let { message ->
                             Text(
                                 text = message,
@@ -531,6 +565,26 @@ private fun DanmakuBlockAddDialog(
                                 color = MaterialTheme.colorScheme.error,
                             )
                         }
+                        androidx.tv.material3.Button(
+                            modifier = Modifier.touchClickable(onClick = { tryAdd() }),
+                            onClick = { tryAdd() },
+                        ) {
+                            Text("添加")
+                        }
+                    }
+
+                    // 右列：远程管理二维码（电视输入不便时扫码用手机输入/导入）
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        DanmakuBlockQrContent(qrSize = 150.dp)
+                        Text(
+                            text = "输入不便？扫码用手机管理\n并导入屏蔽串",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
                     }
                 }
             }

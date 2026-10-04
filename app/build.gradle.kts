@@ -195,6 +195,8 @@ dependencies {
     testImplementation(libs.truth)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
+    testImplementation("androidx.test:core:1.6.1")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2")
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.compiler)
 

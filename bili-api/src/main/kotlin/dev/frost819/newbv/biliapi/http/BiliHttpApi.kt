@@ -49,6 +49,7 @@ import dev.frost819.newbv.biliapi.http.entity.video.CheckVideoFavoured
 import dev.frost819.newbv.biliapi.http.entity.video.OneClickTripleAction
 import dev.frost819.newbv.biliapi.http.entity.video.OnlineTotal
 import dev.frost819.newbv.biliapi.http.entity.video.OnlineTotalApp
+import dev.frost819.newbv.biliapi.http.entity.video.PgcPlayUrlData
 import dev.frost819.newbv.biliapi.http.entity.video.PlayUrlData
 import dev.frost819.newbv.biliapi.http.entity.video.PopularVideoData
 import dev.frost819.newbv.biliapi.http.entity.video.SetVideoFavorite
@@ -334,6 +335,39 @@ object BiliHttpApi {
         }
         return json.decodeFromString(rawText)
     }
+
+    /**
+     * 获取 PGC（番剧/影视）播放地址（Web v2 接口）。
+     *
+     * 无需 WBI 签名；未登录附加 try_look=1 换取试看流（与 UGC 通道处理一致）。
+     * 实测必须携带 Referer，否则返回空流。
+     *
+     * @param epId 剧集 EP ID
+     * @param cid 视频 CID
+     */
+    suspend fun getPgcPlayUrl(
+        epId: Int,
+        cid: Long,
+        qn: Int? = 127,
+        fnval: Int? = 4048,
+        fnver: Int? = 0,
+        fourk: Int? = 1,
+    ): BiliResponse<PgcPlayUrlData> =
+        client.get("/pgc/player/web/v2/playurl") {
+            header("Referer", "https://www.bilibili.com")
+            header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            parameter("ep_id", epId)
+            parameter("cid", cid)
+            parameter("qn", qn)
+            parameter("fnval", fnval)
+            parameter("fnver", fnver)
+            parameter("fourk", fourk)
+            parameter("platform", "web")
+            parameter("high_quality", "1")
+            if (sessData.isEmpty()) {
+                parameter("try_look", "1")
+            }
+        }.body()
 
     /**
      * 获取视频弹幕分段（Web protobuf 接口）。

@@ -85,6 +85,8 @@ import kotlinx.coroutines.delay
  * @param isSeeking 是否正在 seek
  * @param goTime seek 预览位置（毫秒）
  * @param seekerState 进度条状态
+ * @param seekFocusKick 进度条焦点重抓取激励：计数变化时进度条重新请求焦点
+ *   （章节/分集面板点击关闭后焦点悬空，由调用方递增恢复方向键响应）
  * @param title 视频标题
  * @param onlineWatching 同时观看人数文案（空串时不显示）
  * @param videoShot 缩略图数据（为 null 时不显示预览）
@@ -118,6 +120,7 @@ fun ControllerVideoInfo(
     isSeeking: Boolean,
     goTime: Long,
     seekerState: SeekerState,
+    seekFocusKick: Int = 0,
     sponsorBlockMarks: List<ProgressSegmentMark> = emptyList(),
     title: String,
     onlineWatching: String,
@@ -171,6 +174,7 @@ fun ControllerVideoInfo(
                 isSeeking = isSeeking,
                 goTime = goTime,
                 seekerState = seekerState,
+                seekFocusKick = seekFocusKick,
                 sponsorBlockMarks = sponsorBlockMarks,
                 chapterMarks = chapterMarks,
                 videoShot = videoShot,
@@ -289,6 +293,7 @@ fun ControllerVideoInfoBottom(
     isSeeking: Boolean,
     goTime: Long,
     seekerState: SeekerState,
+    seekFocusKick: Int = 0,
     sponsorBlockMarks: List<ProgressSegmentMark>,
     videoShot: VideoShot?,
     videoShotCache: VideoShotImageCache,
@@ -319,7 +324,8 @@ fun ControllerVideoInfoBottom(
 
     var isSeekFocused by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    // 首次显示或激励计数变化时（如章节/分集面板点击关闭后）抓取焦点
+    LaunchedEffect(seekFocusKick) {
         delay(50)
         runCatching { seekFocusRequester.requestFocus() }
     }

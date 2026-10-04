@@ -1326,7 +1326,14 @@ class PlayerViewModel
             epid: Int = 0,
         ): PlaybackConfig {
             val apiType = Prefs.apiType
-            val playData = videoPlayRepository.getPlayData(aid = aid, cid = cid, preferApiType = apiType)
+            // PGC 剧集走专用播放通道（epid 分流），会员专享内容才有试看流/明确的权限错误
+            val playData =
+                videoPlayRepository.getPlayData(
+                    aid = aid,
+                    cid = cid,
+                    preferApiType = apiType,
+                    epid = epid,
+                )
             this.playData = playData
 
             val resolutionMap =

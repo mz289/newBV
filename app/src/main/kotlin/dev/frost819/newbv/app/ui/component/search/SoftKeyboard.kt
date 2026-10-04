@@ -41,8 +41,6 @@ private val keyboardKeys =
  *
  * @param firstButtonFocusRequester 首个按键的焦点请求器
  * @param searchButtonModifier 搜索按钮的额外 modifier（用于焦点恢复）
- * @param extraRows 追加在字母数字网格之后的额外按键行（如正则符号），默认无
- * @param onSearchLabel 确认按钮文案（默认"搜索"，可按场景定制如"添加"）
  * @param onClick 字符键点击回调
  * @param onClear 清除全部
  * @param onDelete 删除最后一个字符
@@ -53,8 +51,6 @@ fun SoftKeyboard(
     modifier: Modifier = Modifier,
     firstButtonFocusRequester: FocusRequester,
     searchButtonModifier: Modifier = Modifier,
-    extraRows: List<List<String>> = emptyList(),
-    onSearchLabel: String = "搜索",
     onClick: (String) -> Unit,
     onClear: () -> Unit,
     onDelete: () -> Unit,
@@ -83,18 +79,6 @@ fun SoftKeyboard(
                 }
             }
         }
-        extraRows.forEach { rowKeys ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                rowKeys.forEach { key ->
-                    SoftKeyboardKey(
-                        key = key,
-                        onClick = { onClick(key) },
-                    )
-                }
-            }
-        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -113,7 +97,7 @@ fun SoftKeyboard(
                     Modifier
                         .weight(1f)
                         .then(searchButtonModifier),
-                key = onSearchLabel,
+                key = "搜索",
                 onClick = onSearch,
             )
         }

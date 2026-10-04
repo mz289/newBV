@@ -153,6 +153,37 @@ class DanmakuBlockRuleImportExportTest {
     }
 
     @Test
+    fun `解析 bilibili_blacklist 分享平台导出的 XML`() {
+        // harrynull/bilibili_blacklist 的 /export_list 生成 blacklist_<id>.xml：
+        // 无 XML 声明，恒为 enabled="true"，仅 t=/r=/u= 三类前缀
+        val xml =
+            """
+            <filters>
+            <item enabled="true">t=前方高能</item>
+            <item enabled="true">r=/^\d+秒/</item>
+            <item enabled="true">u=9ae0daaf</item>
+            </filters>
+            """.trimIndent()
+        val result = parseBlockRules(xml)
+        assertThat(result.skipped).isEqualTo(0)
+        assertThat(result.rules.map { it.type to it.value }).containsExactly(
+            DanmakuBlockRuleType.Keyword to "前方高能",
+            DanmakuBlockRuleType.Regex to "/^\\d+秒/",
+            DanmakuBlockRuleType.User to "9ae0daaf",
+        ).inOrder()
+    }
+
+    @Test
+    fun `容忍该平台未转义的 XML 特殊字符值`() {
+        // 该平台导出时不对值做 XML 转义（data += filter.filter 原样拼接），
+        // 含 & 的关键词需按字面读取而非解析失败
+        val xml = """<filters><item enabled="true">t=a&b<c</item></filters>"""
+        val result = parseBlockRules(xml)
+        assertThat(result.rules.single().type).isEqualTo(DanmakuBlockRuleType.Keyword)
+        assertThat(result.rules.single().value).isEqualTo("a&b<c")
+    }
+
+    @Test
     fun `导出再导入往返保持语义`() {
         val state =
             DanmakuBlockRuleStore.State(

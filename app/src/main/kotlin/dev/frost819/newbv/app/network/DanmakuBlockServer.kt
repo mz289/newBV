@@ -4,15 +4,16 @@ import android.content.Context
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
 import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
 import dev.frost819.newbv.app.data.exportBlockRulesXml
+import dev.frost819.newbv.app.data.midHashOfUid
 import dev.frost819.newbv.app.data.parseBlockRules
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRuleType
 import dev.frost819.newbv.danmaku.filter.DanmakuBlockFilter
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
 import io.ktor.http.ContentDisposition
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.withCharset
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
@@ -58,7 +59,9 @@ import java.net.NetworkInterface
  */
 object DanmakuBlockServer {
     private val logger = Loggers.get("DanmakuBlockServer")
-    private val json = Json { ignoreUnknownKeys = true }
+
+    /** encodeDefaults 必须为 true：否则 enabled=true（默认值）被省略，网页端会把启用规则误读为停用。 */
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     @Volatile
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
@@ -66,16 +69,23 @@ object DanmakuBlockServer {
     @Volatile
     private var resolvedPort: Int? = null
 
+    /** 激活中的展示组件数（添加规则对话框 / 手机管理弹窗可能同时持有二维码）。 */
+    @Volatile
+    private var refCount = 0
+
     /** 由 [start] 注入的 assets 读取函数。 */
     @Volatile
     private var assetProvider: (String) -> ByteArray? = { null }
 
     /**
-     * 启动服务器（随机端口），重复调用安全。
+     * 启动服务器（随机端口），按展示组件引用计数管理生命周期：
+     * 首个调用者真正启动，后续调用仅计数；与 [stop] 配对使用，
+     * 最后一个调用者释放时才真正停止。
      *
      * @param context 用于读取 assets 管理页资源
      */
     fun start(context: Context) {
+        refCount++
         if (server != null) return
         val appContext = context.applicationContext
         assetProvider = { path ->
@@ -89,18 +99,31 @@ object DanmakuBlockServer {
             }.also { it.start(wait = false) }
         resolvedPort =
             runBlocking {
-                server?.engine?.resolvedConnectors()?.firstOrNull()?.port
+                server
+                    ?.engine
+                    ?.resolvedConnectors()
+                    ?.firstOrNull()
+                    ?.port
             }
         logger.info { "DanmakuBlockServer started on port $resolvedPort" }
     }
 
-    /** 停止服务器。 */
+    /** 停止服务器（引用计数归零时真正停止）。 */
     fun stop() {
+        refCount = (refCount - 1).coerceAtLeast(0)
+        if (refCount > 0) return
         server?.stop(gracePeriodMillis = 1000, timeoutMillis = 2000)
         server = null
         resolvedPort = null
         logger.info { "DanmakuBlockServer stopped" }
     }
+
+    /**
+     * 获取实际监听端口。
+     *
+     * @return 端口号，未运行时返回 null。
+     */
+    fun getPort(): Int? = resolvedPort
 
     /**
      * 获取管理页 URL（用于生成二维码）。
@@ -189,7 +212,11 @@ object DanmakuBlockServer {
             if (DanmakuBlockRuleStore.toggleRule(body.typeEnum(), body.value)) {
                 call.respondState()
             } else {
-                call.respondText("""{"ok":false,"message":"规则不存在"}""", ContentType.Application.Json, HttpStatusCode.NotFound)
+                call.respondText(
+                    text = """{"ok":false,"message":"规则不存在"}""",
+                    contentType = ContentType.Application.Json,
+                    status = HttpStatusCode.NotFound,
+                )
             }
         }
 
@@ -198,7 +225,11 @@ object DanmakuBlockServer {
             if (DanmakuBlockRuleStore.removeRule(body.typeEnum(), body.value)) {
                 call.respondState()
             } else {
-                call.respondText("""{"ok":false,"message":"规则不存在"}""", ContentType.Application.Json, HttpStatusCode.NotFound)
+                call.respondText(
+                    text = """{"ok":false,"message":"规则不存在"}""",
+                    contentType = ContentType.Application.Json,
+                    status = HttpStatusCode.NotFound,
+                )
             }
         }
 
@@ -213,8 +244,9 @@ object DanmakuBlockServer {
                 return@post
             }
             val imported = DanmakuBlockRuleStore.addRules(result.rules)
+            val duplicates = result.rules.size - imported
             call.respondText(
-                text = """{"ok":true,"imported":$imported,"duplicates":${result.rules.size - imported},"skipped":${result.skipped}}""",
+                text = """{"ok":true,"imported":$imported,"duplicates":$duplicates,"skipped":${result.skipped}}""",
                 contentType = ContentType.Application.Json,
             )
         }
@@ -241,7 +273,10 @@ object DanmakuBlockServer {
             totalHits = DanmakuBlockHitStats.totalHits.value,
             rules =
                 DanmakuBlockRuleStore.state.value.rules.map { rule ->
-                    RuleDto.from(rule).copy(hitCount = hitCounts[DanmakuBlockFilter.ruleKey(rule.type, rule.value)] ?: 0)
+                    val hits = hitCounts[DanmakuBlockFilter.ruleKey(rule.type, rule.value)] ?: 0
+                    RuleDto
+                        .from(rule)
+                        .copy(hitCount = hits)
                 },
         )
     }
@@ -289,15 +324,55 @@ object DanmakuBlockServer {
         val hitCount: Int = 0,
     ) {
         fun toRule(): DanmakuBlockRule? =
-            runCatching { DanmakuBlockRule(type = typeEnum(), value = value.trim(), enabled = enabled) }
+            runCatching { DanmakuBlockRule(type = typeEnum(), value = normalizeValue(), enabled = enabled) }
                 .getOrNull()
-                ?.takeIf { it.value.isNotEmpty() }
+                ?.takeIf { it.value.isNotEmpty() && isValueValid(it.type, it.value) }
 
-        fun typeEnum(): DanmakuBlockRuleType =
-            DanmakuBlockRuleType.valueOf(type)
+        fun typeEnum(): DanmakuBlockRuleType = DanmakuBlockRuleType.valueOf(type)
+
+        /**
+         * 规范化规则值，与屏蔽串导入语义一致：
+         * 用户规则纯数字按 B 站 UID 转 midHash（否则会被过滤器按十六进制误读），
+         * 颜色统一大写并剥可选 # 前缀。
+         */
+        private fun normalizeValue(): String {
+            val trimmed = value.trim()
+            return when (typeEnum()) {
+                DanmakuBlockRuleType.User ->
+                    if (trimmed.isNotEmpty() && trimmed.all { it in '0'..'9' }) {
+                        midHashOfUid(trimmed.toLong())
+                    } else {
+                        trimmed
+                    }
+                DanmakuBlockRuleType.Color -> trimmed.removePrefix("#").uppercase()
+                else -> trimmed
+            }
+        }
+
+        /**
+         * 服务端合法性校验（非法规则在过滤器编译时会被静默丢弃，必须在入口拒绝）：
+         * 正则须可编译；用户须为 8 位十六进制 midHash；颜色须为 6 位十六进制 RGB。
+         */
+        private fun isValueValid(
+            type: DanmakuBlockRuleType,
+            value: String,
+        ): Boolean =
+            when (type) {
+                DanmakuBlockRuleType.Regex -> DanmakuBlockFilter.parseBlockRegex(value) != null
+                DanmakuBlockRuleType.User ->
+                    value.length == 8 && value.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
+                DanmakuBlockRuleType.Color ->
+                    value.length == 6 && value.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
+                DanmakuBlockRuleType.Keyword -> true
+            }
 
         companion object {
-            fun from(rule: DanmakuBlockRule) = RuleDto(type = rule.type.name, value = rule.value, enabled = rule.enabled)
+            fun from(rule: DanmakuBlockRule): RuleDto =
+                RuleDto(
+                    type = rule.type.name,
+                    value = rule.value,
+                    enabled = rule.enabled,
+                )
         }
     }
 

@@ -188,13 +188,22 @@ private fun xmlUnescape(text: String): String =
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
         .replace("&apos;", "'")
-        .replace(Regex("&#x([0-9a-fA-F]+);")) { match ->
-            match.groupValues[1].toInt(16).toChar().toString()
-        }
-        .replace(Regex("&#([0-9]+);")) { match ->
-            match.groupValues[1].toInt().toChar().toString()
-        }
+        .replace(NUMERIC_ENTITY, ::decodeNumericEntity)
         .replace("&amp;", "&") // amp 最后解，避免二次解码
+
+/** XML 数字字符实体（十进制或十六进制）。 */
+private val NUMERIC_ENTITY = Regex("&#x?([0-9a-fA-F]+);")
+
+/** 解码单个数字字符实体。 */
+private fun decodeNumericEntity(match: MatchResult): String {
+    val code =
+        if (match.value.startsWith("&#x")) {
+            match.groupValues[1].toInt(16)
+        } else {
+            match.groupValues[1].toInt()
+        }
+    return code.toChar().toString()
+}
 
 /**
  * 导出规则列表为 B 站 XML 屏蔽串格式（文件名约定 tv.bilibili.player.xml）。
