@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -749,10 +750,16 @@ private fun VideoInfoHeader(
 
             if (detail.tags.isNotEmpty()) {
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            // 视口向左外扩 4dp（offset）+ 首内容边距补偿：首个标签与点赞按钮
+                            // 左缘对齐；外描边外沿最多伸出 2dp（outerFocusBorder），落在
+                            // 视口余量内不被裁切。
+                            .offset(x = (-4).dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    // 左右各留 4dp 供聚焦外描边绘制，避免首/末标签的描边被视口裁切
-                    //（首个标签因此较点赞按钮右移 4dp，不再严格对齐）。
+                    // 首尾各留 4dp 补偿视口外扩并给末标签描边留绘制空间；
+                    // 上下 8dp 兼作与上一行的额外间距。
                     contentPadding =
                         androidx.compose.foundation.layout
                             .PaddingValues(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
