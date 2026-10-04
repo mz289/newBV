@@ -29,6 +29,8 @@ data class VideoDetail(
     val history: History,
     val playerIcon: PlayerIcon? = null,
     val isUpowerExclusive: Boolean = false,
+    /** 是否为付费视频（rights.ugc_pay，需购买后观看）。 */
+    val isUgcPay: Boolean = false,
 ) {
     companion object {
         fun fromViewReply(viewReply: ViewReply): VideoDetail {
@@ -58,6 +60,7 @@ data class VideoDetail(
                     userActions = UserActions.fromReqUser(viewReply.reqUser),
                     history = History.fromHistory(viewReply.history),
                     playerIcon = viewReply.playerIcon?.let { PlayerIcon.fromPlayerIcon(it) },
+                    isUgcPay = viewReply.arc.rights.ugcPay == 1,
                 )
             } else {
                 return VideoDetail(
@@ -97,6 +100,7 @@ data class VideoDetail(
                                 it,
                             )
                         },
+                    isUgcPay = viewReply.activitySeason.arc.rights.ugcPay == 1,
                 )
             }
         }
@@ -131,6 +135,7 @@ data class VideoDetail(
                 history = History(0, 0),
                 playerIcon = null,
                 isUpowerExclusive = videoDetail.view.isUpowerExclusive ?: false,
+                isUgcPay = videoDetail.view.rights.ugcPay == 1,
             )
     }
 

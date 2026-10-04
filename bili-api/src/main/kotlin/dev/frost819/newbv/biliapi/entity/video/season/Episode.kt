@@ -16,6 +16,7 @@ import dev.frost819.newbv.biliapi.entity.video.Dimension
  * @param cover 封面
  * @param duration 时长
  * @param dimension 分辨率
+ * @param badge 官方角标（如“会员”“限免”），无角标为 null
  */
 data class Episode(
     val id: Int,
@@ -29,6 +30,7 @@ data class Episode(
     /** 时长（秒），用于与观看历史计算进度。 */
     val duration: Int,
     val dimension: Dimension?,
+    val badge: EpisodeBadge? = null,
 ) {
     companion object {
         fun fromEpisode(episode: bilibili.app.view.v1.Episode) =
@@ -70,6 +72,44 @@ data class Episode(
                 epid = episode.epId,
                 duration = (episode.duration / 1000).coerceAtLeast(0),
                 dimension = episode.dimension?.let { Dimension.fromDimension(it) },
+                badge =
+                    EpisodeBadge.fromText(
+                        text = episode.badge,
+                        info = episode.badgeInfo,
+                    ),
             )
+    }
+}
+
+/**
+ * 剧集官方角标（如“会员”“限免”“预告”）。
+ *
+ * 文案与配色均来自接口（badge / badge_info），bgColor 与 bgColorNight
+ * 为 B 站官方十六进制色值（如 #FB7299），可能为空串，由 UI 层兜底。
+ *
+ * @param text 角标文字
+ * @param bgColor 白天背景色（十六进制，如 "#FB7299"）
+ * @param bgColorNight 夜间背景色
+ */
+data class EpisodeBadge(
+    val text: String,
+    val bgColor: String,
+    val bgColorNight: String,
+) {
+    companion object {
+        fun fromText(
+            text: String,
+            info: dev.frost819.newbv.biliapi.http.entity.season.Episode.BadgeInfo?,
+        ): EpisodeBadge? {
+            val displayText =
+                info?.text?.takeIf { it.isNotBlank() }
+                    ?: text.takeIf { it.isNotBlank() }
+                    ?: return null
+            return EpisodeBadge(
+                text = displayText,
+                bgColor = info?.bgColor ?: "",
+                bgColorNight = info?.bgColorNight ?: "",
+            )
+        }
     }
 }

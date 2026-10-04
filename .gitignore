@@ -16,6 +16,7 @@ gradle-app.setting
 
 # Local scratch files
 /.tmp/
+/.verify/
 *.tmp
 *.bak
 *.orig

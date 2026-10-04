@@ -1,5 +1,7 @@
 package dev.frost819.newbv.app.ui.action.player
 
+import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
+import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.VideoCodec
@@ -40,6 +42,23 @@ sealed interface DanmakuSettingAction {
         val types: List<DanmakuType>,
         /** 是否持久化为默认弹幕开关（投屏临时开关传 false，避免覆盖用户默认设置）。 */
         val persist: Boolean = true,
+    ) : DanmakuSettingAction
+
+    /** 设置弹幕屏蔽总开关。 */
+    data class SetBlockEnabled(
+        val enabled: Boolean,
+    ) : DanmakuSettingAction
+
+    /**
+     * 整体替换屏蔽规则列表（增删改统一走此动作，由 UI 组装好新列表）。
+     */
+    data class SetBlockRules(
+        val rules: List<DanmakuBlockRule>,
+    ) : DanmakuSettingAction
+
+    /** 设置重复弹幕合并模式。 */
+    data class SetMergeMode(
+        val mode: DanmakuMergeMode,
     ) : DanmakuSettingAction
 }
 

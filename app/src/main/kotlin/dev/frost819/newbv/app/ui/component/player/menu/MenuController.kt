@@ -40,6 +40,8 @@ import dev.frost819.newbv.biliapi.entity.video.Subtitle
 import dev.frost819.newbv.biliapi.entity.video.SubtitleAiStatus
 import dev.frost819.newbv.biliapi.entity.video.SubtitleAiType
 import dev.frost819.newbv.biliapi.entity.video.SubtitleType
+import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
+import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.DanmakuType
 import dev.frost819.newbv.data.datastore.VideoCodec
@@ -87,6 +89,9 @@ fun MenuController(
     onDanmakuSpeedFactorChange: (Float) -> Unit,
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit = {},
+    onBlockEnabledChange: (Boolean) -> Unit = {},
+    onBlockRulesChange: (List<DanmakuBlockRule>) -> Unit = {},
+    onMergeModeChange: (DanmakuMergeMode) -> Unit = {},
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (Int) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
@@ -127,6 +132,9 @@ fun MenuController(
                 onDanmakuSpeedFactorChange = onDanmakuSpeedFactorChange,
                 onDanmakuAreaChange = onDanmakuAreaChange,
                 onDanmakuMaskChange = onDanmakuMaskChange,
+                onBlockEnabledChange = onBlockEnabledChange,
+                onBlockRulesChange = onBlockRulesChange,
+                onMergeModeChange = onMergeModeChange,
                 onSubtitleChange = onSubtitleChange,
                 onSubtitleSizeChange = onSubtitleSizeChange,
                 onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,
@@ -155,6 +163,9 @@ private fun MenuControllerContent(
     onDanmakuSpeedFactorChange: (Float) -> Unit,
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit,
+    onBlockEnabledChange: (Boolean) -> Unit,
+    onBlockRulesChange: (List<DanmakuBlockRule>) -> Unit,
+    onMergeModeChange: (DanmakuMergeMode) -> Unit,
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (Int) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
@@ -192,6 +203,9 @@ private fun MenuControllerContent(
                     onDanmakuSpeedFactorChange = onDanmakuSpeedFactorChange,
                     onDanmakuAreaChange = onDanmakuAreaChange,
                     onDanmakuMaskChange = onDanmakuMaskChange,
+                    onBlockEnabledChange = onBlockEnabledChange,
+                    onBlockRulesChange = onBlockRulesChange,
+                    onMergeModeChange = onMergeModeChange,
                     onFocusStateChange = { focusState = it },
                     onSubtitleChange = onSubtitleChange,
                     onSubtitleSizeChange = onSubtitleSizeChange,
@@ -242,6 +256,9 @@ private fun MenuList(
     onDanmakuSpeedFactorChange: (Float) -> Unit,
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit,
+    onBlockEnabledChange: (Boolean) -> Unit,
+    onBlockRulesChange: (List<DanmakuBlockRule>) -> Unit,
+    onMergeModeChange: (DanmakuMergeMode) -> Unit,
     onFocusStateChange: (MenuFocusState) -> Unit,
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (Int) -> Unit,
@@ -282,6 +299,9 @@ private fun MenuList(
                     currentSpeedFactor = overlayState.danmakuState.speedFactor,
                     currentArea = overlayState.danmakuState.area,
                     currentMaskEnabled = overlayState.danmakuState.maskEnabled,
+                    currentBlockEnabled = overlayState.danmakuState.blockEnabled,
+                    currentBlockRules = overlayState.danmakuState.blockRules,
+                    currentMergeMode = overlayState.danmakuState.mergeMode,
                     onDanmakuSwitchChange = onDanmakuSwitchChange,
                     onDanmakuSizeChange = onDanmakuSizeChange,
                     onDanmakuOpacityChange = onDanmakuOpacityChange,
@@ -289,6 +309,9 @@ private fun MenuList(
                     onDanmakuAreaChange = onDanmakuAreaChange,
                     onFocusStateChange = onFocusStateChange,
                     onDanmakuMaskChange = onDanmakuMaskChange,
+                    onBlockEnabledChange = onBlockEnabledChange,
+                    onBlockRulesChange = onBlockRulesChange,
+                    onMergeModeChange = onMergeModeChange,
                 )
             }
 

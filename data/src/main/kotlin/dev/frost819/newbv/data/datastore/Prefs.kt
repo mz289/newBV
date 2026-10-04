@@ -354,6 +354,19 @@ object Prefs {
     /** 默认防遮挡蒙版开关。 */
     var defaultDanmakuMask by pref(PrefKeys.defaultDanmakuMask, false)
 
+    /** 默认弹幕屏蔽总开关。 */
+    var danmakuBlockEnabled by pref(PrefKeys.danmakuBlockEnabled, false)
+
+    /**
+     * 默认弹幕屏蔽规则（JSON 串，编解码在 app 层完成）。
+     *
+     * 规则值可能包含逗号等分隔符，故存 JSON 而非拼接串。
+     */
+    var danmakuBlockRules by pref(PrefKeys.danmakuBlockRules, "[]")
+
+    /** 默认合并重复弹幕模式序号（DanmakuMergeMode.ordinal，0=关闭）。 */
+    var danmakuMergeMode by pref(PrefKeys.danmakuMergeMode, 0)
+
     // --- 播放器 - 字幕（PRD 7.4） ---
 
     /** 默认字幕字号（SP）。 */

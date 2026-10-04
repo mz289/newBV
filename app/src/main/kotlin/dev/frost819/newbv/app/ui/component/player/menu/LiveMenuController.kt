@@ -242,6 +242,9 @@ private fun LiveMenuList(
                     currentSpeedFactor = danmakuState.speedFactor,
                     currentArea = danmakuState.area,
                     currentMaskEnabled = danmakuState.maskEnabled,
+                    currentBlockEnabled = danmakuState.blockEnabled,
+                    currentBlockRules = danmakuState.blockRules,
+                    currentMergeMode = danmakuState.mergeMode,
                     onDanmakuSwitchChange = { types ->
                         onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(types.toDanmakuEntities()))
                     },
@@ -251,6 +254,9 @@ private fun LiveMenuList(
                     onDanmakuAreaChange = { onDanmakuSettingChange(DanmakuSettingAction.SetArea(it)) },
                     onFocusStateChange = onFocusStateChange,
                     onDanmakuMaskChange = { onDanmakuSettingChange(DanmakuSettingAction.SetMaskEnabled(it)) },
+                    onBlockEnabledChange = { onDanmakuSettingChange(DanmakuSettingAction.SetBlockEnabled(it)) },
+                    onBlockRulesChange = { onDanmakuSettingChange(DanmakuSettingAction.SetBlockRules(it)) },
+                    onMergeModeChange = { onDanmakuSettingChange(DanmakuSettingAction.SetMergeMode(it)) },
                 )
             }
         }

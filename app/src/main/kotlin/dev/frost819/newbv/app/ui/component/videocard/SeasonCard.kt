@@ -87,6 +87,16 @@ fun SeasonCard(
                     contentScale = ContentScale.FillBounds,
                 )
 
+                data.badge?.let {
+                    BadgeChip(
+                        text = it,
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp),
+                    )
+                }
+
                 if (data.hasRating) {
                     Box(
                         modifier =

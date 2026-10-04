@@ -19,6 +19,7 @@ import dev.frost819.newbv.app.sponsorblock.buildSponsorBlockProgressMarks
 import dev.frost819.newbv.app.ui.action.player.MediaProfileSettingAction
 import dev.frost819.newbv.app.ui.component.settings.displayName
 import dev.frost819.newbv.app.ui.state.player.MediaProfileState
+import dev.frost819.newbv.app.ui.state.player.PlaybackGuide
 import dev.frost819.newbv.app.ui.state.player.PlayerState
 import dev.frost819.newbv.app.ui.state.player.PlayerUiEffect
 import dev.frost819.newbv.app.ui.state.player.PlayerUiState
@@ -67,18 +68,29 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 private const val PLAYER_ACTION_TIMEOUT_MS = 10_000L
 
 /** 同时观看人数刷新间隔（cid 就绪后周期轮询）。 */
 private const val ONLINE_WATCH_REFRESH_MS = 60_000L
+
+/** PGC 会员专享剧集的试看提示。 */
+private const val PGC_PREVIEW_TIP = "该剧集为大会员专享内容，当前为试看片段，开通大会员后可观看完整剧集"
+
+/** 充电专属视频的试看提示。 */
+private const val CHARGE_PREVIEW_TIP = "该视频为充电专属内容，当前为试看片段，开通充电后可观看完整视频"
+
+/** UGC 付费视频的通用试看提示。 */
+private const val PAID_PREVIEW_TIP = "视频需付费，当前为试看片段"
 
 /**
  * 播放器主 ViewModel。
@@ -997,7 +1009,7 @@ class PlayerViewModel
                     availableVideoCodec = emptyList(),
                     availableAudio = emptyList(),
                     onlineWatching = "",
-                    showPreviewTip = false,
+                    previewTipText = null,
                     showSkipToNextEp = false,
                     showBackToStart = false,
                     shortcutTipText = null,
@@ -1065,9 +1077,10 @@ class PlayerViewModel
                         throw e
                     } catch (e: Exception) {
                         logger.error(e) { "Loading video data error: $e" }
+                        val message = e.message ?: "未知错误"
                         _uiState.update {
                             it.copy(
-                                playerState = PlayerState.Error(e.message ?: "未知错误"),
+                                playerState = PlayerState.Error(message, classifyPlaybackGuide(message)),
                                 isBuffering = false,
                             )
                         }
@@ -1353,9 +1366,40 @@ class PlayerViewModel
                 )
             }
 
-            if (playData.needPay) startShowPreviewTipCountdown()
+            if (playData.needPay) startShowPreviewTipCountdown(previewTipText(_uiState.value))
 
             return PlaybackConfig(qn = targetQualityId, codec = targetCodec, audio = targetAudio)
+        }
+
+        /**
+         * 按内容类型确定试看提示文案。
+         *
+         * PGC 剧集为大会员专享；UGC 按已就绪的视频详情区分充电专属与通用付费，
+         * 详情尚未就绪时先显示通用文案，详情到达后由 [startShowPreviewTipCountdown] 修正。
+         */
+        private fun previewTipText(state: PlayerUiState): String {
+            if (state.isPgc) return PGC_PREVIEW_TIP
+            val detail = videoInfoRepository.videoDetail.value
+            if (detail != null && detail.aid == state.aid && detail.isUpowerExclusive) {
+                return CHARGE_PREVIEW_TIP
+            }
+            return PAID_PREVIEW_TIP
+        }
+
+        /**
+         * 按接口错误信息归类无播放权限的类型。
+         *
+         * B 站的权限错误（如“大会员专享限制”“充电专属视频”）
+         * 在 Web 与 App 通道均以业务 message 透出，按关键词归类即可稳定覆盖。
+         */
+        private fun classifyPlaybackGuide(message: String?): PlaybackGuide? {
+            val text = message ?: return null
+            return when {
+                text.contains("充电") -> PlaybackGuide.Charge
+                text.contains("大会员") || text.contains("会员") -> PlaybackGuide.Vip
+                text.contains("付费") || text.contains("购买") -> PlaybackGuide.Paid
+                else -> null
+            }
         }
 
         private fun calculateTargetQuality(
@@ -1700,13 +1744,25 @@ class PlayerViewModel
                 }
         }
 
-        private fun startShowPreviewTipCountdown() {
+        private fun startShowPreviewTipCountdown(initialText: String) {
             previewTipCountdownJob?.cancel()
             previewTipCountdownJob =
                 viewModelScope.launch {
-                    _uiState.update { it.copy(showPreviewTip = true) }
+                    _uiState.update { it.copy(previewTipText = initialText) }
+                    // 充电专属信息随视频详情异步就绪（详情与播放地址并行加载），
+                    // 先前展示的通用付费文案在详情确认后修正为充电专属文案
+                    if (initialText == PAID_PREVIEW_TIP) {
+                        val detail =
+                            withTimeoutOrNull(PLAYER_ACTION_TIMEOUT_MS) {
+                                videoInfoRepository.videoDetail
+                                    .firstOrNull { it != null && it.aid == _uiState.value.aid && it.isUpowerExclusive }
+                            }
+                        if (detail != null && _uiState.value.previewTipText == PAID_PREVIEW_TIP) {
+                            _uiState.update { it.copy(previewTipText = CHARGE_PREVIEW_TIP) }
+                        }
+                    }
                     delay(PlayerConstants.COUNTDOWN_DURATION_MS)
-                    _uiState.update { it.copy(showPreviewTip = false) }
+                    _uiState.update { it.copy(previewTipText = null) }
                 }
         }
 

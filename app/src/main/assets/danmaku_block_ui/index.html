@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>弹幕屏蔽管理</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #1a1d24; --card2: #22262f; --border: #2e333d;
+    --text: #e7eaf0; --muted: #8b93a1; --accent: #4c8dff; --danger: #ff5c5c;
+    --ok: #3ecf8e; --kw: #4c8dff; --re: #b07aff; --us: #3ecf8e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.6 -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", sans-serif; padding-bottom: 48px; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 8px 2px 16px; }
+  h1 { font-size: 20px; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .switch { position: relative; width: 52px; height: 30px; flex: none; }
+  .switch input { opacity: 0; width: 100%; height: 100%; position: absolute; z-index: 2; cursor: pointer; }
+  .switch .track { position: absolute; inset: 0; background: var(--border); border-radius: 15px; transition: background .2s; }
+  .switch .thumb { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; background: #fff; border-radius: 50%; transition: left .2s; }
+  .switch input:checked ~ .track { background: var(--accent); }
+  .switch input:checked ~ .thumb { left: 25px; }
+  section { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+  h2 { font-size: 14px; color: var(--muted); font-weight: 500; margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; }
+  input[type=text], select, textarea, button { font: inherit; border-radius: 10px; border: 1px solid var(--border); background: var(--card2); color: var(--text); }
+  input[type=text], select { padding: 9px 12px; }
+  input[type=text] { flex: 1; min-width: 0; }
+  select { flex: none; }
+  textarea { width: 100%; padding: 10px 12px; min-height: 110px; resize: vertical; font-size: 13px; }
+  button { padding: 9px 16px; cursor: pointer; border: 1px solid var(--border); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.plain:active, button.primary:active { opacity: .8; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  ul { list-style: none; }
+  li { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+  li:last-child { border-bottom: none; }
+  .badge { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: var(--card2); }
+  .badge.Keyword { color: var(--kw); } .badge.Regex { color: var(--re); } .badge.User { color: var(--us); }
+  .value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  li.off .value { color: var(--muted); text-decoration: line-through; }
+  .hits { flex: none; font-size: 12px; color: var(--ok); background: var(--card2); padding: 2px 8px; border-radius: 6px; }
+  .del { flex: none; color: var(--danger); background: none; border: none; font-size: 20px; padding: 4px 8px; }
+  .empty { color: var(--muted); text-align: center; padding: 22px 0; font-size: 13px; }
+  #toast { position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%); background: #000c; padding: 10px 18px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 86vw; }
+  #toast.show { opacity: 1; }
+  .toolbar { display: flex; gap: 8px; margin-top: 10px; }
+  .toolbar button { flex: 1; }
+  label.file { flex: 1; display: flex; align-items: center; justify-content: center; padding: 9px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--card2); cursor: pointer; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>弹幕屏蔽管理</h1>
+      <div class="sub">与电视端实时同步 · 修改即时生效</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="master">
+      <span class="track"></span><span class="thumb"></span>
+    </label>
+  </header>
+
+  <section>
+    <h2>规则列表 <span id="count" class="sub"></span></h2>
+    <ul id="rules"></ul>
+    <div id="empty" class="empty" hidden>暂无规则</div>
+  </section>
+
+  <section>
+    <h2>添加规则</h2>
+    <div class="row">
+      <select id="type">
+        <option value="Keyword">关键词</option>
+        <option value="Regex">正则</option>
+        <option value="User">用户</option>
+        <option value="Color">颜色</option>
+      </select>
+      <input type="text" id="value" placeholder="关键词、/正则/、midHash 或颜色 hex">
+      <button class="primary" onclick="addRule()">添加</button>
+    </div>
+    <div class="hint">关键词：包含即屏蔽（忽略大小写）；正则可用 /pattern/ 包裹；用户填 8 位 midHash 或数字 UID；颜色填 6 位十六进制（如 FF6699）</div>
+  </section>
+
+  <section>
+    <h2>导入屏蔽串</h2>
+    <textarea id="importText" placeholder="粘贴 B 站 XML 屏蔽串（tv.bilibili.player.xml 内容）或每行一条的纯文本词库"></textarea>
+    <div class="toolbar">
+      <label class="file">选择文件<input type="file" id="file" accept=".xml,.txt,text/xml,text/plain"></label>
+      <button class="primary" onclick="doImport()">导入</button>
+    </div>
+    <div class="hint">支持 B 站 XML 屏蔽串、每行一条的文本词库（/正则/ 自动识别），重复规则自动跳过</div>
+  </section>
+
+  <section>
+    <h2>导出</h2>
+    <button onclick="location.href='/api/block/export'">下载 B 站 XML 屏蔽串</button>
+    <div class="hint">导出格式与 B 站播放器兼容，可导入其他客户端</div>
+  </section>
+</div>
+<div id="toast"></div>
+<script>
+  const $ = id => document.getElementById(id);
+  let suppressPoll = false;
+
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._h);
+    t._h = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  async function api(path, body) {
+    const opt = body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) };
+    const res = await fetch(path, opt);
+    if (!res.ok && res.status !== 409 && res.status !== 404) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+
+  function render(state) {
+    $('master').checked = state.enabled;
+    $('count').textContent = state.rules.length
+      ? `（${state.rules.length} 条` + (state.totalHits ? `，已屏蔽 ${state.totalHits}` : '') + '）'
+      : '';
+    const ul = $('rules');
+    ul.innerHTML = '';
+    $('empty').hidden = state.rules.length > 0;
+    const typeNames = { Keyword: '关键词', Regex: '正则', User: '用户', Color: '颜色' };
+    state.rules.forEach(r => {
+      const li = document.createElement('li');
+      if (!r.enabled) li.className = 'off';
+      li.innerHTML =
+        `<label class="switch"><input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="toggleRule(this,'${r.type}',${JSON.stringify(r.value).replace(/"/g,'&quot;')})">` +
+        `<span class="track"></span><span class="thumb"></span></label>` +
+        `<span class="badge ${r.type}">${typeNames[r.type] || r.type}</span>` +
+        `<span class="value"></span>` +
+        (r.hitCount ? `<span class="hits" title="本会话命中">${r.hitCount}</span>` : '') +
+        `<button class="del" onclick="deleteRule('${r.type}',${JSON.stringify(r.value).replace(/"/g,'&quot;')})">×</button>`;
+      li.querySelector('.value').textContent = r.value;
+      ul.appendChild(li);
+    });
+  }
+
+  async function refresh() {
+    try { render(await api('/api/block/state')); } catch (e) { /* 轮询失败静默 */ }
+  }
+
+  async function mutate(promise, okMsg) {
+    suppressPoll = true;
+    try {
+      const data = await promise;
+      if (data.ok === false) { toast(data.message || '操作失败'); }
+      else { render(data); if (okMsg) toast(okMsg); }
+    } catch (e) { toast('操作失败：' + e.message); }
+    suppressPoll = false;
+  }
+
+  const setEnabled = v => mutate(api('/api/block/enabled', { enabled: v }));
+  const addRule = () => {
+    const value = $('value').value.trim();
+    if (!value) { toast('请输入规则内容'); return; }
+    mutate(api('/api/block/rule', { type: $('type').value, value }).then(d => { $('value').value = ''; return d; }), '已添加');
+  };
+  const toggleRule = (el, type, value) => mutate(api('/api/block/rule/toggle', { type, value }));
+  const deleteRule = (type, value) => mutate(api('/api/block/rule/delete', { type, value }), '已删除');
+
+  async function doImport() {
+    const text = $('importText').value.trim();
+    if (!text) { toast('请粘贴屏蔽串或选择文件'); return; }
+    suppressPoll = true;
+    try {
+      const res = await fetch('/api/block/import', { method: 'POST', body: text });
+      const data = await res.json();
+      if (data.ok) {
+        toast(`导入 ${data.imported} 条` + (data.duplicates ? `，重复 ${data.duplicates} 条` : '') + (data.skipped ? `，跳过 ${data.skipped} 条` : ''));
+        $('importText').value = '';
+        render(await api('/api/block/state'));
+      } else { toast(data.message || '导入失败'); }
+    } catch (e) { toast('导入失败：' + e.message); }
+    suppressPoll = false;
+  }
+
+  $('master').addEventListener('change', e => setEnabled(e.target.checked));
+  $('value').addEventListener('keydown', e => { if (e.key === 'Enter') addRule(); });
+  $('file').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => { $('importText').value = reader.result; doImport(); };
+    reader.readAsText(f, 'UTF-8');
+    e.target.value = '';
+  });
+
+  refresh();
+  setInterval(() => { if (!suppressPoll && !document.hidden) refresh(); }, 3000);
+</script>
+</body>
+</html>

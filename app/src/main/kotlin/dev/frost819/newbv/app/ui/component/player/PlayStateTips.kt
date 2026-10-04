@@ -23,6 +23,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
+import dev.frost819.newbv.app.ui.state.player.PlaybackGuide
 import dev.frost819.newbv.core.theme.BVTheme
 
 /**
@@ -31,7 +32,7 @@ import dev.frost819.newbv.core.theme.BVTheme
  * 根据播放状态显示不同的提示：
  * - **暂停**：右下角显示暂停图标（仅当非播放、非缓冲、非错误时）
  * - **缓冲中**：屏幕中央显示加载指示器 + "缓冲中..."
- * - **错误**：屏幕中央显示错误信息
+ * - **错误**：屏幕中央显示错误信息（无权限时附带会员/充电引导）
  *
  * 三种状态互斥，优先级：error > buffering > paused。
  *
@@ -40,6 +41,7 @@ import dev.frost819.newbv.core.theme.BVTheme
  * @param isBuffering 是否正在缓冲
  * @param isError 是否发生错误
  * @param errorMessage 错误信息（为 null 时显示"未知错误"）
+ * @param errorGuide 无播放权限的引导类型，null 表示普通播放故障
  */
 @Composable
 fun PlayStateTips(
@@ -48,6 +50,7 @@ fun PlayStateTips(
     isBuffering: Boolean,
     isError: Boolean,
     errorMessage: String? = null,
+    errorGuide: PlaybackGuide? = null,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (!isPlaying && !isBuffering && !isError) {
@@ -67,6 +70,7 @@ fun PlayStateTips(
             PlayErrorTip(
                 modifier = Modifier.align(Alignment.Center),
                 errorMessage = errorMessage,
+                guide = errorGuide,
             )
         }
     }
@@ -137,14 +141,17 @@ fun BufferingTip(modifier: Modifier = Modifier) {
 /**
  * 播放错误提示。
  *
- * 屏幕中央显示的半透明错误框，包含标题和错误信息。
+ * 屏幕中央显示的半透明错误框：无权限错误（[guide] 非空）展示明确的
+ * 权限类型与开通引导；普通故障沿用原有的"播放器正在抽风"文案。
  *
  * @param errorMessage 错误信息（为 null 时显示"未知错误"）
+ * @param guide 无播放权限的引导类型，null 表示普通播放故障
  */
 @Composable
 fun PlayErrorTip(
     modifier: Modifier = Modifier,
     errorMessage: String?,
+    guide: PlaybackGuide? = null,
 ) {
     Surface(
         modifier = modifier,
@@ -158,11 +165,39 @@ fun PlayErrorTip(
             modifier = Modifier.padding(16.dp, 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = "播放器正在抽风",
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(text = " _(:з」∠)_")
+            when (guide) {
+                PlaybackGuide.Vip -> {
+                    Text(
+                        text = "大会员专享内容",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(text = "开通大会员后可观看完整内容")
+                }
+
+                PlaybackGuide.Charge -> {
+                    Text(
+                        text = "充电专属视频",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(text = "开通充电后可观看完整视频")
+                }
+
+                PlaybackGuide.Paid -> {
+                    Text(
+                        text = "付费视频",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(text = "购买后可观看完整视频")
+                }
+
+                null -> {
+                    Text(
+                        text = "播放器正在抽风",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(text = " _(:з」∠)_")
+                }
+            }
             Spacer(modifier = Modifier.height(12.dp))
             Text(text = "错误信息：${errorMessage ?: "未知错误"}")
         }
@@ -204,6 +239,20 @@ private fun PlayStateTipsErrorPreview() {
             isBuffering = false,
             isError = true,
             errorMessage = "网络连接失败 (404)",
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+private fun PlayStateTipsVipGuideErrorPreview() {
+    BVTheme {
+        PlayStateTips(
+            isPlaying = false,
+            isBuffering = false,
+            isError = true,
+            errorMessage = "大会员专享限制",
+            errorGuide = PlaybackGuide.Vip,
         )
     }
 }

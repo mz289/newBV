@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.tv.material3.SurfaceDefaults
 import androidx.compose.material3.MaterialTheme as CommonMaterialTheme
 import androidx.compose.material3.Surface as CommonSurface
@@ -25,6 +26,14 @@ import androidx.tv.material3.MaterialTheme as TvMaterialTheme
 import androidx.tv.material3.Surface as TvSurface
 import androidx.tv.material3.darkColorScheme as tvDark
 import androidx.tv.material3.lightColorScheme as tvLight
+
+/**
+ * 当前是否处于深色主题（已计入用户的强制深色/浅色设置）。
+ *
+ * 接口下发官方日/夜双色（如剧集角标 badge_info）的 UI 据此取色，
+ * 不要直接用 isSystemInDarkTheme()，其不感知应用内的主题模式设置。
+ */
+val LocalIsDark = staticCompositionLocalOf { true }
 
 /**
  * new BV 根主题。
@@ -144,6 +153,7 @@ fun BVTheme(
         ) {
             CompositionLocalProvider(
                 LocalRippleConfiguration provides null,
+                LocalIsDark provides isDark,
                 LocalFocusOutlineColor provides
                     if (isDark) BVColors.FocusOutlineDark else BVColors.FocusOutlineLight,
                 LocalDensity provides Density(density = density, fontScale = fontScale),

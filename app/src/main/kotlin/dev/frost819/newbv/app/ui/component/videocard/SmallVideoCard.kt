@@ -342,6 +342,7 @@ fun SmallVideoCard(
                     danmaku = data.danmakuString,
                     time = data.timeString,
                     progress = data.progress,
+                    badge = data.badge,
                 )
             }
         }
@@ -358,7 +359,7 @@ fun SmallVideoCard(
 /**
  * 卡片封面区域。
  *
- * 封面图片 + 底部渐变遮罩 + 播放数/弹幕数统计 + 右下角时长角标。
+ * 封面图片 + 底部渐变遮罩 + 播放数/弹幕数统计 + 右下角时长角标 + 右上角付费角标。
  */
 @Composable
 private fun CardCover(
@@ -368,6 +369,7 @@ private fun CardCover(
     danmaku: String,
     time: String,
     progress: Float? = null,
+    badge: String? = null,
 ) {
     Box(
         modifier =
@@ -385,6 +387,16 @@ private fun CardCover(
             contentDescription = null,
             contentScale = ContentScale.Crop,
         )
+
+        badge?.let {
+            BadgeChip(
+                text = it,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+            )
+        }
 
         Box(
             modifier =

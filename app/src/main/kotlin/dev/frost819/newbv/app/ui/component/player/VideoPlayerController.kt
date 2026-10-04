@@ -591,7 +591,7 @@ fun VideoPlayerController(
             SkipTips(
                 showBackToStart = uiState.showBackToStart,
                 showSkipToNextEp = uiState.showSkipToNextEp,
-                showPreviewTip = uiState.showPreviewTip,
+                previewTipText = uiState.previewTipText,
                 shortcutTipText = uiState.shortcutTipText,
                 shortcutTipKey = uiState.shortcutTipKey,
                 sponsorBlockTip = uiState.sponsorBlockTip,
@@ -610,6 +610,7 @@ fun VideoPlayerController(
                 isBuffering = uiState.isBuffering,
                 isError = uiState.playerState is PlayerState.Error,
                 errorMessage = (uiState.playerState as? PlayerState.Error)?.message,
+                errorGuide = (uiState.playerState as? PlayerState.Error)?.guide,
             )
 
             // 手势提示（亮度/音量/倍速反馈）
@@ -710,6 +711,9 @@ fun VideoPlayerController(
                 onDanmakuSpeedFactorChange = { onDanmakuSettingChange(DanmakuSettingAction.SetSpeedFactor(it)) },
                 onDanmakuAreaChange = { onDanmakuSettingChange(DanmakuSettingAction.SetArea(it)) },
                 onDanmakuMaskChange = { onDanmakuSettingChange(DanmakuSettingAction.SetMaskEnabled(it)) },
+                onBlockEnabledChange = { onDanmakuSettingChange(DanmakuSettingAction.SetBlockEnabled(it)) },
+                onBlockRulesChange = { onDanmakuSettingChange(DanmakuSettingAction.SetBlockRules(it)) },
+                onMergeModeChange = { onDanmakuSettingChange(DanmakuSettingAction.SetMergeMode(it)) },
                 onSubtitleChange = { subtitle -> onSubtitleChange(subtitle) },
                 onSubtitleSizeChange = { onSubtitleSettingChange(SubtitleSettingAction.SetFontSize(it)) },
                 onSubtitleBackgroundOpacityChange = { onSubtitleSettingChange(SubtitleSettingAction.SetOpacity(it)) },

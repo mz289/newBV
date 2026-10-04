@@ -239,6 +239,7 @@ fun SearchResultContent(
                                     upName = v.author,
                                     upMid = v.mid,
                                     pubTime = v.pubTime,
+                                    badge = v.badge,
                                 )
                             SmallVideoCard(
                                 modifier = Modifier.focusSaverItem(focusSaver, focusKey),
@@ -266,6 +267,7 @@ fun SearchResultContent(
                                         title = p.title.removeHtmlTags(),
                                         cover = p.cover,
                                         rating = if (p.star > 0) String.format("%.1f", p.star) else null,
+                                        badge = p.badge,
                                     ),
                                 onClick = {
                                     navController.navigate(

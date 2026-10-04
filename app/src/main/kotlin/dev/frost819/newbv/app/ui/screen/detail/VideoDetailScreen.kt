@@ -81,6 +81,7 @@ import dev.frost819.newbv.app.ui.component.dialog.EpisodeListButton
 import dev.frost819.newbv.app.ui.component.dialog.EpisodeListDialog
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
+import dev.frost819.newbv.app.ui.component.videocard.BadgeChip
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
 import dev.frost819.newbv.app.ui.navigation.SearchResultRoute
@@ -628,6 +629,13 @@ private fun VideoInfoHeader(
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            // 付费类标识：充电专属 / 付费视频（与官方 App 一致，置于标题与数据行之间）
+            if (detail.isUpowerExclusive || detail.isUgcPay) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (detail.isUpowerExclusive) BadgeChip("充电专属")
+                    if (detail.isUgcPay) BadgeChip("付费")
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

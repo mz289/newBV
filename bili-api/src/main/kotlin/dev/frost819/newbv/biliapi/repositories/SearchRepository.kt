@@ -360,6 +360,8 @@ data class SearchTypeResult(
         val play: Int,
         val danmaku: Int,
         val pubTime: String? = null,
+        /** 付费相关角标（“充电专属”“付费”），普通视频为 null。 */
+        val badge: String? = null,
     ) : SearchTypeResultItem {
         companion object {
             fun fromSearchVideoResult(video: dev.frost819.newbv.biliapi.http.entity.search.SearchVideoResult) =
@@ -374,6 +376,7 @@ data class SearchTypeResult(
                     play = video.play ?: 0,
                     danmaku = video.danmaku,
                     pubTime = video.pubDate.smartDate,
+                    badge = paidVideoBadge(video.isChargeVideo, video.isPay, video.badgePay),
                 )
 
             fun fromSearchVideoCard(video: bilibili.polymer.app.search.v1.Item) =
@@ -396,6 +399,8 @@ data class SearchTypeResult(
         val cover: String,
         val star: Float,
         val seasonId: Int,
+        /** 官方角标（如“会员”“独家”），无角标为 null。 */
+        val badge: String? = null,
     ) : SearchTypeResultItem {
         companion object {
             fun fromSearchPgcResult(pgc: dev.frost819.newbv.biliapi.http.entity.search.SearchMediaResult) =
@@ -404,6 +409,12 @@ data class SearchTypeResult(
                     cover = pgc.cover,
                     star = pgc.mediaScore.score,
                     seasonId = pgc.seasonId,
+                    badge =
+                        (
+                            pgc.badges ?: pgc.displayInfo
+                        ).orEmpty()
+                            .firstOrNull { it.text.isNotBlank() }
+                            ?.text,
                 )
 
             fun fromSearchPgcCard(pgc: bilibili.polymer.app.search.v1.Item) =
@@ -472,6 +483,22 @@ data class SearchTypeResult(
 }
 
 private fun String.toHttpsUrl(): String = if (startsWith("//")) "https:$this" else this
+
+/**
+ * 由搜索结果判定付费类角标文案。
+ *
+ * 优先级：充电专属（is_charge_video）> 付费（is_pay / badgepay）。
+ */
+private fun paidVideoBadge(
+    isChargeVideo: Int,
+    isPay: Int,
+    badgePay: Boolean,
+): String? =
+    when {
+        isChargeVideo == 1 -> "充电专属"
+        isPay == 1 || badgePay -> "付费"
+        else -> null
+    }
 
 /**
  * 全量搜索（`Search.SearchAll` / HTTP `/search/all/v2`）的结果。

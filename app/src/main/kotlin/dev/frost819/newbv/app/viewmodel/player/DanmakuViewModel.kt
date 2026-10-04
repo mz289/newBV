@@ -13,6 +13,8 @@ import com.kuaishou.akdanmaku.ecs.component.filter.TypeFilter
 import com.kuaishou.akdanmaku.render.SimpleRenderer
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.data.DanmakuBlockHitStats
+import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
 import dev.frost819.newbv.app.data.toDanmakuEntity
 import dev.frost819.newbv.app.data.toDataDanmakuType
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
@@ -23,7 +25,10 @@ import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMeta
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.core.log.Loggers
+import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.danmaku.config.DanmakuState
+import dev.frost819.newbv.danmaku.filter.DanmakuBlockFilter
+import dev.frost819.newbv.danmaku.util.DanmakuMerger
 import dev.frost819.newbv.data.datastore.Prefs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -86,6 +91,12 @@ class DanmakuViewModel
 
         private var danmakuConfig = DanmakuConfig()
         private val danmakuTypeFilter = TypeFilter()
+        private val danmakuBlockFilter = DanmakuBlockFilter()
+
+        init {
+            // 规则命中时上报会话级统计（TV 面板总数 + 手机网页每规则命中数）
+            danmakuBlockFilter.onHit = DanmakuBlockHitStats::record
+        }
 
         /**
          * 从 Prefs 构建初始弹幕状态。
@@ -110,11 +121,27 @@ class DanmakuViewModel
                     } else {
                         savedTypes.map { it.toDanmakuEntity() }
                     },
+                blockEnabled = DanmakuBlockRuleStore.state.value.enabled,
+                blockRules = DanmakuBlockRuleStore.state.value.rules,
+                mergeMode =
+                    DanmakuMergeMode.entries.getOrNull(Prefs.danmakuMergeMode) ?: DanmakuMergeMode.Off,
             )
         }
 
         private val _danmakuState = MutableStateFlow(initialDanmakuState())
         val danmakuState = _danmakuState.asStateFlow()
+
+        init {
+            // 屏蔽规则的单一事实源是 DanmakuBlockRuleStore：TV 设置菜单与
+            // 手机网页管理端（本地 HTTP 服务器）都经它写入，此处统一消费，
+            // 任意一端的修改都会同步到状态并触发引擎重过滤
+            viewModelScope.launch {
+                DanmakuBlockRuleStore.state.collect { blockState ->
+                    _danmakuState.update { it.copy(blockEnabled = blockState.enabled, blockRules = blockState.rules) }
+                    updateDanmakuConfigBlockFilter(_danmakuState.value)
+                }
+            }
+        }
 
         /** 弹幕防遮挡蒙版数据，由 [loadDanmakuMask] 加载后存储。 */
         private val _danmakuMask = MutableStateFlow<DanmakuMask?>(null)
@@ -191,6 +218,8 @@ class DanmakuViewModel
             loadingSegments.clear()
             danmakuClosed = false
             currentTimeFlow.value = 0L
+            // 命中统计为会话级：切换视频时清零
+            DanmakuBlockHitStats.reset()
             // 引擎 updateData 是增量语义，必须调用 clearData 才能真正清空旧数据
             danmakuPlayer?.clearData()
             _danmakuMask.update { null }
@@ -308,6 +337,21 @@ class DanmakuViewModel
         }
 
         /**
+         * 清空已加载分段并按当前位置重载。
+         *
+         * 用于「合并重复弹幕」开关切换：合并在数据加载阶段完成且不可逆，
+         * 切换后必须丢弃旧数据重新拉取分段。重建 watcher 订阅时 StateFlow
+         * 会立即发射当前值，自动触发当前段及预取段重新加载。
+         */
+        private fun reloadDanmakuSegments() {
+            if (currentCid <= 0L || danmakuClosed) return
+            danmakuPlayer?.clearData()
+            loadedSegments.clear()
+            loadingSegments.clear()
+            startSegmentWatcher()
+        }
+
+        /**
          * 由播放位置换算分段索引（从 1 开始）。
          *
          * @param timeMs 播放位置（毫秒）
@@ -367,7 +411,14 @@ class DanmakuViewModel
                                     preferApiType = Prefs.apiType,
                                 )
                             }
-                        val items = dataList.map { it.toDanmakuItemData() }
+                        val rawItems = dataList.map { it.toDanmakuItemData() }
+                        // 按合并模式在数据层合并（时间窗口内相同/相似文本 ×N），引擎侧零改动
+                        val items =
+                            when (_danmakuState.value.mergeMode) {
+                                DanmakuMergeMode.Off -> rawItems
+                                DanmakuMergeMode.Exact -> DanmakuMerger.mergeDuplicate(rawItems)
+                                DanmakuMergeMode.Similar -> DanmakuMerger.mergeSimilar(rawItems)
+                            }
                         // akdanmaku 内部维护有序数据并懒排序，无需预先排序
                         danmakuPlayer?.updateData(items)
                         loadedSegments.add(segmentIndex)
@@ -415,6 +466,8 @@ class DanmakuViewModel
                     },
                 textSize = size,
                 textColor = Color(color).toArgb(),
+                // midHash 为 crc32 十六进制串，供按用户（发送者）屏蔽匹配
+                userId = midHash.toLongOrNull(16),
             )
 
         /**
@@ -487,6 +540,9 @@ class DanmakuViewModel
                     is DanmakuSettingAction.SetSpeedFactor -> old.copy(speedFactor = action.factor)
                     is DanmakuSettingAction.SetMaskEnabled -> old.copy(maskEnabled = action.enabled)
                     is DanmakuSettingAction.SetEnabledTypes -> old.copy(enabledTypes = action.types)
+                    is DanmakuSettingAction.SetBlockEnabled -> old.copy(blockEnabled = action.enabled)
+                    is DanmakuSettingAction.SetBlockRules -> old.copy(blockRules = action.rules)
+                    is DanmakuSettingAction.SetMergeMode -> old.copy(mergeMode = action.mode)
                 }
             if (old == new) return
 
@@ -521,6 +577,15 @@ class DanmakuViewModel
             if (new.maskEnabled != old.maskEnabled) {
                 Prefs.defaultDanmakuMask = new.maskEnabled
             }
+            if (new.blockEnabled != old.blockEnabled || new.blockRules != old.blockRules) {
+                // 经共享仓库写入（Prefs + StateFlow），引擎重过滤由 init 中的 collect 回流执行
+                DanmakuBlockRuleStore.setBlockState(new.blockEnabled, new.blockRules)
+            }
+            if (new.mergeMode != old.mergeMode) {
+                Prefs.danmakuMergeMode = new.mergeMode.ordinal
+                // 合并发生在数据加载阶段且不可逆，切换模式需清空已加载分段并重载
+                reloadDanmakuSegments()
+            }
         }
 
         /**
@@ -542,13 +607,15 @@ class DanmakuViewModel
 
         private fun initDanmakuConfig() {
             rebuildTypeFilter(_danmakuState.value.enabledTypes)
+            danmakuBlockFilter.enable = _danmakuState.value.blockEnabled
+            danmakuBlockFilter.setRules(_danmakuState.value.blockRules)
 
             danmakuConfig =
                 danmakuConfig.copy(
                     density = 120,
                     textSizeScale = Prefs.defaultDanmakuScale,
                     screenPart = Prefs.defaultDanmakuArea,
-                    dataFilter = listOf(danmakuTypeFilter),
+                    dataFilter = listOf(danmakuTypeFilter, danmakuBlockFilter),
                     rollingSpeedFactor = Prefs.defaultDanmakuSpeedFactor,
                 )
             danmakuConfig.updateFilter()
@@ -557,6 +624,18 @@ class DanmakuViewModel
 
         private fun updateDanmakuConfigTypeFilter(enabledTypes: List<DanmakuEntityDanmakuType>) {
             rebuildTypeFilter(enabledTypes)
+            danmakuConfig.updateFilter()
+            danmakuPlayer?.updateConfig(danmakuConfig)
+        }
+
+        /**
+         * 把屏蔽总开关与规则列表同步进屏蔽过滤器并触发引擎重过滤。
+         *
+         * `updateFilter` 递增过滤代际，引擎会对已加载的弹幕数据按新规则重新过滤。
+         */
+        private fun updateDanmakuConfigBlockFilter(state: DanmakuState) {
+            danmakuBlockFilter.enable = state.blockEnabled
+            danmakuBlockFilter.setRules(state.blockRules)
             danmakuConfig.updateFilter()
             danmakuPlayer?.updateConfig(danmakuConfig)
         }

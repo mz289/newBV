@@ -68,6 +68,8 @@ import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.LoadingTip
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
+import dev.frost819.newbv.app.ui.component.videocard.BadgeChip
+import dev.frost819.newbv.app.ui.component.videocard.parseHexColorOrNull
 import dev.frost819.newbv.app.ui.navigation.PgcFeatureRoute
 import dev.frost819.newbv.app.ui.navigation.VideoPlayerRoute
 import dev.frost819.newbv.app.util.ToastUtils
@@ -80,6 +82,7 @@ import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.core.theme.LocalFocusOutlineColor
+import dev.frost819.newbv.core.theme.LocalIsDark
 
 /**
  * 番剧详情页路由注册。
@@ -576,6 +579,21 @@ private fun EpisodeCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
+                // 官方角标（会员/限免等）：优先使用接口下发的配色，右下进度条与左上“上次观看”互不遮挡
+                episode.badge?.let { badge ->
+                    val bgColor =
+                        parseHexColorOrNull(
+                            if (LocalIsDark.current) badge.bgColorNight else badge.bgColor,
+                        )
+                    BadgeChip(
+                        text = badge.text,
+                        bgColor = bgColor,
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp),
+                    )
+                }
                 if (isLastWatched) {
                     Text(
                         "上次观看",

@@ -3,19 +3,22 @@ package dev.frost819.newbv.app.ui.component.player.menu
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.frost819.newbv.app.ui.component.player.menu.component.CheckBoxMenuList
+import dev.frost819.newbv.app.ui.component.player.menu.component.DanmakuBlockPanel
 import dev.frost819.newbv.app.ui.component.player.menu.component.PlayerThreeLevelMenu
 import dev.frost819.newbv.app.ui.component.player.menu.component.RadioMenuList
 import dev.frost819.newbv.app.ui.component.player.menu.component.StepLessMenuItem
 import dev.frost819.newbv.app.ui.state.player.MenuFocusState
 import dev.frost819.newbv.app.ui.state.player.VideoPlayerDanmakuMenuItem
+import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
+import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.data.datastore.DanmakuType
 import java.text.NumberFormat
 
 /**
  * 弹幕设置面板。
  *
- * 双列布局：左侧为选项值面板（CheckBoxMenuList / StepLessMenuItem），右侧为子项列表。
- * 子项包括：开关、大小、透明度、速度、区域、蒙版。
+ * 双列布局：左侧为选项值面板（CheckBoxMenuList / StepLessMenuItem / DanmakuBlockPanel），右侧为子项列表。
+ * 子项包括：开关、大小、透明度、速度、区域、蒙版、屏蔽。
  *
  * @param modifier 修饰符
  * @param currentEnabledTypes 当前启用的弹幕类型
@@ -24,12 +27,18 @@ import java.text.NumberFormat
  * @param currentSpeedFactor 当前速度因子
  * @param currentArea 当前显示区域
  * @param currentMaskEnabled 当前蒙版状态
+ * @param currentBlockEnabled 当前屏蔽总开关
+ * @param currentBlockRules 当前屏蔽规则列表
+ * @param currentMergeMode 当前重复弹幕合并模式
  * @param onDanmakuSwitchChange 弹幕类型变化回调
  * @param onDanmakuSizeChange 大小变化回调
  * @param onDanmakuOpacityChange 透明度变化回调
  * @param onDanmakuSpeedFactorChange 速度因子变化回调
  * @param onDanmakuAreaChange 区域变化回调
  * @param onDanmakuMaskChange 蒙版变化回调
+ * @param onBlockEnabledChange 屏蔽总开关变化回调
+ * @param onBlockRulesChange 屏蔽规则列表变化回调
+ * @param onMergeModeChange 合并模式变化回调
  * @param onFocusStateChange 焦点状态变化回调
  */
 @Composable
@@ -42,12 +51,18 @@ fun DanmakuMenuList(
     currentSpeedFactor: Float,
     currentArea: Float,
     currentMaskEnabled: Boolean,
+    currentBlockEnabled: Boolean,
+    currentBlockRules: List<DanmakuBlockRule>,
+    currentMergeMode: DanmakuMergeMode,
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
     onDanmakuSizeChange: (Float) -> Unit,
     onDanmakuOpacityChange: (Float) -> Unit,
     onDanmakuSpeedFactorChange: (Float) -> Unit,
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit,
+    onBlockEnabledChange: (Boolean) -> Unit,
+    onBlockRulesChange: (List<DanmakuBlockRule>) -> Unit,
+    onMergeModeChange: (DanmakuMergeMode) -> Unit,
     onFocusStateChange: (MenuFocusState) -> Unit,
 ) {
     PlayerThreeLevelMenu(
@@ -134,6 +149,27 @@ fun DanmakuMenuList(
                     items = listOf("关闭", "开启"),
                     selected = if (currentMaskEnabled) 1 else 0,
                     onSelectedChanged = { onDanmakuMaskChange(it == 1) },
+                    onFocusBackToParent = backToMenu,
+                )
+
+            VideoPlayerDanmakuMenuItem.Block ->
+                DanmakuBlockPanel(
+                    modifier = itemModifier,
+                    blockEnabled = currentBlockEnabled,
+                    rules = currentBlockRules,
+                    onEnabledChange = onBlockEnabledChange,
+                    onRulesChange = onBlockRulesChange,
+                    onFocusBackToParent = backToMenu,
+                )
+
+            VideoPlayerDanmakuMenuItem.Merge ->
+                RadioMenuList(
+                    modifier = itemModifier,
+                    items = DanmakuMergeMode.entries.map { it.displayName },
+                    selected = DanmakuMergeMode.entries.indexOf(currentMergeMode),
+                    onSelectedChanged = { index ->
+                        onMergeModeChange(DanmakuMergeMode.entries[index])
+                    },
                     onFocusBackToParent = backToMenu,
                 )
         }

@@ -50,10 +50,13 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
+import dev.frost819.newbv.app.ui.component.videocard.BadgeChip
+import dev.frost819.newbv.app.ui.component.videocard.parseHexColorOrNull
 import dev.frost819.newbv.biliapi.entity.video.season.Episode
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
+import dev.frost819.newbv.core.theme.LocalIsDark
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
@@ -332,6 +335,14 @@ private fun EpisodeSelectionCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // 官方角标（会员/限免等）：与“上次观看”并排，避免挤压标题可读区
+                episode.badge?.let { badge ->
+                    val bgColor =
+                        parseHexColorOrNull(
+                            if (LocalIsDark.current) badge.bgColorNight else badge.bgColor,
+                        )
+                    BadgeChip(text = badge.text, bgColor = bgColor)
+                }
                 if (isHistory) Text("上次观看", style = MaterialTheme.typography.labelSmall)
             }
             Text(

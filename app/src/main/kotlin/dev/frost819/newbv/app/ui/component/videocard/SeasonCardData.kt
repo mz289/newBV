@@ -10,6 +10,7 @@ package dev.frost819.newbv.app.ui.component.videocard
  * @property subTitle 副标题。
  * @property cover 封面 URL。
  * @property rating 评分（如 "9.8"），null 或 "0" 表示无评分。
+ * @property badge 官方角标（如 “会员”“独家”），null 表示无角标。
  */
 data class SeasonCardData(
     val seasonId: Int,
@@ -17,6 +18,7 @@ data class SeasonCardData(
     val subTitle: String? = null,
     val cover: String,
     val rating: String? = null,
+    val badge: String? = null,
 ) {
     /**
      * 是否有有效评分。

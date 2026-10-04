@@ -53,7 +53,7 @@ import dev.frost819.newbv.core.theme.BVTheme
  * @param modifier 修饰符
  * @param showBackToStart 是否显示"回到开头"提示
  * @param showSkipToNextEp 是否显示"跳下集"提示
- * @param showPreviewTip 是否显示"试看"提示
+ * @param previewTipText 试看/付费提示文本，null 时不显示
  * @param shortcutTipText 最近一次快捷键提示文本，为 null 时不显示
  * @param shortcutTipKey 触发按键的显示名，非空时以键帽图标呈现（P2-4）
  * @param sponsorBlockTip SponsorBlock 提示文本，为 null 时不显示
@@ -64,7 +64,7 @@ fun SkipTips(
     modifier: Modifier = Modifier,
     showBackToStart: Boolean,
     showSkipToNextEp: Boolean,
-    showPreviewTip: Boolean,
+    previewTipText: String?,
     shortcutTipText: String? = null,
     shortcutTipKey: String? = null,
     sponsorBlockTip: String? = null,
@@ -85,8 +85,8 @@ fun SkipTips(
                 onClick = onSponsorTipClick,
             )
             PlayerTip(
-                show = showPreviewTip,
-                text = "视频需付费，当前为试看片段",
+                show = previewTipText != null,
+                text = previewTipText.orEmpty(),
                 icon = Icons.Outlined.Info,
             )
             PlayerTip(
@@ -204,7 +204,7 @@ private fun SkipTipsAllVisiblePreview() {
         SkipTips(
             showBackToStart = true,
             showSkipToNextEp = true,
-            showPreviewTip = true,
+            previewTipText = "该剧集为大会员专享内容，当前为试看片段",
         )
     }
 }
@@ -216,7 +216,7 @@ private fun SkipTipsBackToStartPreview() {
         SkipTips(
             showBackToStart = true,
             showSkipToNextEp = false,
-            showPreviewTip = false,
+            previewTipText = null,
         )
     }
 }

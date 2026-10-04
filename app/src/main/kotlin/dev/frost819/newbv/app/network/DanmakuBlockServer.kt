@@ -1,0 +1,308 @@
+package dev.frost819.newbv.app.network
+
+import android.content.Context
+import dev.frost819.newbv.app.data.DanmakuBlockHitStats
+import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
+import dev.frost819.newbv.app.data.exportBlockRulesXml
+import dev.frost819.newbv.app.data.parseBlockRules
+import dev.frost819.newbv.core.log.Loggers
+import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
+import dev.frost819.newbv.danmaku.config.DanmakuBlockRuleType
+import dev.frost819.newbv.danmaku.filter.DanmakuBlockFilter
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.ContentDisposition
+import io.ktor.http.HttpHeaders
+import io.ktor.http.withCharset
+import io.ktor.server.application.Application
+import io.ktor.server.application.call
+import io.ktor.server.cio.CIO
+import io.ktor.server.cio.CIOApplicationEngine
+import io.ktor.server.engine.EmbeddedServer
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.request.receiveText
+import io.ktor.server.response.header
+import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import java.net.Inet4Address
+import java.net.NetworkInterface
+
+/**
+ * 弹幕屏蔽规则远程管理服务器。
+ *
+ * 使用 Ktor CIO 引擎在随机端口启动，提供手机网页管理端与 REST API，
+ * 与 TV 端通过 [DanmakuBlockRuleStore]（进程内 StateFlow）实时同步：
+ * 手机端的任何修改即时生效到正在播放的弹幕过滤，TV 端的修改也会
+ * 反映到手机页面（页面轮询拉取）。
+ *
+ * 服务器仅在 TV 端「远程管理」二维码弹窗打开期间运行（对话框负责
+ * [start]/[stop] 生命周期），且仅监听局域网，无跨网段暴露面。
+ *
+ * 路由：
+ * - `GET  /` — 管理页首页（assets/danmaku_block_ui/index.html）
+ * - `GET  /danmaku_block_ui/{path...}` — 静态资源
+ * - `GET  /api/block/state` — 屏蔽开关 + 规则列表 JSON
+ * - `POST /api/block/enabled` — 修改总开关（body: `{"enabled":true}`）
+ * - `POST /api/block/rule` — 添加规则（body: `{"type":"Keyword","value":".."}`）
+ * - `POST /api/block/rule/toggle` — 切换规则启用状态
+ * - `POST /api/block/rule/delete` — 删除规则
+ * - `POST /api/block/import` — 导入屏蔽串（body 为原始文本，自动嗅探 XML/纯文本）
+ * - `GET  /api/block/export` — 导出 B 站 XML 屏蔽串（附件下载）
+ */
+object DanmakuBlockServer {
+    private val logger = Loggers.get("DanmakuBlockServer")
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @Volatile
+    private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
+
+    @Volatile
+    private var resolvedPort: Int? = null
+
+    /** 由 [start] 注入的 assets 读取函数。 */
+    @Volatile
+    private var assetProvider: (String) -> ByteArray? = { null }
+
+    /**
+     * 启动服务器（随机端口），重复调用安全。
+     *
+     * @param context 用于读取 assets 管理页资源
+     */
+    fun start(context: Context) {
+        if (server != null) return
+        val appContext = context.applicationContext
+        assetProvider = { path ->
+            runCatching {
+                appContext.assets.open(path).use { it.readBytes() }
+            }.getOrNull()
+        }
+        server =
+            embeddedServer(CIO, port = 0) {
+                configureRoutes()
+            }.also { it.start(wait = false) }
+        resolvedPort =
+            runBlocking {
+                server?.engine?.resolvedConnectors()?.firstOrNull()?.port
+            }
+        logger.info { "DanmakuBlockServer started on port $resolvedPort" }
+    }
+
+    /** 停止服务器。 */
+    fun stop() {
+        server?.stop(gracePeriodMillis = 1000, timeoutMillis = 2000)
+        server = null
+        resolvedPort = null
+        logger.info { "DanmakuBlockServer stopped" }
+    }
+
+    /**
+     * 获取管理页 URL（用于生成二维码）。
+     *
+     * @return 形如 `http://192.168.1.100:12345/` 的 URL，未运行或取不到 IP 返回 null。
+     */
+    fun getUrl(): String? {
+        val port = resolvedPort ?: return null
+        val host = getLocalIpAddress()
+        if (host.isEmpty()) return null
+        return "http://$host:$port/"
+    }
+
+    // ── 路由配置 ──────────────────────────────────────────────────────
+
+    private fun Application.configureRoutes() {
+        routing {
+            homeRoute()
+            staticAssetsRoute()
+            blockApiRoute()
+        }
+    }
+
+    /** `GET /` — 管理页首页。 */
+    private fun Route.homeRoute() {
+        get("/") {
+            val bytes = assetProvider("danmaku_block_ui/index.html")
+            if (bytes != null) {
+                call.respondBytes(bytes, contentType = ContentType.Text.Html.withCharset(Charsets.UTF_8))
+            } else {
+                call.respondText("danmaku_block_ui/index.html not found", status = HttpStatusCode.NotFound)
+            }
+        }
+    }
+
+    /** `GET /danmaku_block_ui/{path...}` — 静态资源（含路径穿越防护）。 */
+    private fun Route.staticAssetsRoute() {
+        get("/danmaku_block_ui/{path...}") {
+            val segments = call.parameters.getAll("path").orEmpty()
+            val relPath = segments.joinToString("/").ifBlank { "index.html" }
+            if (relPath.contains("..") || relPath.contains("\\")) {
+                return@get call.respondText("forbidden", status = HttpStatusCode.Forbidden)
+            }
+            val bytes = assetProvider("danmaku_block_ui/$relPath")
+            if (bytes != null) {
+                call.respondBytes(bytes, contentType = ContentType.Text.Html.withCharset(Charsets.UTF_8))
+            } else {
+                call.respondText("not found", status = HttpStatusCode.NotFound)
+            }
+        }
+    }
+
+    /** 屏蔽规则 REST API。 */
+    @Suppress("LongMethod")
+    private fun Route.blockApiRoute() {
+        get("/api/block/state") {
+            call.respondText(
+                text = json.encodeToString(call.stateDto()),
+                contentType = ContentType.Application.Json,
+            )
+        }
+
+        post("/api/block/enabled") {
+            val body = call.receiveBody<EnabledDto>()
+            DanmakuBlockRuleStore.setEnabled(body.enabled)
+            call.respondState()
+        }
+
+        post("/api/block/rule") {
+            val body = call.receiveBody<RuleDto>()
+            val added =
+                body.toRule()?.let { DanmakuBlockRuleStore.addRule(it) } ?: false
+            if (added) {
+                call.respondState()
+            } else {
+                call.respondText(
+                    text = """{"ok":false,"message":"规则已存在或无效"}""",
+                    contentType = ContentType.Application.Json,
+                    status = HttpStatusCode.Conflict,
+                )
+            }
+        }
+
+        post("/api/block/rule/toggle") {
+            val body = call.receiveBody<RuleDto>()
+            if (DanmakuBlockRuleStore.toggleRule(body.typeEnum(), body.value)) {
+                call.respondState()
+            } else {
+                call.respondText("""{"ok":false,"message":"规则不存在"}""", ContentType.Application.Json, HttpStatusCode.NotFound)
+            }
+        }
+
+        post("/api/block/rule/delete") {
+            val body = call.receiveBody<RuleDto>()
+            if (DanmakuBlockRuleStore.removeRule(body.typeEnum(), body.value)) {
+                call.respondState()
+            } else {
+                call.respondText("""{"ok":false,"message":"规则不存在"}""", ContentType.Application.Json, HttpStatusCode.NotFound)
+            }
+        }
+
+        post("/api/block/import") {
+            val text = call.receiveText()
+            val result = parseBlockRules(text)
+            if (result.rules.isEmpty()) {
+                call.respondText(
+                    text = """{"ok":false,"imported":0,"skipped":${result.skipped},"message":"未解析到有效规则"}""",
+                    contentType = ContentType.Application.Json,
+                )
+                return@post
+            }
+            val imported = DanmakuBlockRuleStore.addRules(result.rules)
+            call.respondText(
+                text = """{"ok":true,"imported":$imported,"duplicates":${result.rules.size - imported},"skipped":${result.skipped}}""",
+                contentType = ContentType.Application.Json,
+            )
+        }
+
+        get("/api/block/export") {
+            call.response.header(
+                HttpHeaders.ContentDisposition,
+                ContentDisposition.Attachment
+                    .withParameter(ContentDisposition.Parameters.FileName, "tv.bilibili.player.xml")
+                    .toString(),
+            )
+            call.respondText(
+                text = exportBlockRulesXml(DanmakuBlockRuleStore.state.value),
+                contentType = ContentType.Text.Xml.withCharset(Charsets.UTF_8),
+            )
+        }
+    }
+
+    /** 当前状态序列化为响应 DTO（含每规则会话命中数）。 */
+    private fun io.ktor.server.application.ApplicationCall.stateDto(): BlockStateDto {
+        val hitCounts = DanmakuBlockHitStats.snapshot()
+        return BlockStateDto(
+            enabled = DanmakuBlockRuleStore.state.value.enabled,
+            totalHits = DanmakuBlockHitStats.totalHits.value,
+            rules =
+                DanmakuBlockRuleStore.state.value.rules.map { rule ->
+                    RuleDto.from(rule).copy(hitCount = hitCounts[DanmakuBlockFilter.ruleKey(rule.type, rule.value)] ?: 0)
+                },
+        )
+    }
+
+    private suspend inline fun <reified T : Any> io.ktor.server.application.ApplicationCall.receiveBody(): T =
+        json.decodeFromString(receiveText())
+
+    private suspend fun io.ktor.server.application.ApplicationCall.respondState() {
+        respondText(
+            text = json.encodeToString(stateDto()),
+            contentType = ContentType.Application.Json,
+        )
+    }
+
+    /** 扫描非回环 IPv4 地址（无线/有线均可），失败返回空串。 */
+    private fun getLocalIpAddress(): String =
+        runCatching {
+            NetworkInterface
+                .getNetworkInterfaces()
+                .toList()
+                .filter { it.isUp && !it.isLoopback }
+                .flatMap { it.inetAddresses.toList() }
+                .filterIsInstance<Inet4Address>()
+                .firstOrNull()
+                ?.hostAddress ?: ""
+        }.getOrDefault("")
+
+    // ── DTO ──────────────────────────────────────────────────────────
+
+    @Serializable
+    private data class BlockStateDto(
+        val enabled: Boolean,
+        val rules: List<RuleDto>,
+        /** 本会话总命中数（切换视频时清零）。 */
+        val totalHits: Int = 0,
+    )
+
+    /** 规则 DTO：type 用 [DanmakuBlockRuleType] 名称（Keyword/Regex/User/Color）。 */
+    @Serializable
+    private data class RuleDto(
+        val type: String,
+        val value: String,
+        val enabled: Boolean = true,
+        /** 本会话该规则命中数。 */
+        val hitCount: Int = 0,
+    ) {
+        fun toRule(): DanmakuBlockRule? =
+            runCatching { DanmakuBlockRule(type = typeEnum(), value = value.trim(), enabled = enabled) }
+                .getOrNull()
+                ?.takeIf { it.value.isNotEmpty() }
+
+        fun typeEnum(): DanmakuBlockRuleType =
+            DanmakuBlockRuleType.valueOf(type)
+
+        companion object {
+            fun from(rule: DanmakuBlockRule) = RuleDto(type = rule.type.name, value = rule.value, enabled = rule.enabled)
+        }
+    }
+
+    @Serializable
+    private data class EnabledDto(
+        val enabled: Boolean,
+    )
+}

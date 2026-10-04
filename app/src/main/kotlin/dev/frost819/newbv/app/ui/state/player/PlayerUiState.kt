@@ -36,7 +36,8 @@ data class PlayerUiState(
     // 提示
     val showSkipToNextEp: Boolean = false,
     val showBackToStart: Boolean = false,
-    val showPreviewTip: Boolean = false,
+    /** 试看/付费提示文案，null 时不显示（PGC 会员专享、充电视频、付费视频各对应不同文案）。 */
+    val previewTipText: String? = null,
     val shortcutTipText: String? = null,
     val shortcutTipKey: String? = null,
     // SponsorBlock
@@ -131,8 +132,24 @@ sealed class PlayerState {
 
     /** 发生错误。
      * @param message 错误信息
+     * @param guide 无播放权限时的引导类型（大会员/充电/付费），普通播放故障为 null
      */
     data class Error(
         val message: String,
+        val guide: PlaybackGuide? = null,
     ) : PlayerState()
+}
+
+/**
+ * 无播放权限的引导类型，由接口错误信息归类得出，用于错误提示的文案与样式。
+ */
+enum class PlaybackGuide {
+    /** 大会员专享内容。 */
+    Vip,
+
+    /** UP 主充电专属内容。 */
+    Charge,
+
+    /** 付费内容（需购买）。 */
+    Paid,
 }
