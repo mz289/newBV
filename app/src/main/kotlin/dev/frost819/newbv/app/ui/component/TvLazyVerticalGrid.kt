@@ -58,9 +58,6 @@ fun videoGridVSpacing(): Dp {
     }
 }
 
-/** 海报卡片栅格（番剧/影视封面卡）的最小卡片宽度。 */
-val POSTER_CARD_MIN_WIDTH: Dp = 260.dp
-
 /**
  * 番剧页卡片放大系数：横版 200dp、竖版 150dp、时间表 260dp 等基准宽度
  * 乘以该系数得到实际卡宽。
@@ -115,12 +112,38 @@ fun videoCardGridCells(): GridCells {
 }
 
 /**
+ * 「最少滚动」bring-into-view 策略：焦点项不完全可见时最小滚动贴边即停，可见则不动。
+ *
+ * 时间表看板这类内部自持滚动的固定高度板块用它跟随焦点（不定轴）；
+ * 也作为 [TvLazyVerticalGrid] scrollLock 期间的退化策略，避免锁死后焦点落在视口外。
+ */
+@OptIn(ExperimentalFoundationApi::class)
+internal val minimalBringIntoViewSpec =
+    object : BringIntoViewSpec {
+        override fun calculateScrollDistance(
+            offset: Float,
+            size: Float,
+            containerSize: Float,
+        ): Float =
+            when {
+                offset < 0f -> offset
+                offset + size > containerSize -> offset + size - containerSize
+                else -> 0f
+            }
+    }
+
+/**
  * 封装了 TV 焦点定轴逻辑的 [LazyVerticalGrid]。
  *
  * TV 端 D-Pad 导航时，聚焦的 item 会自动滚动到屏幕上方 [pivotFraction] 比例处，
  * 避免焦点被顶部/底部遮挡。默认 0.3f（屏幕上方 30%），符合 TV 端习惯。
  *
  * @param pivotFraction 焦点 item 在屏幕上的停留位置比例 (0.0 - 1.0)。
+ * @param scrollLock 返回 true 期间不定轴：滚动退化为最少滚动（贴边即停），
+ *   供新番时间表这类内部自持滚动的固定高度板块使用——板块持焦时定轴会把整页
+ *   反复拉去对齐 30% 线、把看板推出视口；保留最少滚动是为了焦点从板块外进入时
+ *   仍能被带入视口（板块整体在屏内时页面纹丝不动）。滚算发生在焦点请求期，
+ *   lambda 每次调用都会执行，须读取 remember 的状态才能当帧感知锁的切换。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -132,16 +155,24 @@ fun TvLazyVerticalGrid(
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(0.dp),
     horizontalArrangement: Arrangement.Horizontal = Arrangement.spacedBy(0.dp),
     pivotFraction: Float = 0.3f,
+    scrollLock: () -> Boolean = { false },
     content: LazyGridScope.() -> Unit,
 ) {
     val bringIntoViewSpec =
-        remember(pivotFraction) {
+        remember(pivotFraction, scrollLock) {
             object : BringIntoViewSpec {
                 override fun calculateScrollDistance(
                     offset: Float,
                     size: Float,
                     containerSize: Float,
                 ): Float {
+                    if (scrollLock()) {
+                        return minimalBringIntoViewSpec.calculateScrollDistance(
+                            offset,
+                            size,
+                            containerSize,
+                        )
+                    }
                     val targetPosition = containerSize * pivotFraction
                     return offset - targetPosition
                 }

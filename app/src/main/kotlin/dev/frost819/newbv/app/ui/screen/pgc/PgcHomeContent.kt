@@ -19,6 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,7 +100,8 @@ fun PgcHomeContent(
 
 /**
  * 分区页主网格。布局骨架与番剧页主网格一致：
- * 板块标题与横滑行占满整行，网格列宽仅决定首屏骨架卡宽度。
+ * 板块标题与横滑行占满整行，网格列宽仅决定首屏骨架卡宽度；
+ * 时间表看板持焦期间锁滚动，避免定轴把固定高度的看板推出视口。
  */
 @Composable
 private fun PgcHomeGrid(
@@ -109,12 +113,14 @@ private fun PgcHomeGrid(
     onRetry: () -> Unit,
 ) {
     val cardScale = animeCardScale()
+    var timelineFocused by remember { mutableStateOf(false) }
 
     TvLazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp * cardScale),
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
+        scrollLock = { timelineFocused },
     ) {
         if (!state.loaded && state.loading) {
             // 首屏加载中：同构骨架屏占位（P0-4）
@@ -161,6 +167,7 @@ private fun PgcHomeGrid(
                     timeline = state.timeline,
                     focusSaver = focusSaver,
                     keyPrefix = keyPrefix,
+                    onTimelineFocusChange = { timelineFocused = it },
                     navController = navController,
                 )
             }
@@ -221,6 +228,7 @@ private fun PgcModuleRow(
     timeline: List<Timeline>,
     focusSaver: FocusSaver,
     keyPrefix: String,
+    onTimelineFocusChange: (Boolean) -> Unit,
     navController: NavController,
 ) {
     when {
@@ -233,6 +241,7 @@ private fun PgcModuleRow(
                         navController.navigate(PgcFeatureRoute(seasonId = ep.seasonId.toLong()))
                     },
                     focusKeyPrefix = GUOCHUANG_TIMELINE_KEY_PREFIX,
+                    onFocusInsideChange = onTimelineFocusChange,
                 )
             }
         }

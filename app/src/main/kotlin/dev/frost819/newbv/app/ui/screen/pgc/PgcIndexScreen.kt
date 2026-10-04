@@ -45,10 +45,10 @@ import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
-import dev.frost819.newbv.app.ui.component.POSTER_CARD_MIN_WIDTH
 import dev.frost819.newbv.app.ui.component.SKELETON_FIRST_SCREEN_COUNT
 import dev.frost819.newbv.app.ui.component.SkeletonSeasonCard
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.animeCardScale
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.videocard.SeasonCard
@@ -158,7 +158,8 @@ private fun IndexBody(
                 false
             },
         state = gridState,
-        columns = GridCells.Adaptive(POSTER_CARD_MIN_WIDTH),
+        // 与番剧页竖版卡同宽：索引结果卡此前按 260dp 起排，明显大于全站海报卡
+        columns = GridCells.Adaptive(150.dp * animeCardScale()),
         contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),

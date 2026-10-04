@@ -1,5 +1,8 @@
 package dev.frost819.newbv.app.ui.screen.pgc
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +27,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +60,7 @@ import dev.frost819.newbv.app.ui.component.ErrorTip
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.animeCardScale
 import dev.frost819.newbv.app.ui.component.focusSaverItem
+import dev.frost819.newbv.app.ui.component.minimalBringIntoViewSpec
 import dev.frost819.newbv.biliapi.entity.pgc.PgcRankData
 import dev.frost819.newbv.biliapi.entity.season.Timeline
 import dev.frost819.newbv.biliapi.entity.season.TimelineEp
@@ -240,15 +245,22 @@ internal fun PgcRankCard(
  * 首次进入横向滚动到「今天」附近（今天列落在第 2 列位置）；之后再组合
  * （滚出视口又滚回、从详情页返回）不再重置横向位置，由焦点恢复逻辑接手。
  *
+ * 焦点滚动契约：持焦期间通过 [onFocusInsideChange] 通知宿主页面对网格锁滚动
+ * （[dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid] 的 scrollLock），
+ * 焦点移动只由看板内部滚动跟随；板内列表一律按最少滚动贴边即停，不走上层定轴。
+ *
  * @param focusKeyPrefix 看板内条目 focusSaver key 前缀（各分区需不同前缀避免串扰），
  *   形如 `"anime_timeline_"`，完整 key 为 `前缀 + 日期 + "_" + seasonId + "_" + 序号`。
+ * @param onFocusInsideChange 看板（含板内任意条目）持有/失去焦点时回调。
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun PgcTimelineBoard(
     timeline: List<Timeline>,
     focusSaver: FocusSaver,
     onEpClick: (TimelineEp) -> Unit,
     focusKeyPrefix: String,
+    onFocusInsideChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scale = animeCardScale()
@@ -278,43 +290,48 @@ internal fun PgcTimelineBoard(
                 if (!boardHasFocus) restoreTimelineFocus(key, timeline, listState, focusSaver, focusKeyPrefix)
             }
     }
-    BoxWithConstraints(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .height(boardHeight)
-                .onFocusChanged { boardHasFocus = it.hasFocus },
-    ) {
-        // 与其他横滑行一致预留 4dp 边距，避免最右列卡片的聚焦外描边被裁切
-        val horizontalInset = 4.dp
-        val usableWidth = maxWidth - horizontalInset * 2
-        val columnCount =
-            maxOf(
-                1,
-                floor((usableWidth + columnSpacing) / (TIMELINE_MIN_COLUMN_WIDTH * scale + columnSpacing))
-                    .toInt(),
-            )
-        val columnWidth = (usableWidth - columnSpacing * (columnCount - 1)) / columnCount
-        LazyRow(
-            state = listState,
+    CompositionLocalProvider(LocalBringIntoViewSpec provides minimalBringIntoViewSpec) {
+        BoxWithConstraints(
             modifier =
-                Modifier
-                    .fillMaxSize()
-                    .focusRestorer(),
-            horizontalArrangement = Arrangement.spacedBy(columnSpacing),
-            contentPadding = PaddingValues(horizontal = horizontalInset),
+                modifier
+                    .fillMaxWidth()
+                    .height(boardHeight)
+                    .onFocusChanged {
+                        boardHasFocus = it.hasFocus
+                        onFocusInsideChange(it.hasFocus)
+                    },
         ) {
-            items(timeline.size, key = { index -> timeline[index].dateString }) { index ->
-                PgcTimelineDayColumn(
-                    day = timeline[index],
-                    width = columnWidth,
-                    scale = scale,
-                    listHeight = boardHeight - TIMELINE_HEADER_HEIGHT,
-                    rowHeight = rowHeight,
-                    focusSaver = focusSaver,
-                    focusKeyPrefix = focusKeyPrefix,
-                    onEpClick = onEpClick,
+            // 与其他横滑行一致预留 4dp 边距，避免最右列卡片的聚焦外描边被裁切
+            val horizontalInset = 4.dp
+            val usableWidth = maxWidth - horizontalInset * 2
+            val columnCount =
+                maxOf(
+                    1,
+                    floor((usableWidth + columnSpacing) / (TIMELINE_MIN_COLUMN_WIDTH * scale + columnSpacing))
+                        .toInt(),
                 )
+            val columnWidth = (usableWidth - columnSpacing * (columnCount - 1)) / columnCount
+            LazyRow(
+                state = listState,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .focusRestorer(),
+                horizontalArrangement = Arrangement.spacedBy(columnSpacing),
+                contentPadding = PaddingValues(horizontal = horizontalInset),
+            ) {
+                items(timeline.size, key = { index -> timeline[index].dateString }) { index ->
+                    PgcTimelineDayColumn(
+                        day = timeline[index],
+                        width = columnWidth,
+                        scale = scale,
+                        listHeight = boardHeight - TIMELINE_HEADER_HEIGHT,
+                        rowHeight = rowHeight,
+                        focusSaver = focusSaver,
+                        focusKeyPrefix = focusKeyPrefix,
+                        onEpClick = onEpClick,
+                    )
+                }
             }
         }
     }

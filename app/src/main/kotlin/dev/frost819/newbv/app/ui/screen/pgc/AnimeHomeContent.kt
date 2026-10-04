@@ -21,7 +21,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,7 +104,8 @@ fun AnimeHomeContent(
  *
  * 所有板块堆叠在同一个网格中（分区标题与横向滚动行占满整行，
  * 网格列宽仅决定首屏骨架卡宽度，随屏宽分档与竖版卡同宽），
- * D-Pad 上下移动时由 BringIntoViewSpec 自动滚动到焦点项。
+ * D-Pad 上下移动时由 BringIntoViewSpec 自动滚动到焦点项；
+ * 新番时间表看板持焦期间锁滚动，避免定轴把固定高度的看板推出视口。
  */
 @Composable
 private fun AnimeHomeGrid(
@@ -113,6 +116,7 @@ private fun AnimeHomeGrid(
     onRetry: () -> Unit,
 ) {
     val cardScale = animeCardScale()
+    var timelineFocused by remember { mutableStateOf(false) }
 
     TvLazyVerticalGrid(
         // 实际内容行均占满整行，网格列宽只决定首屏骨架卡宽度，与竖版卡片同宽
@@ -120,6 +124,7 @@ private fun AnimeHomeGrid(
         contentPadding = PaddingValues(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
+        scrollLock = { timelineFocused },
     ) {
         if (!state.loaded && state.loading) {
             // 首屏加载中：同构骨架屏占位（P0-4）
@@ -182,6 +187,7 @@ private fun AnimeHomeGrid(
                         navController.navigate(PgcFeatureRoute(seasonId = ep.seasonId.toLong()))
                     },
                     focusKeyPrefix = ANIME_TIMELINE_KEY_PREFIX,
+                    onFocusInsideChange = { timelineFocused = it },
                 )
             }
         }
