@@ -32,7 +32,7 @@ data class DanmakuData(
                 time = elem.progress / 1000f,
                 type = elem.mode,
                 size = elem.fontsize,
-                color = elem.color.toInt(),
+                color = elem.color,
                 // ctime 文档中已是秒级时间戳，无需除以 1000
                 timestamp = elem.ctime.toInt(),
                 pool = elem.pool,

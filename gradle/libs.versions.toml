@@ -3,9 +3,9 @@
 agp = "9.1.1"
 kotlin = "2.4.10"
 ksp = "2.3.10"
-protobuf-gradle = "0.9.5"
+protobuf-gradle = "0.9.6"
 ktlint = "14.2.0"
-detekt = "1.23.7"
+detekt = "2.0.0-alpha.6"
 versions-plugin = "0.52.0"
 
 # === AndroidX ===
@@ -184,5 +184,5 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
 versions = { id = "com.github.ben-manes.versions", version.ref = "versions-plugin" }

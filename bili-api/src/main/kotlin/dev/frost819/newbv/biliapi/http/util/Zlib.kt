@@ -1,6 +1,5 @@
 package dev.frost819.newbv.biliapi.http.util
 
-import io.ktor.utils.io.core.use
 import org.brotli.dec.BrotliInputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream

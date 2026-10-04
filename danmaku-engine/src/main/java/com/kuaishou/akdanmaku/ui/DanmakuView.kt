@@ -26,6 +26,7 @@ package com.kuaishou.akdanmaku.ui
 import android.content.Context
 import android.graphics.Canvas
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.View
 
 /**
@@ -47,7 +48,7 @@ class DanmakuView : View {
     init {
         context.resources.displayMetrics?.let { metrics ->
             displayer.density = metrics.density
-            displayer.scaleDensity = metrics.scaledDensity
+            displayer.scaleDensity = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 1f, metrics)
             displayer.densityDpi = metrics.densityDpi
         }
     }

@@ -194,7 +194,11 @@ fun SystemBarsEffect() {
     val statusBarColor = TvMaterialTheme.colorScheme.surface
     SideEffect {
         val window = (view.context as Activity).window
-        window.statusBarColor = statusBarColor.toArgb()
+        // Android 15 起状态栏固定为透明，仅旧系统需要设置背景色。
+        if (android.os.Build.VERSION.SDK_INT < 35) {
+            @Suppress("DEPRECATION")
+            window.statusBarColor = statusBarColor.toArgb()
+        }
         // 状态栏图标外观由背景亮度决定：暗色状态栏配浅色图标，反之配深色图标
         WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars =
             statusBarColor.luminance() > 0.5f

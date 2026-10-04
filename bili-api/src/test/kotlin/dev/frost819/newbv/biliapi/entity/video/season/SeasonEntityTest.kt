@@ -53,7 +53,7 @@ class SeasonEntityTest {
         assertThat(episode.duration).isEqualTo(1440)
         assertThat(episode.dimension).isNotNull()
         assertThat(episode.dimension!!.width).isEqualTo(1920)
-        assertThat(episode.dimension!!.height).isEqualTo(1080)
+        assertThat(episode.dimension.height).isEqualTo(1080)
     }
 
     @Test
@@ -506,8 +506,8 @@ class SeasonEntityTest {
         assertThat(result.userStatus.pay).isTrue()
         assertThat(result.userStatus.progress).isNotNull()
         assertThat(result.userStatus.progress!!.lastEpId).isEqualTo(500)
-        assertThat(result.userStatus.progress!!.lastEpIndex).isEqualTo("第5话")
-        assertThat(result.userStatus.progress!!.lastTime).isEqualTo(120)
+        assertThat(result.userStatus.progress.lastEpIndex).isEqualTo("第5话")
+        assertThat(result.userStatus.progress.lastTime).isEqualTo(120)
     }
 
     @Test

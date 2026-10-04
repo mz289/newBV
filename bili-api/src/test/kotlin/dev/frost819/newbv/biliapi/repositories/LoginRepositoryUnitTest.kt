@@ -203,10 +203,10 @@ class LoginRepositoryUnitTest {
             assertThat(result.state).isEqualTo(QrLoginState.Success)
             assertThat(result.cookies).isNotNull()
             assertThat(result.cookies!!.dedeUserId).isEqualTo(12345L)
-            assertThat(result.cookies!!.dedeUserIdCkMd5).isEqualTo("abc")
-            assertThat(result.cookies!!.sid).isEqualTo("sid123")
-            assertThat(result.cookies!!.biliJct).isEqualTo("jct456")
-            assertThat(result.cookies!!.sessData).isEqualTo("sess789")
+            assertThat(result.cookies.dedeUserIdCkMd5).isEqualTo("abc")
+            assertThat(result.cookies.sid).isEqualTo("sid123")
+            assertThat(result.cookies.biliJct).isEqualTo("jct456")
+            assertThat(result.cookies.sessData).isEqualTo("sess789")
         }
 
     // ------------------------------------------------------------------
@@ -350,10 +350,10 @@ class LoginRepositoryUnitTest {
             assertThat(result.state).isEqualTo(QrLoginState.Success)
             assertThat(result.cookies).isNotNull()
             assertThat(result.cookies!!.dedeUserId).isEqualTo(12345L)
-            assertThat(result.cookies!!.dedeUserIdCkMd5).isEqualTo("ckmd5abc")
-            assertThat(result.cookies!!.sid).isEqualTo("sid123")
-            assertThat(result.cookies!!.biliJct).isEqualTo("jct456")
-            assertThat(result.cookies!!.sessData).isEqualTo("sess789")
+            assertThat(result.cookies.dedeUserIdCkMd5).isEqualTo("ckmd5abc")
+            assertThat(result.cookies.sid).isEqualTo("sid123")
+            assertThat(result.cookies.biliJct).isEqualTo("jct456")
+            assertThat(result.cookies.sessData).isEqualTo("sess789")
             assertThat(result.accessToken).isEqualTo("access-token-123")
             assertThat(result.refreshToken).isEqualTo("refresh-token-456")
         }

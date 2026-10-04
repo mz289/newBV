@@ -6,7 +6,7 @@ complexity:
     active: false
   ComplexCondition:
     active: true
-    threshold: 5
+    allowedConditions: 5
   CyclomaticComplexMethod:
     active: false
   LargeClass:
@@ -26,7 +26,7 @@ style:
     active: false
   UseDataClass:
     active: false
-  UnusedPrivateMember:
+  UnusedPrivateFunction:
     active: true
     ignoreAnnotated: ['Preview']
   MaxLineLength:

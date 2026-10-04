@@ -1,9 +1,11 @@
 package dev.frost819.newbv.bilisubtitle.entity
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class BiliSubtitle(
     @SerialName("font_size")

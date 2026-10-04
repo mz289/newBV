@@ -305,9 +305,9 @@ class PlayDataTest {
 
         assertThat(playData.dolby).isNotNull()
         assertThat(playData.dolby!!.baseUrl).isEqualTo("http://c/dolby.m4s")
-        assertThat(playData.dolby!!.bandwidth).isEqualTo(500_000)
-        assertThat(playData.dolby!!.codecId).isEqualTo(30250)
-        assertThat(playData.dolby!!.backUrl).containsExactly("http://cdn2.test/audio-30250.m4s")
+        assertThat(playData.dolby.bandwidth).isEqualTo(500_000)
+        assertThat(playData.dolby.codecId).isEqualTo(30250)
+        assertThat(playData.dolby.backUrl).containsExactly("http://cdn2.test/audio-30250.m4s")
     }
 
     @Test
@@ -323,7 +323,7 @@ class PlayDataTest {
 
         assertThat(playData.dolby).isNotNull()
         assertThat(playData.dolby!!.baseUrl).isEqualTo("http://c/d1.m4s")
-        assertThat(playData.dolby!!.codecId).isEqualTo(30250)
+        assertThat(playData.dolby.codecId).isEqualTo(30250)
     }
 
     @Test
@@ -378,9 +378,9 @@ class PlayDataTest {
 
         assertThat(playData.flac).isNotNull()
         assertThat(playData.flac!!.baseUrl).isEqualTo("http://c/flac.m4s")
-        assertThat(playData.flac!!.bandwidth).isEqualTo(800_000)
-        assertThat(playData.flac!!.codecId).isEqualTo(30251)
-        assertThat(playData.flac!!.backUrl).containsExactly("http://cdn2.test/audio-30251.m4s")
+        assertThat(playData.flac.bandwidth).isEqualTo(800_000)
+        assertThat(playData.flac.codecId).isEqualTo(30251)
+        assertThat(playData.flac.backUrl).containsExactly("http://cdn2.test/audio-30251.m4s")
     }
 
     @Test

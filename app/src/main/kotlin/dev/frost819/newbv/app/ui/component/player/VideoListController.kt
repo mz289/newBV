@@ -210,7 +210,7 @@ private fun VideoListItemRow(
                 modifier = Modifier.padding(start = 16.dp, top = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                video.ugcPages?.forEach { page ->
+                video.ugcPages.forEach { page ->
                     val isPageSelected = page.cid == currentCid
                     val childModifier =
                         if (isPageSelected) {

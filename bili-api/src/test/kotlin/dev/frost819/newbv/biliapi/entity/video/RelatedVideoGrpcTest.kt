@@ -45,7 +45,7 @@ class RelatedVideoGrpcTest {
         assertThat(related.title).isEqualTo("相关视频")
         assertThat(related.duration).isEqualTo(600)
         assertThat(related.author!!.mid).isEqualTo(123L)
-        assertThat(related.author!!.name).isEqualTo("UP主")
+        assertThat(related.author.name).isEqualTo("UP主")
         assertThat(related.jumpToSeason).isFalse()
         assertThat(related.epid).isNull()
         assertThat(related.view).isEqualTo(100000)
@@ -70,8 +70,8 @@ class RelatedVideoGrpcTest {
 
         assertThat(related.author).isNotNull()
         assertThat(related.author!!.mid).isEqualTo(0L)
-        assertThat(related.author!!.name).isEqualTo("fallback author")
-        assertThat(related.author!!.face).isEqualTo("")
+        assertThat(related.author.name).isEqualTo("fallback author")
+        assertThat(related.author.face).isEqualTo("")
     }
 
     @Test
@@ -91,8 +91,8 @@ class RelatedVideoGrpcTest {
 
         assertThat(related.author).isNotNull()
         assertThat(related.author!!.mid).isEqualTo(0L)
-        assertThat(related.author!!.name).isEqualTo("")
-        assertThat(related.author!!.face).isEqualTo("")
+        assertThat(related.author.name).isEqualTo("")
+        assertThat(related.author.face).isEqualTo("")
     }
 
     @Test

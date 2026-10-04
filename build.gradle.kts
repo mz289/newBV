@@ -14,13 +14,13 @@ plugins {
 
 subprojects {
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
-    apply(plugin = "io.gitlab.arturbosch.detekt")
+    apply(plugin = "dev.detekt")
     apply(plugin = "jacoco")
 
     // detekt 配置：使用根目录的 config/detekt.yml
-    tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
         config.setFrom(rootProject.files("config/detekt.yml"))
-        buildUponDefaultConfig = true
+        buildUponDefaultConfig.set(true)
     }
 
     // JaCoCo：统一排除生成代码和纯数据类

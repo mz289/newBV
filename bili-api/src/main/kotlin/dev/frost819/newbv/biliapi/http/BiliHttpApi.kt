@@ -187,7 +187,7 @@ object BiliHttpApi {
             val spiResponse = client.get("/x/frontend/finger/spi") {}
             val spiData = spiResponse.body<BiliResponse<SpiData>>()
             if (spiData.code != 0 || spiData.data?.b3.isNullOrBlank()) return@runCatching null
-            buvid3 = spiData.data!!.b3!!
+            buvid3 = spiData.data.b3
 
             // 2. 携带 buvid3 请求 www.bilibili.com 获取 b_nut 等设备 cookie
             val biliResponse =

@@ -120,7 +120,7 @@ class VideoDetailRepository(
                     runCatching {
                         viewStub?.view(
                             viewReq {
-                                this.aid = aid.toLong()
+                                this.aid = aid
                             },
                         ) ?: throw IllegalStateException("Player stub is not initialized")
                     }.onFailure { handleGrpcException(it) }.getOrThrow()

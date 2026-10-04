@@ -254,7 +254,7 @@ data class PlayData(
 
             val dashVideos =
                 if (hasDash) {
-                    dash!!.video.map {
+                    dash.video.map {
                         DashVideo(
                             quality = it.id,
                             baseUrl = it.baseUrl,
@@ -338,7 +338,7 @@ data class PlayData(
 
             val dashVideos =
                 if (hasDash) {
-                    playUrlData.dash!!.video.map {
+                    playUrlData.dash.video.map {
                         DashVideo(
                             quality = it.id,
                             baseUrl = it.baseUrl,

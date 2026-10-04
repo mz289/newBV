@@ -41,7 +41,7 @@ data class Relation(
     val isSpecialFollowing: Boolean = special == 1,
 )
 
-private object RelationTypeSerializer : CommonEnumIntSerializer<RelationType>(
+object RelationTypeSerializer : CommonEnumIntSerializer<RelationType>(
     "RelationType",
     RelationType.entries.toTypedArray(),
     RelationType.entries.toTypedArray().serial(),

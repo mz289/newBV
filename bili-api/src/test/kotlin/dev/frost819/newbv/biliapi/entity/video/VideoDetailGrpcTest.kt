@@ -92,7 +92,7 @@ class VideoDetailGrpcTest {
         assertThat(detail.history.lastPlayedCid).isEqualTo(1051761130L)
         assertThat(detail.playerIcon).isNotNull()
         assertThat(detail.playerIcon!!.idle).isEqualTo("")
-        assertThat(detail.playerIcon!!.moving).isEqualTo("")
+        assertThat(detail.playerIcon.moving).isEqualTo("")
         assertThat(detail.ugcSeason).isNull()
     }
 
@@ -189,7 +189,7 @@ class VideoDetailGrpcTest {
 
         assertThat(detail.playerIcon).isNotNull()
         assertThat(detail.playerIcon!!.idle).isEqualTo("http://idle.test")
-        assertThat(detail.playerIcon!!.moving).isEqualTo("http://moving.test")
+        assertThat(detail.playerIcon.moving).isEqualTo("http://moving.test")
     }
 
     @Test
