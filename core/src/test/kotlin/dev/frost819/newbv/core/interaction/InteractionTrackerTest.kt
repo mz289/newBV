@@ -14,35 +14,27 @@ class InteractionTrackerTest {
     @Test
     fun `initial value is DPad by default`() {
         val tracker = InteractionTracker()
-        assertThat(tracker.current).isEqualTo(InputMethod.DPad)
+        assertThat(tracker.inputMethod.value).isEqualTo(InputMethod.DPad)
     }
 
     @Test
     fun `initial value can be customized`() {
         val tracker = InteractionTracker(initial = InputMethod.Touch)
-        assertThat(tracker.current).isEqualTo(InputMethod.Touch)
+        assertThat(tracker.inputMethod.value).isEqualTo(InputMethod.Touch)
     }
 
     @Test
     fun `onTouch switches to Touch`() {
         val tracker = InteractionTracker()
         tracker.onTouch()
-        assertThat(tracker.current).isEqualTo(InputMethod.Touch)
+        assertThat(tracker.inputMethod.value).isEqualTo(InputMethod.Touch)
     }
 
     @Test
     fun `onDpadKey switches to DPad`() {
         val tracker = InteractionTracker(initial = InputMethod.Touch)
         tracker.onDpadKey()
-        assertThat(tracker.current).isEqualTo(InputMethod.DPad)
-    }
-
-    @Test
-    fun `reset returns to DPad`() {
-        val tracker = InteractionTracker()
-        tracker.onTouch()
-        tracker.reset()
-        assertThat(tracker.current).isEqualTo(InputMethod.DPad)
+        assertThat(tracker.inputMethod.value).isEqualTo(InputMethod.DPad)
     }
 
     @Test

@@ -7,7 +7,6 @@ import dev.frost819.newbv.biliapi.repositories.ChannelRepository
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.db.dao.UserDao
 import dev.frost819.newbv.data.db.entity.UserEntity
-import dev.frost819.newbv.data.repository.AccountRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,7 +34,7 @@ class AccountRepositoryImpl
         private val userDao: UserDao,
         private val authRepository: AuthRepository,
         private val channelRepository: ChannelRepository,
-    ) : AccountRepository {
+    ) {
         /** UI 状态：当前登录用户信息。 */
         private val _uiState = MutableStateFlow(AccountUiState())
         val uiState: StateFlow<AccountUiState> = _uiState.asStateFlow()
@@ -104,11 +103,11 @@ class AccountRepositoryImpl
             }
         }
 
-        override suspend fun getAllUsers(): List<UserEntity> = userDao.getAll()
+        suspend fun getAllUsers(): List<UserEntity> = userDao.getAll()
 
-        override suspend fun findUserByUid(uid: Long): UserEntity? = userDao.findUserByUid(uid)
+        suspend fun findUserByUid(uid: Long): UserEntity? = userDao.findUserByUid(uid)
 
-        override suspend fun upsertUser(user: UserEntity) {
+        suspend fun upsertUser(user: UserEntity) {
             val existing = userDao.findUserByUid(user.uid)
             if (existing != null) {
                 existing.auth = user.auth
@@ -118,13 +117,13 @@ class AccountRepositoryImpl
             }
         }
 
-        override suspend fun deleteUser(user: UserEntity) {
+        suspend fun deleteUser(user: UserEntity) {
             userDao.delete(user)
         }
 
-        override fun isLogin(): Boolean = Prefs.isLogin
+        fun isLogin(): Boolean = Prefs.isLogin
 
-        override fun currentUid(): Long = Prefs.uid
+        fun currentUid(): Long = Prefs.uid
 
         /**
          * 设置当前登录用户。
@@ -137,7 +136,7 @@ class AccountRepositoryImpl
          *
          * @param user 登录成功的用户。
          */
-        override suspend fun setCurrentUser(user: UserEntity) {
+        suspend fun setCurrentUser(user: UserEntity) {
             val authData = AuthData.fromJson(user.auth)
             authData.saveToPrefs()
             syncToAuthRepository(
@@ -233,7 +232,7 @@ class AccountRepositoryImpl
             }
         }
 
-        override suspend fun logout() {
+        suspend fun logout() {
             val user = userDao.findUserByUid(Prefs.uid)
             if (user != null) {
                 userDao.delete(user)
@@ -260,26 +259,12 @@ class AccountRepositoryImpl
         }
 
         /**
-         * 更新用户锁密码。
-         *
-         * @param uid 用户 UID。
-         * @param lock 锁密码字符串（空字符串表示取消锁）。
-         */
-        suspend fun updateUserLock(
-            uid: Long,
-            lock: String,
-        ) {
-            val user = userDao.findUserByUid(uid) ?: return
-            user.lock = lock
-            userDao.update(user)
-        }
-
-        /**
          * 切换无痕模式。
+         *
+         * 状态只存于 [Prefs]（UI 经 [Prefs.incognitoModeFlow] 观察），不进入 [AccountUiState]。
          */
         fun toggleIncognitoMode() {
             Prefs.incognitoMode = !Prefs.incognitoMode
-            _uiState.update { it.copy(incognitoMode = Prefs.incognitoMode) }
         }
     }
 
@@ -294,7 +279,6 @@ class AccountRepositoryImpl
  * @property currentMin 当前等级经验最低值。
  * @property exp 当前经验值（总经验）。
  * @property nextExp 下一等级所需经验值（门槛，非剩余）。Lv6 满级时为 0。
- * @property incognitoMode 无痕模式。
  */
 data class AccountUiState(
     val isLogin: Boolean = false,
@@ -305,5 +289,4 @@ data class AccountUiState(
     val currentMin: Int = 0,
     val exp: Int = 0,
     val nextExp: Int = 0,
-    val incognitoMode: Boolean = false,
 )

@@ -155,23 +155,4 @@ fun Modifier.focusedBorder(
             .border(width = width, color = borderColor, shape = shape)
     }
 
-/**
- * 未获焦点时缩小，获焦点时恢复原大小。
- *
- * 触屏模式下保持显示缩放效果（D-Pad 用户看到放大，触屏用户看到缩小）。
- * 注意：与 [focusedBorder] 不同，[focusedScale] 不会根据输入方式隐藏。
- *
- * @param scale 未获焦点时的缩放比例，默认 0.9。
- */
-fun Modifier.focusedScale(scale: Float = 0.9f): Modifier =
-    composed {
-        var hasFocus by remember { mutableStateOf(false) }
-        val scaleValue by animateFloatAsState(
-            targetValue = if (hasFocus) 1f else scale,
-            label = "focused-scale",
-        )
-
-        onFocusChanged { hasFocus = it.hasFocus }
-            .scale(scaleValue)
-    }
 

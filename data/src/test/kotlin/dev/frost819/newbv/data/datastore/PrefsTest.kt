@@ -181,23 +181,6 @@ class PrefsTest {
             assertThat(Prefs.density).isEqualTo(2f)
         }
 
-    // ===== flowOf 测试 =====
-
-    @Test
-    fun `flowOf returns StateFlow for existing key`() {
-        val flow = Prefs.flowOf(PrefKeys.isLogin)
-        assertThat(flow).isNotNull()
-    }
-
-    @Test
-    fun `flowOf returns null for unregistered key`() {
-        val unregisteredKey =
-            androidx.datastore.preferences.core
-                .booleanPreferencesKey("nonexistent_key")
-        val flow = Prefs.flowOf(unregisteredKey)
-        assertThat(flow).isNull()
-    }
-
     // ===== 枚举安全解析测试 =====
 
     @Test

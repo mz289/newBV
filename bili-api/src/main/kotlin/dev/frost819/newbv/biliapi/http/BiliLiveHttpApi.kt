@@ -5,7 +5,6 @@ import dev.frost819.newbv.biliapi.http.entity.live.DanmuInfoData
 import dev.frost819.newbv.biliapi.http.entity.live.FollowLiveResponse
 import dev.frost819.newbv.biliapi.http.entity.live.HistoryDanmaku
 import dev.frost819.newbv.biliapi.http.entity.live.LiveAreaParent
-import dev.frost819.newbv.biliapi.http.entity.live.LiveListResponse
 import dev.frost819.newbv.biliapi.http.entity.live.LiveRecommendResponse
 import dev.frost819.newbv.biliapi.http.entity.live.LiveRoomItem
 import dev.frost819.newbv.biliapi.http.entity.live.RoomInfoData
@@ -90,17 +89,6 @@ object BiliLiveHttpApi {
         client
             .get("/xlive/web-room/v1/dM/gethistory") {
                 parameter("roomid", roomId)
-            }.body()
-
-    /**
-     * 获取直播首页模块化列表（分区入口 + 推荐模块 + Banner）。
-     *
-     * 端点: `GET /xlive/web-interface/v1/index/getList`
-     */
-    suspend fun getLiveList(): BiliResponse<LiveListResponse> =
-        client
-            .get("/xlive/web-interface/v1/index/getList") {
-                parameter("platform", "web")
             }.body()
 
     /**

@@ -57,9 +57,6 @@ class LiveFollowViewModel
     constructor(
         private val liveRepository: LiveRepository,
     ) : ViewModel() {
-        companion object {
-        }
-
         private val logger = Loggers.get("LiveFollowScreen")
 
         private val _uiState = MutableStateFlow(LiveFollowUiState())

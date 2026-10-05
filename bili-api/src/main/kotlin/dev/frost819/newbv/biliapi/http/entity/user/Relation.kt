@@ -57,12 +57,3 @@ enum class RelationType(
     BothFollowed(6),
     BlackList(128),
 }
-
-@Serializable
-data class RelationStat(
-    val black: Int,
-    val follower: Int,
-    val following: Int,
-    val mid: Long,
-    val whisper: Int,
-)

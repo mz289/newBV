@@ -78,55 +78,6 @@ class FavoriteRepositoryTest {
         }
 
     @Test
-    fun `add video to favorite folder with cookies`() =
-        runBlocking {
-            // 互动类：repository 失败会抛异常，正常返回即接口成功
-            val defaultMediaId = getDefaultFavoriteFolderId(ApiType.Web)
-            assertThat(defaultMediaId).isNotEqualTo(0L)
-            favoriteRepository.addVideoToFavoriteFolder(
-                aid = 170001,
-                addMediaIds = listOf(defaultMediaId),
-                preferApiType = ApiType.Web,
-            )
-        }
-
-    @Test
-    fun `add video to favorite folder with token`() =
-        runBlocking {
-            val defaultMediaId = getDefaultFavoriteFolderId(ApiType.App)
-            assertThat(defaultMediaId).isNotEqualTo(0L)
-            favoriteRepository.addVideoToFavoriteFolder(
-                aid = 170001,
-                addMediaIds = listOf(defaultMediaId),
-                preferApiType = ApiType.App,
-            )
-        }
-
-    @Test
-    fun `del video from favorite folder with cookies`() =
-        runBlocking {
-            val defaultMediaId = getDefaultFavoriteFolderId(ApiType.Web)
-            assertThat(defaultMediaId).isNotEqualTo(0L)
-            favoriteRepository.delVideoFromFavoriteFolder(
-                aid = 170001,
-                delMediaIds = listOf(defaultMediaId),
-                preferApiType = ApiType.Web,
-            )
-        }
-
-    @Test
-    fun `del video from favorite folder with token`() =
-        runBlocking {
-            val defaultMediaId = getDefaultFavoriteFolderId(ApiType.App)
-            assertThat(defaultMediaId).isNotEqualTo(0L)
-            favoriteRepository.delVideoFromFavoriteFolder(
-                aid = 170001,
-                delMediaIds = listOf(defaultMediaId),
-                preferApiType = ApiType.App,
-            )
-        }
-
-    @Test
     fun `update video to favorite folder with cookies`() =
         runBlocking {
             val defaultMediaId = getDefaultFavoriteFolderId(ApiType.App)

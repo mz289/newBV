@@ -143,15 +143,6 @@ class BiliLiveHttpApiTest {
     }
 
     @Test
-    fun `get live list returns modules`() {
-        runBlocking {
-            val response = BiliLiveHttpApi.getLiveList()
-            Assertions.assertEquals(0, response.code, "API should return code=0, got: ${response.message}")
-            val data = requireNotNull(response.data) { "data should not be null" }
-        }
-    }
-
-    @Test
     fun `get live recommend returns list`() {
         runBlocking {
             val response = BiliLiveHttpApi.getLiveRecommend()

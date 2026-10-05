@@ -56,9 +56,6 @@ class LiveAreaListViewModel
         private val liveRepository: LiveRepository,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
-        companion object {
-        }
-
         private val route = savedStateHandle.toRoute<LiveAreaRoute>()
 
         private val logger = Loggers.get("LiveAreaListScreen")

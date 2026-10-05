@@ -58,11 +58,10 @@ dependencies {
 
     implementation(project(":danmaku-engine"))
 
-    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.util)
-    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.kotlinx.coroutines)
     implementation(libs.androidsvg)
     implementation("com.github.promeg:tinypinyin:2.0.3")

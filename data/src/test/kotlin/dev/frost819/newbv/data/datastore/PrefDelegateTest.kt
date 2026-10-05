@@ -242,13 +242,13 @@ class PrefDelegateTest {
             assertThat(Prefs.buvid3).isEqualTo("custom_buvid3_value")
         }
 
-    // ===== PrefDelegate null flow value =====
+    // ===== PrefDelegate 缓存读取 =====
 
     @Test
-    fun `getValue returns default when flow value is null`() {
-        val key = stringPreferencesKey("test_null_flow")
+    fun `getValue restores the cached persisted value`() {
+        val key = stringPreferencesKey("test_cache_read")
         val delegate = PrefDelegate(key, "default")
-        delegate.flow.value = null
-        assertThat(delegate.getValue(null, ::dummy)).isEqualTo("default")
+        delegate.flow.value = "stored"
+        assertThat(delegate.getValue(null, ::dummy)).isEqualTo("stored")
     }
 }

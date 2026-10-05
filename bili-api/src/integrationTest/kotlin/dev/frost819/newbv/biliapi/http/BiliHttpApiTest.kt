@@ -544,19 +544,6 @@ internal class BiliHttpApiTest {
     }
 
     @Test
-    fun `get user relation stat`() {
-        runBlocking {
-            val response =
-                BiliHttpApi.getRelationStat(
-                    mid = 11336264,
-                )
-            println(response)
-            assertThat(response.code).isEqualTo(0)
-            assertThat(response.data).isNotNull()
-        }
-    }
-
-    @Test
     fun `get web search hot words`() {
         runBlocking {
             val result = BiliHttpApi.getWebSearchSquare()
@@ -593,20 +580,6 @@ internal class BiliHttpApiTest {
     }
 
     @Test
-    fun `search all`() {
-        runBlocking {
-            val result =
-                BiliHttpApi.searchAll(
-                    keyword = "007",
-                )
-            println(result)
-            assertThat(result.code).isEqualTo(0)
-            assertThat(result.data).isNotNull()
-            assertThat(result.data!!.result).isNotEmpty()
-        }
-    }
-
-    @Test
     fun `search type`() {
         val types =
             listOf("video", "media_bangumi", "media_ft", "article", "topic", "bili_user")
@@ -639,38 +612,6 @@ internal class BiliHttpApiTest {
                     result.toString().replace("\n", ""),
                 )
                 assertThat(result.modules.banner.items).isNotEmpty()
-            }
-        }
-    }
-
-    @Test
-    fun `get pgc feed data`() {
-        runBlocking {
-            PgcType.entries.forEach { pgcType ->
-                println("type: ${pgcType.name}")
-                when (pgcType) {
-                    PgcType.Anime, PgcType.GuoChuang -> {
-                        val result =
-                            BiliHttpApi.getPgcFeedV3(name = pgcType.name.lowercase())
-                        println(
-                            result.toString().replace("\n", ""),
-                        )
-                        assertThat(result.code).isEqualTo(0)
-                        assertThat(result.data).isNotNull()
-                        assertThat(result.data!!.items).isNotNull()
-                    }
-
-                    PgcType.Tv, PgcType.Movie, PgcType.Documentary, PgcType.Variety -> {
-                        val result =
-                            BiliHttpApi.getPgcFeed(name = pgcType.name.lowercase())
-                        println(
-                            result.toString().replace("\n", ""),
-                        )
-                        assertThat(result.code).isEqualTo(0)
-                        assertThat(result.data).isNotNull()
-                        assertThat(result.data!!.items).isNotNull()
-                    }
-                }
             }
         }
     }

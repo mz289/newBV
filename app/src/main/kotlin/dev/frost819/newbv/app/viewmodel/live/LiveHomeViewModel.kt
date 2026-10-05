@@ -28,9 +28,6 @@ class LiveHomeViewModel
     constructor(
         private val liveRepository: LiveRepository,
     ) : ViewModel() {
-        companion object {
-        }
-
         private val _uiState = MutableStateFlow(LiveHomeUiState())
         val uiState: StateFlow<LiveHomeUiState> = _uiState.asStateFlow()
 

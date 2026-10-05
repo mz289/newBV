@@ -17,6 +17,7 @@ import dev.frost819.newbv.biliapi.repositories.LivePlayInfo
 import dev.frost819.newbv.biliapi.repositories.LivePlayLine
 import dev.frost819.newbv.biliapi.repositories.LiveRepository
 import dev.frost819.newbv.biliapi.websocket.LiveDataWebSocket
+import dev.frost819.newbv.app.util.PlayerConstants
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.player.AbstractVideoPlayer
@@ -87,6 +88,9 @@ class LivePlayerViewModel
     ) : ViewModel() {
         private val logger = Loggers.get("LivePlayerViewModel")
 
+        /** 直播防盗链 Referer。 */
+        private val liveReferer = "https://live.bilibili.com"
+
         var videoPlayer: AbstractVideoPlayer? by mutableStateOf(null)
             private set
 
@@ -131,8 +135,8 @@ class LivePlayerViewModel
         fun initVideoPlayer(context: Context) {
             val options =
                 VideoPlayerOptions(
-                    userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-                    referer = "https://live.bilibili.com",
+                    userAgent = PlayerConstants.WEB_USER_AGENT,
+                    referer = liveReferer,
                 )
             videoPlayer = exoPlayerFactory.create(context, options)
             videoPlayer?.setPlayerEventListener(

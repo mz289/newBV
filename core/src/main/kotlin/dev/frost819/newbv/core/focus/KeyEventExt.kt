@@ -9,9 +9,6 @@ import androidx.compose.ui.input.key.type
 /** 按键事件是否为 KeyDown 类型。 */
 fun KeyEvent.isKeyDown(): Boolean = type == KeyEventType.KeyDown
 
-/** 按键事件是否为 KeyUp 类型。 */
-fun KeyEvent.isKeyUp(): Boolean = type == KeyEventType.KeyUp
-
 /** 按键是否为 D-Pad 上方向键。 */
 fun KeyEvent.isDpadUp(): Boolean = key == Key.DirectionUp
 

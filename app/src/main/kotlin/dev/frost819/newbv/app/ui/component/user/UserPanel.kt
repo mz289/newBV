@@ -31,6 +31,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.R
 import dev.frost819.newbv.app.data.AccountUiState
+import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.app.viewmodel.user.UserViewModel
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
@@ -59,11 +60,13 @@ fun UserPanel(
     onGoFollowList: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val incognitoMode by Prefs.incognitoModeFlow.collectAsState()
 
     UserPanelContent(
         modifier = modifier,
         focusRequester = focusRequester,
         uiState = uiState,
+        incognitoMode = incognitoMode,
         onToggleIncognito = { viewModel.toggleIncognitoMode() },
         onGoUserSwitch = onGoUserSwitch,
         onGoFollowList = onGoFollowList,
@@ -78,6 +81,7 @@ private fun UserPanelContent(
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
     uiState: AccountUiState,
+    incognitoMode: Boolean,
     onToggleIncognito: () -> Unit = {},
     onGoUserSwitch: () -> Unit = {},
     onGoFollowList: () -> Unit = {},
@@ -156,7 +160,7 @@ private fun UserPanelContent(
                     Text(
                         text =
                             stringResource(R.string.user_panel_incognito) +
-                                if (uiState.incognitoMode) "：开" else "：关",
+                                if (incognitoMode) "：开" else "：关",
                     )
                 }
                 Button(
@@ -200,8 +204,8 @@ private fun UserPanelContentPreview() {
                     level = 6,
                     exp = 5000,
                     nextExp = 8000,
-                    incognitoMode = false,
                 ),
+            incognitoMode = false,
             onGoFollowList = {},
         )
     }

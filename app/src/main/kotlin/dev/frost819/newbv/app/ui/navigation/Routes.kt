@@ -22,7 +22,6 @@ object HomeRoute
 data class VideoDetailRoute(
     val aid: Long,
     val bvid: String = "",
-    val epid: Long? = null,
 )
 
 // ── 播放器 ────────────────────────────────────────────────────────────

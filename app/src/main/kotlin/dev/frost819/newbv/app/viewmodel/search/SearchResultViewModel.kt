@@ -36,9 +36,6 @@ class SearchResultViewModel
     ) : ViewModel() {
         private val logger = Loggers.get("SearchResultViewModel")
 
-        companion object {
-        }
-
         private val _uiState = MutableStateFlow(SearchResultUiState())
         val uiState = _uiState.asStateFlow()
 

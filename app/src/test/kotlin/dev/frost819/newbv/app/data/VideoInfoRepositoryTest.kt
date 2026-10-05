@@ -10,8 +10,15 @@ import dev.frost819.newbv.biliapi.entity.video.RelatedVideo
 import dev.frost819.newbv.biliapi.entity.video.UserActions
 import dev.frost819.newbv.biliapi.entity.video.VideoDetail
 import dev.frost819.newbv.biliapi.entity.video.VideoPage
+import dev.frost819.newbv.biliapi.http.entity.video.OneClickTripleAction
+import dev.frost819.newbv.biliapi.repositories.CoinRepository
+import dev.frost819.newbv.biliapi.repositories.LikeRepository
+import dev.frost819.newbv.biliapi.repositories.OneClickTripleActionRepository
 import dev.frost819.newbv.biliapi.repositories.VideoDetailRepository
+import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -33,13 +40,25 @@ import java.util.Date
 class VideoInfoRepositoryTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var videoDetailRepository: VideoDetailRepository
+    private lateinit var likeRepository: LikeRepository
+    private lateinit var coinRepository: CoinRepository
+    private lateinit var oneClickTripleActionRepository: OneClickTripleActionRepository
     private lateinit var repository: VideoInfoRepository
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         videoDetailRepository = mockk()
-        repository = VideoInfoRepository(videoDetailRepository)
+        likeRepository = mockk()
+        coinRepository = mockk()
+        oneClickTripleActionRepository = mockk()
+        repository =
+            VideoInfoRepository(
+                videoDetailRepository = videoDetailRepository,
+                likeRepository = likeRepository,
+                coinRepository = coinRepository,
+                oneClickTripleActionRepository = oneClickTripleActionRepository,
+            )
     }
 
     @AfterEach
@@ -278,11 +297,23 @@ class VideoInfoRepositoryTest {
     // ── updateHistory ────────────────────────────────────────────────
 
     @Test
-    fun `updateHistory sets lastPlayedCid and lastPlayedTime in sharedState`() =
+    fun `updateHistory before detail load is a no-op`() =
         runTest(testDispatcher) {
             repository.updateHistory(progress = 600, lastPlayedCid = 200L)
             advanceUntilIdle()
 
+            assertThat(repository.videoSharedState.value).isNull()
+        }
+
+    @Test
+    fun `updateHistory sets lastPlayedCid and lastPlayedTime in sharedState`() =
+        runTest(testDispatcher) {
+            repository.updateVideoDetail(fakeVideoDetail())
+
+            repository.updateHistory(progress = 600, lastPlayedCid = 200L)
+            advanceUntilIdle()
+
+            assertThat(repository.videoSharedState.value?.aid).isEqualTo(1L)
             assertThat(repository.videoSharedState.value?.lastPlayedCid).isEqualTo(200L)
             assertThat(repository.videoSharedState.value?.lastPlayedTime).isEqualTo(600)
         }
@@ -290,46 +321,72 @@ class VideoInfoRepositoryTest {
     @Test
     fun `updateHistory with negative progress sets negative value`() =
         runTest(testDispatcher) {
+            repository.updateVideoDetail(fakeVideoDetail())
+
             repository.updateHistory(progress = -1, lastPlayedCid = 0L)
             advanceUntilIdle()
 
             assertThat(repository.videoSharedState.value?.lastPlayedTime).isEqualTo(-1)
         }
 
-    @Test
-    fun `videoSharedState emits lastPlayedCid on updateHistory`() =
-        runTest(testDispatcher) {
-            repository.videoSharedState.test {
-                assertThat(awaitItem()).isNull()
-
-                repository.updateHistory(progress = 100, lastPlayedCid = 42L)
-                advanceUntilIdle()
-
-                val shared = awaitItem()
-                assertThat(shared?.lastPlayedCid).isEqualTo(42L)
-            }
-        }
-
     // ── reset ────────────────────────────────────────────────────────
 
     @Test
-    fun `reset clears all state`() =
+    fun `setVideoLiked writes state only after api success`() =
         runTest(testDispatcher) {
-            val items = listOf(VideoListItem(aid = 1, cid = 10, title = "视频1"))
-            repository.updateVideoList(items)
+            mockkObject(Prefs)
+            coEvery { Prefs.apiType } returns ApiType.Web
+            coEvery { likeRepository.updateVideoLiked(any(), any(), any(), any()) } returns Unit
+
             repository.updateVideoDetail(fakeVideoDetail())
-            repository.updateHistory(progress = 100, lastPlayedCid = 50L)
-            advanceUntilIdle()
+            repository.setVideoLiked(aid = 1L, like = true)
 
-            assertThat(repository.videoList.value).isNotEmpty()
-            assertThat(repository.videoDetail.value).isNotNull()
+            assertThat(repository.videoSharedState.value?.liked).isTrue()
 
-            repository.reset()
-            advanceUntilIdle()
+            coEvery { likeRepository.updateVideoLiked(any(), any(), any(), any()) } throws RuntimeException("fail")
+            val result = runCatching { repository.setVideoLiked(aid = 1L, like = false) }
 
-            assertThat(repository.videoList.value).isEmpty()
-            assertThat(repository.videoDetail.value).isNull()
-            assertThat(repository.relatedVideos.value).isEmpty()
-            assertThat(repository.videoSharedState.value).isNull()
+            assertThat(result.isFailure).isTrue()
+            assertThat(repository.videoSharedState.value?.liked).isTrue()
+            unmockkObject(Prefs)
+        }
+
+    @Test
+    fun `sendVideoCoin writes coined state after api success`() =
+        runTest(testDispatcher) {
+            mockkObject(Prefs)
+            coEvery { Prefs.apiType } returns ApiType.Web
+            coEvery { coinRepository.sendVideoCoin(any(), any(), any(), any()) } returns Unit
+
+            repository.updateVideoDetail(fakeVideoDetail())
+            repository.sendVideoCoin(aid = 1L)
+
+            assertThat(repository.videoSharedState.value?.coined).isTrue()
+            unmockkObject(Prefs)
+        }
+
+    @Test
+    fun `sendOneClickTriple syncs state when api returns result`() =
+        runTest(testDispatcher) {
+            mockkObject(Prefs)
+            coEvery { Prefs.apiType } returns ApiType.Web
+            coEvery { oneClickTripleActionRepository.sendVideoOneClickTripleAction(any(), any(), any()) } returns
+                OneClickTripleAction(like = true, coin = true, fav = true)
+
+            repository.updateVideoDetail(fakeVideoDetail())
+            val result = repository.sendOneClickTriple(aid = 1L)
+
+            assertThat(result).isEqualTo(OneClickTripleAction(like = true, coin = true, fav = true))
+            assertThat(repository.videoSharedState.value).isEqualTo(
+                VideoSharedState(
+                    aid = 1L,
+                    liked = true,
+                    coined = true,
+                    favorited = true,
+                    lastPlayedCid = 0L,
+                    lastPlayedTime = 0,
+                ),
+            )
+            unmockkObject(Prefs)
         }
 }

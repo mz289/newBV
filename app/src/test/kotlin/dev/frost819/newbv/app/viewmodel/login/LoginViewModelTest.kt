@@ -176,22 +176,6 @@ class LoginViewModelTest {
         }
 
     @Test
-    fun `reset clears state and cancels polling`() =
-        runTest(testDispatcher) {
-            coEvery { loginRepository.requestAppQrLogin() } returns fakeQrData
-            coEvery { loginRepository.checkAppQrLoginState(any()) } returns
-                QrLoginResult(
-                    state = QrLoginState.WaitingForScan,
-                )
-
-            viewModel.requestAppQrCode()
-            viewModel.reset()
-
-            assertThat(viewModel.uiState.value.state).isEqualTo(QrLoginState.Ready)
-            assertThat(viewModel.uiState.value.qrUrl).isEmpty()
-        }
-
-    @Test
     fun `polling failure sets Error state and stops polling`() =
         runTest(testDispatcher) {
             coEvery { loginRepository.requestAppQrLogin() } returns fakeQrData

@@ -45,6 +45,7 @@ import dev.frost819.newbv.danmaku.config.DanmakuMergeConfig
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.DanmakuType
+import dev.frost819.newbv.data.datastore.PlaySpeed
 import dev.frost819.newbv.data.datastore.VideoCodec
 
 /**
@@ -291,7 +292,7 @@ private fun MenuList(
 
             VideoPlayerMenuNavItem.PlaySpeed ->
                 PlaySpeedMenuList(
-                    currentSelectedPlaySpeedItem = PlaySpeedItem.fromSpeed(uiState.playSpeed),
+                    selectedSpeed = PlaySpeed.fromSpeed(uiState.playSpeed),
                     onPlaySpeedChange = onPlaySpeedChange,
                     onFocusStateChange = onFocusStateChange,
                 )

@@ -5,7 +5,6 @@ import dev.frost819.newbv.biliapi.http.BiliLiveHttpApi
 import dev.frost819.newbv.biliapi.http.entity.BiliResponse
 import dev.frost819.newbv.biliapi.http.entity.live.FollowLiveResponse
 import dev.frost819.newbv.biliapi.http.entity.live.LiveAreaParent
-import dev.frost819.newbv.biliapi.http.entity.live.LiveListResponse
 import dev.frost819.newbv.biliapi.http.entity.live.LiveRecommendResponse
 import dev.frost819.newbv.biliapi.http.entity.live.LiveRoomItem
 import dev.frost819.newbv.biliapi.http.entity.live.MediaInfo
@@ -48,17 +47,6 @@ class LiveRepositoryUnitTest {
     fun tearDown() {
         unmockkObject(BiliLiveHttpApi)
     }
-
-    @Test
-    fun `getLiveList returns response data`() =
-        runBlocking {
-            val fakeData = LiveListResponse()
-            coEvery { BiliLiveHttpApi.getLiveList() } returns fakeResponse(fakeData)
-
-            val result = repository.getLiveList()
-
-            assertThat(result).isEqualTo(fakeData)
-        }
 
     @Test
     fun `getLiveRecommend returns response data`() =
@@ -161,85 +149,6 @@ class LiveRepositoryUnitTest {
 
             assertThat(result.roomId).isEqualTo(1718159119)
             assertThat(result.title).isEqualTo("测试直播间")
-        }
-
-    @Test
-    fun `getAvailableQualities returns sorted qualities on success`() =
-        runBlocking {
-            val playInfo = fakeRoomPlayInfoV2Data()
-            coEvery { BiliLiveHttpApi.getRoomPlayInfoV2(any(), any()) } returns fakeResponse(playInfo)
-
-            val result = repository.getAvailableQualities(1718159119)
-
-            assertThat(result).isNotEmpty()
-            assertThat(result[0].first).isAtLeast(result[1].first)
-        }
-
-    @Test
-    fun `getAvailableQualities returns empty list on failure`() =
-        runBlocking {
-            coEvery { BiliLiveHttpApi.getRoomPlayInfoV2(any(), any()) } throws RuntimeException("network error")
-
-            val result = repository.getAvailableQualities(1718159119)
-
-            assertThat(result).isEmpty()
-        }
-
-    @Test
-    fun `getLiveStreamInfo returns url and qn on success`() =
-        runBlocking {
-            val playInfo = fakeRoomPlayInfoV2Data()
-            coEvery { BiliLiveHttpApi.getRoomPlayInfoV2(any(), any()) } returns fakeResponse(playInfo)
-
-            val result = repository.getLiveStreamInfo(1718159119, 10000)
-
-            assertThat(result.url).isNotNull()
-            assertThat(result.currentQn).isEqualTo(10000)
-        }
-
-    @Test
-    fun `getLiveStreamInfo falls back to simple url on v2 failure`() =
-        runBlocking {
-            coEvery { BiliLiveHttpApi.getRoomPlayInfoV2(any(), any()) } throws RuntimeException("v2 error")
-            coEvery { BiliLiveHttpApi.getLiveStreamUrl(any(), any()) } returns
-                fakeResponse(
-                    SimplePlayUrlData(
-                        currentQuality = 0,
-                        durl =
-                            listOf(
-                                SimpleDurl(
-                                    url = "http://fallback.flv",
-                                ),
-                            ),
-                    ),
-                )
-            val result = repository.getLiveStreamInfo(1718159119, 0)
-
-            assertThat(result.url).isEqualTo("http://fallback.flv")
-            assertThat(result.currentQn).isEqualTo(0)
-        }
-
-    @Test
-    fun `getLiveStreamInfo returns null url when all methods fail`() =
-        runBlocking {
-            coEvery { BiliLiveHttpApi.getRoomPlayInfoV2(any(), any()) } throws RuntimeException("v2 error")
-            coEvery { BiliLiveHttpApi.getLiveStreamUrl(any(), any()) } throws RuntimeException("simple error")
-
-            val result = repository.getLiveStreamInfo(1718159119, 0)
-
-            assertThat(result.url).isNull()
-            assertThat(result.currentQn).isEqualTo(0)
-        }
-
-    @Test
-    fun `getLiveStreamUrl delegates to getLiveStreamInfo url`() =
-        runBlocking {
-            val playInfo = fakeRoomPlayInfoV2Data()
-            coEvery { BiliLiveHttpApi.getRoomPlayInfoV2(any(), any()) } returns fakeResponse(playInfo)
-
-            val result = repository.getLiveStreamUrl(1718159119, 10000)
-
-            assertThat(result).isNotNull()
         }
 
     @Test

@@ -21,10 +21,7 @@ import dev.frost819.newbv.biliapi.entity.user.Author
 import dev.frost819.newbv.biliapi.entity.video.RelatedVideo
 import dev.frost819.newbv.biliapi.entity.video.VideoDetail
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
-import dev.frost819.newbv.biliapi.repositories.CoinRepository
 import dev.frost819.newbv.biliapi.repositories.FavoriteRepository
-import dev.frost819.newbv.biliapi.repositories.LikeRepository
-import dev.frost819.newbv.biliapi.repositories.OneClickTripleActionRepository
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.data.datastore.ActionAfterPlay
 import dev.frost819.newbv.data.datastore.Audio
@@ -77,10 +74,7 @@ class PlayerViewModelTest {
     private lateinit var authRepository: AuthRepository
     private lateinit var exoPlayerFactory: ExoPlayerFactory
     private lateinit var videoCapabilityProvider: VideoCapabilityProvider
-    private lateinit var likeRepository: LikeRepository
-    private lateinit var coinRepository: CoinRepository
     private lateinit var favoriteRepository: FavoriteRepository
-    private lateinit var oneClickTripleActionRepository: OneClickTripleActionRepository
     private lateinit var sponsorBlockApi: SponsorBlockApi
     private lateinit var cdnSelector: CdnSelector
     private lateinit var viewModel: PlayerViewModel
@@ -96,10 +90,7 @@ class PlayerViewModelTest {
         exoPlayerFactory = mockk()
         videoCapabilityProvider = mockk()
         every { videoCapabilityProvider.isDecodable(any()) } returns true
-        likeRepository = mockk(relaxed = true)
-        coinRepository = mockk(relaxed = true)
         favoriteRepository = mockk(relaxed = true)
-        oneClickTripleActionRepository = mockk(relaxed = true)
         sponsorBlockApi = mockk(relaxed = true)
         cdnSelector = mockk(relaxed = true)
 
@@ -130,10 +121,7 @@ class PlayerViewModelTest {
                 authRepository = authRepository,
                 exoPlayerFactory = exoPlayerFactory,
                 videoCapabilityProvider = videoCapabilityProvider,
-                likeRepository = likeRepository,
-                coinRepository = coinRepository,
                 favoriteRepository = favoriteRepository,
-                oneClickTripleActionRepository = oneClickTripleActionRepository,
                 sponsorBlockApi = sponsorBlockApi,
                 cdnSelector = cdnSelector,
             )

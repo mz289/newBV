@@ -36,9 +36,6 @@ class SearchInputViewModel
     ) : ViewModel() {
         private val logger = Loggers.get("SearchInputViewModel")
 
-        companion object {
-        }
-
         private val _uiState = MutableStateFlow(SearchInputUiState())
         val uiState = _uiState.asStateFlow()
 

@@ -23,6 +23,20 @@ import androidx.compose.ui.unit.dp
 import dev.frost819.newbv.app.ui.component.player.ifElse
 import dev.frost819.newbv.app.ui.component.player.menu.component.MenuListItem
 import dev.frost819.newbv.app.ui.state.player.MenuFocusState
+import dev.frost819.newbv.data.datastore.PlaySpeed
+
+/** 倍速菜单展示顺序（从高到低）。 */
+private val PLAY_SPEED_MENU_ORDER = listOf(PlaySpeed.X2, PlaySpeed.X1_5, PlaySpeed.X1_25, PlaySpeed.X1, PlaySpeed.X0_5)
+
+/** [PlaySpeed] 的菜单显示名（显示名归 app 层，data 层只存编码与倍速值）。 */
+private val PlaySpeed.menuName: String
+    get() = when (this) {
+        PlaySpeed.X2 -> "2.0x"
+        PlaySpeed.X1_5 -> "1.5x"
+        PlaySpeed.X1_25 -> "1.25x"
+        PlaySpeed.X1 -> "1.0x"
+        PlaySpeed.X0_5 -> "0.5x"
+    }
 
 /**
  * 倍速设置面板。
@@ -31,14 +45,14 @@ import dev.frost819.newbv.app.ui.state.player.MenuFocusState
  * 按方向右键返回导航列表。
  *
  * @param modifier 修饰符
- * @param currentSelectedPlaySpeedItem 当前选中的倍速项
+ * @param selectedSpeed 当前选中的倍速
  * @param onPlaySpeedChange 倍速变化回调
  * @param onFocusStateChange 焦点状态变化回调
  */
 @Composable
 fun PlaySpeedMenuList(
     modifier: Modifier = Modifier,
-    currentSelectedPlaySpeedItem: PlaySpeedItem,
+    selectedSpeed: PlaySpeed,
     onPlaySpeedChange: (Float) -> Unit,
     onFocusStateChange: (MenuFocusState) -> Unit,
 ) {
@@ -67,45 +81,19 @@ fun PlaySpeedMenuList(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(8.dp),
         ) {
-            itemsIndexed(PlaySpeedItem.entries.toMutableList()) { index, item ->
+            itemsIndexed(PLAY_SPEED_MENU_ORDER) { _, item ->
                 MenuListItem(
                     modifier =
                         Modifier
                             .ifElse(
-                                index == currentSelectedPlaySpeedItem.ordinal,
+                                item == selectedSpeed,
                                 Modifier.focusRequester(focusRequester),
                             ),
-                    text = item.displayName,
-                    selected = currentSelectedPlaySpeedItem == item,
+                    text = item.menuName,
+                    selected = selectedSpeed == item,
                     onClick = { onPlaySpeedChange(item.speed) },
                 )
             }
         }
-    }
-}
-
-/**
- * 播放速度预设。
- *
- * @property code 速度标识（用于持久化）
- * @property displayName 显示名称
- * @property speed 实际倍速值
- */
-enum class PlaySpeedItem(
-    val code: Int,
-    val displayName: String,
-    val speed: Float,
-) {
-    X2(4, "2.0x", 2f),
-    X1_5(3, "1.5x", 1.5f),
-    X1_25(2, "1.25x", 1.25f),
-    X1(1, "1.0x", 1f),
-    X0_5(0, "0.5x", 0.5f),
-    ;
-
-    companion object {
-        fun fromCode(code: Int): PlaySpeedItem = entries.find { it.code == code } ?: X1
-
-        fun fromSpeed(speed: Float): PlaySpeedItem = entries.find { it.speed == speed } ?: X1
     }
 }

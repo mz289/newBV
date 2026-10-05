@@ -20,34 +20,6 @@ class FavoriteRepository(
             accessKey = authRepository.accessToken.takeIf { preferApiType == ApiType.App },
         )
 
-    suspend fun addVideoToFavoriteFolder(
-        aid: Long,
-        addMediaIds: List<Long>,
-        preferApiType: ApiType,
-    ) {
-        BiliHttpApi.setVideoToFavorite(
-            avid = aid,
-            type = FavoriteItemType.Video.value,
-            addMediaIds = addMediaIds,
-            csrf = authRepository.biliJct.takeIf { preferApiType == ApiType.Web },
-            accessKey = authRepository.accessToken.takeIf { preferApiType == ApiType.App },
-        )
-    }
-
-    suspend fun delVideoFromFavoriteFolder(
-        aid: Long,
-        delMediaIds: List<Long>,
-        preferApiType: ApiType,
-    ) {
-        BiliHttpApi.setVideoToFavorite(
-            avid = aid,
-            type = FavoriteItemType.Video.value,
-            delMediaIds = delMediaIds,
-            csrf = authRepository.biliJct.takeIf { preferApiType == ApiType.Web },
-            accessKey = authRepository.accessToken.takeIf { preferApiType == ApiType.App },
-        )
-    }
-
     suspend fun updateVideoToFavoriteFolder(
         aid: Long,
         addMediaIds: List<Long>,

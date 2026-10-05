@@ -38,12 +38,10 @@ import dev.frost819.newbv.biliapi.entity.DashVideo
 import dev.frost819.newbv.biliapi.entity.PlayData
 import dev.frost819.newbv.biliapi.entity.video.VideoPage
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
-import dev.frost819.newbv.biliapi.repositories.CoinRepository
 import dev.frost819.newbv.biliapi.repositories.FavoriteRepository
-import dev.frost819.newbv.biliapi.repositories.LikeRepository
-import dev.frost819.newbv.biliapi.repositories.OneClickTripleActionRepository
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.core.log.Loggers
+import dev.frost819.newbv.data.datastore.ActionAfterPlay
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.datastore.Resolution
@@ -104,10 +102,7 @@ private const val PAID_PREVIEW_TIP = "视频需付费，当前为试看片段"
  * @param videoPlayRepository 播放数据仓库（URL、弹幕、字幕、蒙版、心跳、缩略图）
  * @param videoInfoRepository 视频信息共享仓库（分集列表、详情）
  * @param authRepository 鉴权仓库（会话凭证）
- * @param likeRepository 视频点赞仓库
- * @param coinRepository 视频投币仓库
  * @param favoriteRepository 视频收藏仓库
- * @param oneClickTripleActionRepository 一键三连仓库
  * @param sponsorBlockApi SponsorBlock 片段查询 API（bsbsb.top 社区服务器）
  * @param exoPlayerFactory ExoPlayer 工厂
  * @param videoCapabilityProvider 设备视频解码能力查询器（选流时过滤超能力组合）
@@ -122,10 +117,7 @@ class PlayerViewModel
         private val authRepository: AuthRepository,
         private val exoPlayerFactory: ExoPlayerFactory,
         private val videoCapabilityProvider: VideoCapabilityProvider,
-        private val likeRepository: LikeRepository,
-        private val coinRepository: CoinRepository,
         private val favoriteRepository: FavoriteRepository,
-        private val oneClickTripleActionRepository: OneClickTripleActionRepository,
         private val sponsorBlockApi: SponsorBlockApi,
         private val cdnSelector: CdnSelector,
     ) : ViewModel() {
@@ -752,10 +744,8 @@ class PlayerViewModel
             viewModelScope.launch {
                 runCatching {
                     withTimeout(PLAYER_ACTION_TIMEOUT_MS) {
-                        likeRepository.updateVideoLiked(aid = aid, like = !current, preferApiType = Prefs.apiType)
+                        videoInfoRepository.setVideoLiked(aid = aid, like = !current)
                     }
-                }.onSuccess {
-                    videoInfoRepository.updateVideoActionState(aid = aid, liked = !current)
                 }.onFailure { error ->
                     error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to toggle video like: aid=$aid" }
@@ -770,10 +760,8 @@ class PlayerViewModel
             viewModelScope.launch {
                 runCatching {
                     withTimeout(PLAYER_ACTION_TIMEOUT_MS) {
-                        coinRepository.sendVideoCoin(aid = aid, preferApiType = Prefs.apiType)
+                        videoInfoRepository.sendVideoCoin(aid = aid)
                     }
-                }.onSuccess {
-                    videoInfoRepository.updateVideoActionState(aid = aid, coined = true)
                 }.onFailure { error ->
                     error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to send video coin: aid=$aid" }
@@ -833,21 +821,9 @@ class PlayerViewModel
             viewModelScope.launch {
                 runCatching {
                     withTimeout(PLAYER_ACTION_TIMEOUT_MS) {
-                        oneClickTripleActionRepository.sendVideoOneClickTripleAction(
-                            aid = aid,
-                            bvid = bvid,
-                            preferApiType = Prefs.apiType,
-                        )
+                        videoInfoRepository.sendOneClickTriple(aid = aid, bvid = bvid)
                     }
-                }.onSuccess { result ->
-                    if (result != null) {
-                        videoInfoRepository.updateVideoActionState(
-                            aid = aid,
-                            liked = result.like,
-                            coined = result.coin,
-                            favorited = result.fav,
-                        )
-                    }
+                }.onSuccess { _ ->
                     _uiEffect.emit(PlayerUiEffect.ShowToast("一键三连"))
                 }.onFailure { error ->
                     error.rethrowUnlessTimeout()
@@ -941,12 +917,12 @@ class PlayerViewModel
          */
         fun checkAndPlayNext() {
             when (Prefs.actionAfterPlay) {
-                dev.frost819.newbv.data.datastore.ActionAfterPlay.Pause -> return
-                dev.frost819.newbv.data.datastore.ActionAfterPlay.Exit -> {
+                ActionAfterPlay.Pause -> return
+                ActionAfterPlay.Exit -> {
                     viewModelScope.launch { _uiEffect.emit(PlayerUiEffect.FinishActivity) }
                     return
                 }
-                dev.frost819.newbv.data.datastore.ActionAfterPlay.PlayRelated -> {
+                ActionAfterPlay.PlayRelated -> {
                     val firstRelated = videoInfoRepository.relatedVideos.value.firstOrNull()
                     if (firstRelated != null) {
                         startNextEpisodeCountdown(
@@ -961,7 +937,7 @@ class PlayerViewModel
                         return
                     }
                 }
-                dev.frost819.newbv.data.datastore.ActionAfterPlay.PlayNext -> { /* 继续执行 */ }
+                ActionAfterPlay.PlayNext -> { /* 继续执行 */ }
             }
 
             val nextTarget = findNextPlayTarget()

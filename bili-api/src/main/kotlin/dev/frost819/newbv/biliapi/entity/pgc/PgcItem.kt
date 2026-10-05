@@ -14,31 +14,6 @@ data class PgcItem(
     var duration: Int? = null,
 ) {
     companion object {
-        fun fromFeedSubItem(feedSubItem: dev.frost819.newbv.biliapi.http.entity.pgc.PgcFeedData.FeedSubItem): PgcItem =
-            PgcItem(
-                cover = feedSubItem.cover,
-                title = feedSubItem.title,
-                subTitle = feedSubItem.subTitle,
-                seasonId = feedSubItem.seasonId!!,
-                episodeId = feedSubItem.episodeId,
-                seasonType = SeasonIndexType.fromId(feedSubItem.seasonType!!),
-                rating = feedSubItem.rating ?: "0",
-            )
-
-        fun fromFeedSubItem(
-            feedSubItem: dev.frost819.newbv.biliapi.http.entity.pgc.PgcFeedV3Data.FeedItem.FeedSubItem,
-        ): PgcItem =
-            PgcItem(
-                cover = feedSubItem.cover,
-                title = feedSubItem.title,
-                subTitle = feedSubItem.subTitle,
-                seasonId = feedSubItem.seasonId!!,
-                episodeId = feedSubItem.episodeId ?: feedSubItem.inline!!.epId,
-                seasonType = SeasonIndexType.fromId(feedSubItem.seasonType!!),
-                rating = feedSubItem.rating ?: "0",
-                duration = feedSubItem.stat?.duration,
-            )
-
         fun fromIndexResultItem(
             indexResultItem: dev.frost819.newbv.biliapi.http.entity.index.IndexResultData.IndexResultItem,
         ): PgcItem =

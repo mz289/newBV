@@ -8,9 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.frost819.newbv.BuildConfig
 import dev.frost819.newbv.app.cast.server.CastRequestLogger
-import dev.frost819.newbv.app.data.AccountRepositoryImpl
 import dev.frost819.newbv.app.network.HttpServer
-import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
 import dev.frost819.newbv.biliapi.repositories.ChannelRepository
 import dev.frost819.newbv.biliapi.repositories.CoinRepository
@@ -33,8 +31,6 @@ import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.core.interaction.InteractionTracker
 import dev.frost819.newbv.core.log.CrashHandler
 import dev.frost819.newbv.core.log.CrashUploader
-import dev.frost819.newbv.data.db.dao.UserDao
-import dev.frost819.newbv.data.repository.AccountRepository
 import dev.frost819.newbv.data.repository.SearchHistoryRepository
 import dev.frost819.newbv.data.repository.SearchHistoryRepositoryImpl
 import io.ktor.client.HttpClient
@@ -48,7 +44,7 @@ import javax.inject.Singleton
 /**
  * 网络与基础设施 Hilt 模块。
  *
- * 提供 BiliHttpApi 初始化、AuthRepository、崩溃处理和 HttpServer 的单例绑定。
+ * 提供 AuthRepository、崩溃处理和 HttpServer 的单例绑定。
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -90,16 +86,6 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideAuthRepository(): AuthRepository = AuthRepository()
-
-    /**
-     * 提供 [BiliHttpApi] 单例。
-     *
-     * BiliHttpApi 是 `object` 单例，在 [BVApplication.onCreate] 中完成 [BiliHttpApi.init]。
-     * 此处仅返回引用，供需要依赖注入的组件使用。
-     */
-    @Provides
-    @Singleton
-    fun provideBiliHttpApi(): BiliHttpApi = BiliHttpApi
 
     /**
      * 提供 [InteractionTracker] 单例。
@@ -286,19 +272,6 @@ object NetworkModule {
         authRepository: AuthRepository,
         channelRepository: ChannelRepository,
     ): VideoPlayRepository = VideoPlayRepository(authRepository, channelRepository)
-
-    /**
-     * 提供 [AccountRepository] 单例。
-     *
-     * 绑定 [AccountRepositoryImpl] 实现，聚合 UserDao + Prefs + AuthRepository。
-     */
-    @Provides
-    @Singleton
-    fun provideAccountRepository(
-        userDao: UserDao,
-        authRepository: AuthRepository,
-        channelRepository: ChannelRepository,
-    ): AccountRepository = AccountRepositoryImpl(userDao, authRepository, channelRepository)
 
     /**
      * 提供 [SearchRepository] 单例。

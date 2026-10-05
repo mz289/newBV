@@ -14,8 +14,6 @@ import dev.frost819.newbv.biliapi.http.entity.history.HistoryData
 import dev.frost819.newbv.biliapi.http.entity.home.RcmdIndexData
 import dev.frost819.newbv.biliapi.http.entity.home.RcmdTopData
 import dev.frost819.newbv.biliapi.http.entity.index.IndexResultData
-import dev.frost819.newbv.biliapi.http.entity.pgc.PgcFeedData
-import dev.frost819.newbv.biliapi.http.entity.pgc.PgcFeedV3Data
 import dev.frost819.newbv.biliapi.http.entity.pgc.PgcPageTabData
 import dev.frost819.newbv.biliapi.http.entity.pgc.PgcWebInitialStateData
 import dev.frost819.newbv.biliapi.http.entity.pgc.PgcWebRankData
@@ -35,9 +33,7 @@ import dev.frost819.newbv.biliapi.http.entity.user.FollowAction
 import dev.frost819.newbv.biliapi.http.entity.user.FollowActionSource
 import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
 import dev.frost819.newbv.biliapi.http.entity.user.RelationData
-import dev.frost819.newbv.biliapi.http.entity.user.RelationStat
 import dev.frost819.newbv.biliapi.http.entity.user.UserFollowData
-import dev.frost819.newbv.biliapi.http.entity.user.UserInfoData
 import dev.frost819.newbv.biliapi.http.entity.user.WebSpaceVideoData
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.CollectedFavoriteFoldersData
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteFolderInfoListData
@@ -441,18 +437,6 @@ object BiliHttpApi {
                 parameter("type", type)
                 parameter("page", page)
                 offset?.let { parameter("offset", offset) }
-            }.body()
-
-    /**
-     * 获取用户[uid]的详细信息。
-     *
-     * 使用 WBI 签名端点 `/x/space/wbi/acc/info`，旧版 `/x/space/acc/info` 已被 B 站废弃。
-     * 路径中的 `wbi` 会自动触发 [encApiSign] 拦截器添加 `w_rid`/`wts` 签名参数。
-     */
-    suspend fun getUserInfo(uid: Long): BiliResponse<UserInfoData> =
-        client
-            .get("/x/space/wbi/acc/info") {
-                parameter("mid", uid)
             }.body()
 
     /**
@@ -1521,19 +1505,6 @@ object BiliHttpApi {
             }.body()
 
     /**
-     * 获取用户[mid]的关系统计（关注数，粉丝数，黑名单数）
-     */
-    suspend fun getRelationStat(
-        mid: Long,
-        accessKey: String? = null,
-    ): BiliResponse<RelationStat> =
-        client
-            .get("x/relation/stat") {
-                parameter("vmid", mid)
-                accessKey?.let { parameter("access_key", accessKey) }
-            }.body()
-
-    /**
      * 获取搜索提示（Web）
      *
      * @param limit 返回数量
@@ -1595,26 +1566,7 @@ object BiliHttpApi {
         return keywordSuggest
     }
 
-    /**
-     * 综合搜索与[keyword]相关的结果
-     */
-    suspend fun searchAll(
-        keyword: String,
-        page: Int = 1,
-        tid: Int? = null,
-        order: String? = null,
-        duration: Int? = null,
-    ): BiliResponse<SearchResultData> =
-        client
-            .get("/x/web-interface/wbi/search/all/v2") {
-                parameter("keyword", keyword)
-                parameter("page", page)
-                tid?.let { parameter("tids", it) }
-                order?.let { parameter("order", it) }
-                duration?.let { parameter("duration", it) }
-            }.body()
-
-    /**
+        /**
      * 分类搜索与[keyword]相关的[type]类型的相关结果
      */
     suspend fun searchType(
@@ -1656,35 +1608,6 @@ object BiliHttpApi {
             }.getOrNull() ?: throw IllegalStateException("parse initial state data failed")
         return initinalData
     }
-
-    /**
-     * 获取 PGC 猜你喜欢
-     *
-     * 返回数据的前几条内包含每小时更新的分类排行榜
-     */
-    suspend fun getPgcFeedV3(
-        name: String = "anime",
-        cursor: Int = 0,
-    ): BiliResponse<PgcFeedV3Data> =
-        client
-            .get("/pgc/page/web/v3/feed") {
-                parameter("name", name)
-                parameter("coursor", cursor)
-            }.body()
-
-    /**
-     * 获取 PGC 猜你喜欢
-     */
-    suspend fun getPgcFeed(
-        name: String = "movie",
-        cursor: Int = 0,
-    ): BiliResponse<PgcFeedData> =
-        client
-            .get("/pgc/page/web/feed") {
-                parameter("name", name)
-                parameter("coursor", cursor)
-                parameter("new_cursor_status", true)
-            }.body()
 
     /**
      * 获取用户[mid]的追剧列表

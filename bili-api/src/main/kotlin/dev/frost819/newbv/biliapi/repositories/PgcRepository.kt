@@ -1,7 +1,5 @@
 package dev.frost819.newbv.biliapi.repositories
 
-import dev.frost819.newbv.biliapi.entity.CarouselData
-import dev.frost819.newbv.biliapi.entity.pgc.PgcFeedData
 import dev.frost819.newbv.biliapi.entity.pgc.PgcPageTab
 import dev.frost819.newbv.biliapi.entity.pgc.PgcRankData
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
@@ -23,12 +21,6 @@ import dev.frost819.newbv.biliapi.entity.pgc.index.Year
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 
 class PgcRepository {
-    suspend fun getCarousel(pgcType: PgcType): CarouselData {
-        val initialStateData = BiliHttpApi.getPgcWebInitialStateData(pgcType)
-        val carouselData = CarouselData.fromPgcWebInitialStateData(initialStateData)
-        return carouselData
-    }
-
     /**
      * 获取 PGC 分区页数据（轮播 + 索引快捷筛选 + 服务端下发的板块列表）。
      *
@@ -36,33 +28,6 @@ class PgcRepository {
      */
     suspend fun getPgcWebPage(pgcType: PgcType): PgcWebPage =
         PgcWebPage.fromPgcWebInitialStateData(BiliHttpApi.getPgcWebInitialStateData(pgcType))
-
-    suspend fun getFeed(
-        pgcType: PgcType,
-        cursor: Int,
-    ): PgcFeedData {
-        val data =
-            when (pgcType) {
-                PgcType.Anime, PgcType.GuoChuang ->
-                    PgcFeedData.fromPgcFeedData(
-                        BiliHttpApi
-                            .getPgcFeedV3(
-                                name = pgcType.name.lowercase(),
-                                cursor = cursor,
-                            ).getResponseData(),
-                    )
-
-                PgcType.Movie, PgcType.Tv, PgcType.Documentary, PgcType.Variety ->
-                    PgcFeedData.fromPgcFeedData(
-                        BiliHttpApi
-                            .getPgcFeed(
-                                name = pgcType.name.lowercase(),
-                                cursor = cursor,
-                            ).getResponseData(),
-                    )
-            }
-        return data
-    }
 
     /** 获取 PGC 热播榜（番剧/国创等分区的排行榜，免登录）。 */
     suspend fun getPgcRankList(pgcType: PgcType): PgcRankData =

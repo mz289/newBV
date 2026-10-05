@@ -217,7 +217,7 @@ class PersonalViewModelTest {
             val vm = createViewModel()
             advanceUntilIdle()
 
-            assertThat(vm.toViewItems).hasSize(2)
+            assertThat(vm.uiState.value.toViewItems).hasSize(2)
             assertThat(vm.uiState.value.toViewLoading).isFalse()
             assertThat(vm.uiState.value.toViewError).isFalse()
         }
@@ -230,7 +230,7 @@ class PersonalViewModelTest {
             val vm = createViewModel()
             advanceUntilIdle()
 
-            assertThat(vm.toViewItems).isEmpty()
+            assertThat(vm.uiState.value.toViewItems).isEmpty()
             assertThat(vm.uiState.value.toViewError).isTrue()
             assertThat(vm.uiState.value.toViewLoading).isFalse()
         }
@@ -248,8 +248,8 @@ class PersonalViewModelTest {
             vm.delToView(aid = 1)
             advanceUntilIdle()
 
-            assertThat(vm.toViewItems).hasSize(1)
-            assertThat(vm.toViewItems[0].oid).isEqualTo(2)
+            assertThat(vm.uiState.value.toViewItems).hasSize(1)
+            assertThat(vm.uiState.value.toViewItems[0].oid).isEqualTo(2)
         }
 
     @Test
@@ -261,7 +261,7 @@ class PersonalViewModelTest {
             val vm = createViewModel()
             advanceUntilIdle()
 
-            assertThat(vm.toViewItems).hasSize(1)
+            assertThat(vm.uiState.value.toViewItems).hasSize(1)
 
             val items2 = listOf(fakeToViewItem(3), fakeToViewItem(4))
             coEvery { toViewRepo.getToView(any(), any()) } returns fakeToViewData(items2)
@@ -269,8 +269,8 @@ class PersonalViewModelTest {
             vm.refreshToView()
             advanceUntilIdle()
 
-            assertThat(vm.toViewItems).hasSize(2)
-            assertThat(vm.toViewItems[0].oid).isEqualTo(3)
+            assertThat(vm.uiState.value.toViewItems).hasSize(2)
+            assertThat(vm.uiState.value.toViewItems[0].oid).isEqualTo(3)
         }
 
     // endregion
@@ -490,7 +490,7 @@ class PersonalViewModelTest {
             vm.refresh(dev.frost819.newbv.data.datastore.PersonalTopNavItem.ToView)
             advanceUntilIdle()
 
-            assertThat(vm.toViewItems[0].oid).isEqualTo(99)
+            assertThat(vm.uiState.value.toViewItems[0].oid).isEqualTo(99)
         }
 
     // endregion
@@ -509,8 +509,8 @@ class PersonalViewModelTest {
             advanceUntilIdle()
 
             coVerify { toViewRepo.delToView(aid = 1, viewed = true, preferApiType = any()) }
-            assertThat(vm.toViewItems).hasSize(1)
-            assertThat(vm.toViewItems[0].oid).isEqualTo(2)
+            assertThat(vm.uiState.value.toViewItems).hasSize(1)
+            assertThat(vm.uiState.value.toViewItems[0].oid).isEqualTo(2)
         }
 
     @Test

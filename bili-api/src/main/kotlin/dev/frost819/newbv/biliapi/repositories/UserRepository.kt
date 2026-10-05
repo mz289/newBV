@@ -9,7 +9,6 @@ import dev.frost819.newbv.biliapi.entity.user.FollowedUser
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoData
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
-import dev.frost819.newbv.biliapi.entity.user.UserSpaceInfo
 import dev.frost819.newbv.biliapi.grpc.utils.handleGrpcException
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.user.FollowAction
@@ -82,28 +81,6 @@ class UserRepository(
         }.getOrNull()
     }
 
-    suspend fun getFollowingUpCount(
-        mid: Long,
-        preferApiType: ApiType,
-    ): Int {
-        if (authRepository.sessionData == null && authRepository.accessToken == null) return 0
-        return runCatching {
-            val response =
-                when (preferApiType) {
-                    ApiType.Web ->
-                        BiliHttpApi.getRelationStat(mid = mid)
-                    ApiType.App ->
-                        BiliHttpApi.getRelationStat(
-                            mid = mid,
-                            accessKey = authRepository.accessToken,
-                        )
-                }.getResponseData()
-            response.following
-        }.onFailure {
-            BiliLogger.error(it) { "getFollowingUpCount failed" }
-        }.getOrNull() ?: 0
-    }
-
     suspend fun addSeasonFollow(
         seasonId: Int,
         preferApiType: ApiType,
@@ -147,16 +124,6 @@ class UserRepository(
                     ).getResponseData()
                     .toast
         }
-
-    /**
-     * 获取用户空间信息（昵称、头像、签名、等级、关注状态等）。
-     *
-     * 对应接口：`GET /x/space/acc/info`
-     */
-    suspend fun getUserInfo(mid: Long): UserSpaceInfo {
-        val response = BiliHttpApi.getUserInfo(uid = mid).getResponseData()
-        return UserSpaceInfo.fromUserInfoData(response)
-    }
 
     suspend fun getSpaceVideos(
         mid: Long,

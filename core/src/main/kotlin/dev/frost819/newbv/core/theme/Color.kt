@@ -39,8 +39,6 @@ object BVColors {
 
     /** 次要文字统一灰：深浅主题共用一个中性灰（参照 wiliwili 的做法）。 */
     val DarkOnSurfaceVariant = Color(0xFF9499A0)
-    val DarkBorder = PrimaryLight
-
     /** 浅色主题中性色。 */
     val LightBackground = Color(0xFFF5F7FB)
     val LightSurface = Color(0xFFFFFFFF)
@@ -48,8 +46,6 @@ object BVColors {
     val LightOnBackground = Color(0xFF172033)
     val LightOnSurface = Color(0xFF172033)
     val LightOnSurfaceVariant = Color(0xFF9499A0)
-    val LightBorder = PrimaryStrong
-
     /**
      * 焦点描边色（P0-3）：与品牌色解耦的中性高对比色，
      * 深色主题近白、浅色主题近黑，保证任何底色下焦点位置一眼可辨。

@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import dev.frost819.newbv.app.ui.component.EmptyTip
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
@@ -56,8 +57,8 @@ fun ToViewScreen(
     val context = LocalContext.current
 
     val (unwatched, watched) =
-        remember(viewModel.toViewItems.toList()) {
-            viewModel.toViewItems.partition { it.progress != -1 }
+        remember(state.toViewItems) {
+            state.toViewItems.partition { it.progress != -1 }
         }
 
     LaunchedEffect(Unit) {
@@ -70,16 +71,8 @@ fun ToViewScreen(
         }
     }
 
-    if (viewModel.toViewItems.isEmpty() && !state.toViewLoading && !state.toViewError) {
-        Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            androidx.tv.material3.Text(
-                text = "没有稍后再看的视频",
-                color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
-            )
-        }
+    if (state.toViewItems.isEmpty() && !state.toViewLoading && !state.toViewError) {
+        EmptyTip(text = "没有稍后再看的视频", modifier = modifier)
         return
     }
 
@@ -97,35 +90,7 @@ fun ToViewScreen(
             }
             itemsIndexed(items = unwatched) { index, item ->
                 val cardData =
-                    remember(item) {
-                        val durationMs = item.duration * 1000L
-                        val progressRatio =
-                            if (item.duration > 0) {
-                                item.progress.toFloat() / item.duration.toFloat()
-                            } else {
-                                null
-                            }
-                        val timeString =
-                            if (item.progress > 0 && item.duration > 0) {
-                                "${(item.progress * 1000L).formatHourMinSec()} / ${durationMs.formatHourMinSec()}"
-                            } else {
-                                durationMs.formatHourMinSec()
-                            }
-                        VideoCardData(
-                            avid = item.oid,
-                            bvid = item.bvid,
-                            cid = item.cid,
-                            epid = item.epid,
-                            title = item.title,
-                            cover = item.cover,
-                            playString = "",
-                            danmakuString = "",
-                            timeString = timeString,
-                            upName = item.author,
-                            upMid = item.mid,
-                            progress = progressRatio,
-                        )
-                    }
+                    remember(item) { VideoCardData.fromToViewItem(item) }
                 SmallVideoCard(
                     modifier = Modifier.focusSaverItem(focusSaver, "toview_unwatched_$index"),
                     data = cardData,
@@ -152,23 +117,7 @@ fun ToViewScreen(
             }
             itemsIndexed(items = watched) { index, item ->
                 val cardData =
-                    remember(item) {
-                        val durationMs = item.duration * 1000L
-                        VideoCardData(
-                            avid = item.oid,
-                            bvid = item.bvid,
-                            cid = item.cid,
-                            epid = item.epid,
-                            title = item.title,
-                            cover = item.cover,
-                            playString = "",
-                            danmakuString = "",
-                            timeString = "已看完 / ${durationMs.formatHourMinSec()}",
-                            upName = item.author,
-                            upMid = item.mid,
-                            progress = 1f,
-                        )
-                    }
+                    remember(item) { VideoCardData.fromToViewItem(item) }
                 SmallVideoCard(
                     modifier = Modifier.focusSaverItem(focusSaver, "toview_watched_$index"),
                     data = cardData,
@@ -194,7 +143,7 @@ fun ToViewScreen(
                 isLoading = state.toViewLoading,
                 isError = state.toViewError,
                 hasMore = false,
-                itemsIsEmpty = viewModel.toViewItems.isEmpty(),
+                itemsIsEmpty = state.toViewItems.isEmpty(),
                 onRetry = viewModel::loadToView,
             )
         }

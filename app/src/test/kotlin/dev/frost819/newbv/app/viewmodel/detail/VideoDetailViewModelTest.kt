@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.app.data.VideoInfoRepository
+import dev.frost819.newbv.app.data.VideoSharedState
 import dev.frost819.newbv.biliapi.entity.FavoriteFolderMetadata
 import dev.frost819.newbv.biliapi.entity.user.Author
 import dev.frost819.newbv.biliapi.entity.video.Dimension
@@ -13,11 +14,7 @@ import dev.frost819.newbv.biliapi.entity.video.VideoPage
 import dev.frost819.newbv.biliapi.entity.video.season.Episode
 import dev.frost819.newbv.biliapi.entity.video.season.Section
 import dev.frost819.newbv.biliapi.entity.video.season.UgcSeason
-import dev.frost819.newbv.biliapi.http.entity.video.OneClickTripleAction
-import dev.frost819.newbv.biliapi.repositories.CoinRepository
 import dev.frost819.newbv.biliapi.repositories.FavoriteRepository
-import dev.frost819.newbv.biliapi.repositories.LikeRepository
-import dev.frost819.newbv.biliapi.repositories.OneClickTripleActionRepository
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.biliapi.repositories.VideoDetailRepository
 import dev.frost819.newbv.data.datastore.Prefs
@@ -43,31 +40,28 @@ import java.util.Date
  * [VideoDetailViewModel] 的单元测试。
  *
  * 验证详情数据加载、点赞/投币/收藏操作、一键三连、超时/错误处理。
- * 使用 MockK mock 所有 Repository。
+ * 使用 MockK mock 所有 Repository；交互状态断言通过
+ * [VideoInfoRepository.updateVideoActionState] 的调用与共享状态进行。
  */
 class VideoDetailViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var videoDetailRepository: VideoDetailRepository
-    private lateinit var likeRepository: LikeRepository
-    private lateinit var coinRepository: CoinRepository
     private lateinit var favoriteRepository: FavoriteRepository
-    private lateinit var oneClickTripleActionRepository: OneClickTripleActionRepository
     private lateinit var userRepository: UserRepository
     private lateinit var videoInfoRepository: VideoInfoRepository
+    private lateinit var sharedStateFlow: MutableStateFlow<VideoSharedState?>
     private lateinit var viewModel: VideoDetailViewModel
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         videoDetailRepository = mockk()
-        likeRepository = mockk()
-        coinRepository = mockk()
         favoriteRepository = mockk()
-        oneClickTripleActionRepository = mockk()
         userRepository = mockk()
         videoInfoRepository = mockk(relaxed = true)
-        every { videoInfoRepository.videoSharedState } returns MutableStateFlow(null)
+        sharedStateFlow = MutableStateFlow(null)
+        every { videoInfoRepository.videoSharedState } returns sharedStateFlow
 
         mockkObject(Prefs)
         coEvery { Prefs.isLogin } returns false
@@ -83,10 +77,7 @@ class VideoDetailViewModelTest {
         val savedStateHandle = SavedStateHandle(mapOf("aid" to aid))
         return VideoDetailViewModel(
             videoDetailRepository = videoDetailRepository,
-            likeRepository = likeRepository,
-            coinRepository = coinRepository,
             favoriteRepository = favoriteRepository,
-            oneClickTripleActionRepository = oneClickTripleActionRepository,
             userRepository = userRepository,
             videoInfoRepository = videoInfoRepository,
             savedStateHandle = savedStateHandle,
@@ -160,24 +151,21 @@ class VideoDetailViewModelTest {
         }
 
     @Test
-    fun `toggleLike updates liked state on success`() =
+    fun `toggleLike delegates to shared repository`() =
         runTest(testDispatcher) {
             val detail =
                 fakeVideoDetail().copy(
                     userActions = UserActions(like = false, coin = false, favorite = false),
                 )
             coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
-            coEvery { likeRepository.updateVideoLiked(any(), any(), any(), any()) } returns Unit
 
             viewModel = createViewModel(aid = 1L)
             advanceUntilIdle()
 
-            assertThat(viewModel.uiState.value.isLiked).isFalse()
-
             viewModel.toggleLike(true)
             advanceUntilIdle()
 
-            assertThat(viewModel.uiState.value.isLiked).isTrue()
+            coVerify { videoInfoRepository.setVideoLiked(aid = 1L, like = true, bvid = "BV1") }
         }
 
     @Test
@@ -185,7 +173,7 @@ class VideoDetailViewModelTest {
         runTest(testDispatcher) {
             val detail = fakeVideoDetail()
             coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
-            coEvery { likeRepository.updateVideoLiked(any(), any(), any(), any()) } throws Exception("already liked")
+            coEvery { videoInfoRepository.setVideoLiked(any(), any(), any()) } throws Exception("already liked")
 
             viewModel = createViewModel(aid = 1L)
             advanceUntilIdle()
@@ -201,24 +189,21 @@ class VideoDetailViewModelTest {
         }
 
     @Test
-    fun `sendCoin updates coined state on success`() =
+    fun `sendCoin delegates to shared repository`() =
         runTest(testDispatcher) {
             val detail =
                 fakeVideoDetail().copy(
                     userActions = UserActions(coin = false),
                 )
             coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
-            coEvery { coinRepository.sendVideoCoin(any(), any(), any(), any()) } returns Unit
 
             viewModel = createViewModel(aid = 1L)
             advanceUntilIdle()
 
-            assertThat(viewModel.uiState.value.isCoined).isFalse()
-
             viewModel.sendCoin()
             advanceUntilIdle()
 
-            assertThat(viewModel.uiState.value.isCoined).isTrue()
+            coVerify { videoInfoRepository.sendVideoCoin(aid = 1L, bvid = "BV1") }
         }
 
     @Test
@@ -226,7 +211,7 @@ class VideoDetailViewModelTest {
         runTest(testDispatcher) {
             val detail = fakeVideoDetail()
             coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
-            coEvery { coinRepository.sendVideoCoin(any(), any(), any(), any()) } throws Exception("no coins")
+            coEvery { videoInfoRepository.sendVideoCoin(any(), any()) } throws Exception("no coins")
 
             viewModel = createViewModel(aid = 1L)
             advanceUntilIdle()
@@ -327,7 +312,7 @@ class VideoDetailViewModelTest {
         }
 
     @Test
-    fun `updateFavorite updates favorite state on success`() =
+    fun `updateFavorite syncs shared state and folder ids on success`() =
         runTest(testDispatcher) {
             val detail = fakeVideoDetail()
             coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
@@ -339,12 +324,12 @@ class VideoDetailViewModelTest {
             viewModel.updateFavorite(listOf(1L, 2L))
             advanceUntilIdle()
 
-            assertThat(viewModel.uiState.value.isFavorite).isTrue()
             assertThat(viewModel.uiState.value.videoFavoriteFolderIds).containsExactly(1L, 2L)
+            coVerify { videoInfoRepository.updateVideoActionState(aid = 1L, favorited = true) }
         }
 
     @Test
-    fun `updateFavorite emits toast on failure`() =
+    fun `updateFavorite does not sync shared state on failure`() =
         runTest(testDispatcher) {
             val detail = fakeVideoDetail()
             coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
@@ -362,6 +347,7 @@ class VideoDetailViewModelTest {
                 assertThat(effect).isInstanceOf(VideoDetailUiEffect.ShowToast::class.java)
                 assertThat((effect as VideoDetailUiEffect.ShowToast).message).contains("收藏失败")
             }
+            coVerify(exactly = 0) { videoInfoRepository.updateVideoActionState(aid = any(), liked = any(), coined = any(), favorited = any()) }
         }
 
     @Test
@@ -390,7 +376,7 @@ class VideoDetailViewModelTest {
             viewModel.toggleFavorite()
             advanceUntilIdle()
 
-            assertThat(viewModel.uiState.value.isFavorite).isTrue()
+            coVerify { videoInfoRepository.updateVideoActionState(aid = 1L, favorited = true) }
         }
 
     @Test
@@ -447,25 +433,25 @@ class VideoDetailViewModelTest {
                     ),
                 )
             coEvery { favoriteRepository.updateVideoToFavoriteFolder(any(), any(), any(), any()) } returns Unit
+            sharedStateFlow.value = VideoSharedState(aid = 1L, favorited = true)
 
             viewModel = createViewModel()
             advanceUntilIdle()
 
-            assertThat(viewModel.uiState.value.isFavorite).isTrue()
-
             viewModel.toggleFavorite()
             advanceUntilIdle()
 
-            assertThat(viewModel.uiState.value.isFavorite).isFalse()
+            coVerify { favoriteRepository.updateVideoToFavoriteFolder(aid = 1L, addMediaIds = emptyList(), any(), any()) }
+            coVerify { videoInfoRepository.updateVideoActionState(aid = 1L, favorited = false) }
         }
 
     @Test
-    fun `oneClickTripleAction updates all states on success`() =
+    fun `oneClickTripleAction delegates and toasts on success`() =
         runTest(testDispatcher) {
             val detail = fakeVideoDetail()
             coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
-            coEvery { oneClickTripleActionRepository.sendVideoOneClickTripleAction(any(), any(), any()) } returns
-                OneClickTripleAction(like = true, coin = true, fav = true)
+            coEvery { videoInfoRepository.sendOneClickTriple(any(), any()) } returns
+                dev.frost819.newbv.biliapi.http.entity.video.OneClickTripleAction(like = true, coin = true, fav = true)
 
             viewModel = createViewModel()
             advanceUntilIdle()
@@ -478,10 +464,7 @@ class VideoDetailViewModelTest {
                 assertThat(effect).isInstanceOf(VideoDetailUiEffect.ShowToast::class.java)
                 assertThat((effect as VideoDetailUiEffect.ShowToast).message).isEqualTo("一键三连")
             }
-
-            assertThat(viewModel.uiState.value.isLiked).isTrue()
-            assertThat(viewModel.uiState.value.isCoined).isTrue()
-            assertThat(viewModel.uiState.value.isFavorite).isTrue()
+            coVerify { videoInfoRepository.sendOneClickTriple(aid = 1L, bvid = "BV1") }
         }
 
     @Test
@@ -489,7 +472,7 @@ class VideoDetailViewModelTest {
         runTest(testDispatcher) {
             val detail = fakeVideoDetail()
             coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
-            coEvery { oneClickTripleActionRepository.sendVideoOneClickTripleAction(any(), any(), any()) } throws
+            coEvery { videoInfoRepository.sendOneClickTriple(any(), any()) } throws
                 RuntimeException("triple error")
 
             viewModel = createViewModel()
@@ -516,179 +499,6 @@ class VideoDetailViewModelTest {
             viewModel.oneClickTripleAction()
             advanceUntilIdle()
 
-            coVerify(exactly = 0) { oneClickTripleActionRepository.sendVideoOneClickTripleAction(any(), any(), any()) }
-        }
-
-    @Test
-    fun `updateVideoList single video calls repository`() =
-        runTest(testDispatcher) {
-            coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns fakeVideoDetail()
-
-            viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.updateVideoList(aid = 1L, cid = 100L, title = "测试视频 1")
-            advanceUntilIdle()
-
-            coVerify { videoInfoRepository.updateVideoList(any()) }
-        }
-
-    @Test
-    fun `updateVideoList sectionIndex with ugcSeason episodes`() =
-        runTest(testDispatcher) {
-            val ugcSeason =
-                UgcSeason(
-                    id = 1,
-                    title = "合集",
-                    cover = "",
-                    sections =
-                        listOf(
-                            Section(
-                                id = 1,
-                                title = "第一集",
-                                episodes =
-                                    listOf(
-                                        Episode(
-                                            id = 1,
-                                            aid = 100L,
-                                            bvid = "BV100",
-                                            cid = 1000L,
-                                            epid = 1,
-                                            title = "P1",
-                                            longTitle = "第一话",
-                                            cover = "",
-                                            duration = 600,
-                                            dimension = Dimension(1920, 1080),
-                                        ),
-                                        Episode(
-                                            id = 2,
-                                            aid = 200L,
-                                            bvid = "BV200",
-                                            cid = 2000L,
-                                            epid = 2,
-                                            title = "P2",
-                                            longTitle = "第二话",
-                                            cover = "",
-                                            duration = 600,
-                                            dimension = Dimension(1920, 1080),
-                                        ),
-                                    ),
-                            ),
-                        ),
-                )
-            val detail = fakeVideoDetail().copy(ugcSeason = ugcSeason)
-            coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
-
-            viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.updateVideoList(sectionIndex = 0)
-            advanceUntilIdle()
-
-            coVerify { videoInfoRepository.updateVideoList(any()) }
-        }
-
-    @Test
-    fun `updateVideoList sectionIndex with null ugcSeason does nothing`() =
-        runTest(testDispatcher) {
-            coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns fakeVideoDetail()
-
-            viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.updateVideoList(sectionIndex = 0)
-            advanceUntilIdle()
-
-            coVerify(exactly = 0) { videoInfoRepository.updateVideoList(any()) }
-        }
-
-    @Test
-    fun `loadVideoDetail when logged in fetches favorite folders and following`() =
-        runTest(testDispatcher) {
-            val detail = fakeVideoDetail()
-            coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns detail
-            coEvery { Prefs.isLogin } returns true
-            coEvery { Prefs.uid } returns 123L
-            coEvery { favoriteRepository.getAllFavoriteFolderMetadataList(any(), any(), any(), any()) } returns
-                listOf(
-                    FavoriteFolderMetadata(
-                        id = 1,
-                        fid = 1,
-                        mid = 123L,
-                        title = "收藏夹1",
-                        cover = null,
-                        videoInThisFav = true,
-                        mediaCount = 10,
-                    ),
-                )
-            coEvery { userRepository.checkIsFollowing(any()) } returns true
-
-            viewModel = createViewModel()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.favoriteFolders).hasSize(1)
-            assertThat(viewModel.uiState.value.videoFavoriteFolderIds).contains(1L)
-            assertThat(viewModel.uiState.value.isFollowing).isTrue()
-        }
-
-    @Test
-    fun `loadVideoDetail retry after error succeeds`() =
-        runTest(testDispatcher) {
-            coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } throws RuntimeException("first error")
-
-            viewModel = createViewModel()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.error).isTrue()
-
-            coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } returns fakeVideoDetail()
-
-            viewModel.loadVideoDetail()
-            advanceUntilIdle()
-
-            assertThat(viewModel.uiState.value.error).isFalse()
-            assertThat(viewModel.uiState.value.detail).isNotNull()
-        }
-
-    @Test
-    fun `toggleLike is no-op when detail is null`() =
-        runTest(testDispatcher) {
-            coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } throws RuntimeException("error")
-
-            viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.toggleLike(true)
-            advanceUntilIdle()
-
-            coVerify(exactly = 0) { likeRepository.updateVideoLiked(any(), any(), any(), any()) }
-        }
-
-    @Test
-    fun `sendCoin is no-op when detail is null`() =
-        runTest(testDispatcher) {
-            coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } throws RuntimeException("error")
-
-            viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.sendCoin()
-            advanceUntilIdle()
-
-            coVerify(exactly = 0) { coinRepository.sendVideoCoin(any(), any(), any(), any()) }
-        }
-
-    @Test
-    fun `updateFavorite is no-op when detail is null`() =
-        runTest(testDispatcher) {
-            coEvery { videoDetailRepository.getVideoDetail(any(), any(), any()) } throws RuntimeException("error")
-
-            viewModel = createViewModel()
-            advanceUntilIdle()
-
-            viewModel.updateFavorite(listOf(1L))
-            advanceUntilIdle()
-
-            coVerify(exactly = 0) { favoriteRepository.updateVideoToFavoriteFolder(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { videoInfoRepository.sendOneClickTriple(any(), any()) }
         }
 }

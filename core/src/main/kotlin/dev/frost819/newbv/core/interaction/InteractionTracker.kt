@@ -45,9 +45,6 @@ class InteractionTracker(
     private val _inputMethod = MutableStateFlow(initial)
     val inputMethod: StateFlow<InputMethod> = _inputMethod.asStateFlow()
 
-    /** 当前输入方式（非 Compose 环境下可直接读取）。 */
-    val current: InputMethod get() = _inputMethod.value
-
     /**
      * 标记发生了触摸事件，切换到 [InputMethod.Touch]。
      */
@@ -59,13 +56,6 @@ class InteractionTracker(
      * 标记发生了 D-Pad 按键事件，切换到 [InputMethod.DPad]。
      */
     fun onDpadKey() {
-        _inputMethod.value = InputMethod.DPad
-    }
-
-    /**
-     * 重置为初始状态。
-     */
-    fun reset() {
         _inputMethod.value = InputMethod.DPad
     }
 }

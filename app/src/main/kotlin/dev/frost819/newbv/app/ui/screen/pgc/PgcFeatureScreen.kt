@@ -72,6 +72,7 @@ import dev.frost819.newbv.app.ui.component.videocard.BadgeChip
 import dev.frost819.newbv.app.ui.component.videocard.parseHexColorOrNull
 import dev.frost819.newbv.app.ui.navigation.PgcFeatureRoute
 import dev.frost819.newbv.app.ui.navigation.VideoPlayerRoute
+import dev.frost819.newbv.app.ui.navigation.navigateToVideoPlayer
 import dev.frost819.newbv.app.util.ToastUtils
 import dev.frost819.newbv.app.viewmodel.pgc.SeasonDetailUiEffect
 import dev.frost819.newbv.app.viewmodel.pgc.SeasonDetailUiState
@@ -116,7 +117,7 @@ private fun SeasonDetailScreen(navController: NavController) {
                     ToastUtils.show(context, effect.message)
                 }
                 is SeasonDetailUiEffect.NavigateToPlayer -> {
-                    navController.navigate(
+                    navController.navigateToVideoPlayer(
                         VideoPlayerRoute(
                             aid = effect.aid,
                             cid = effect.cid,
@@ -124,10 +125,7 @@ private fun SeasonDetailScreen(navController: NavController) {
                             title = effect.title,
                             cover = effect.cover,
                         ),
-                    ) {
-                        popUpTo<VideoPlayerRoute> { inclusive = true }
-                        launchSingleTop = true
-                    }
+                    )
                 }
             }
         }

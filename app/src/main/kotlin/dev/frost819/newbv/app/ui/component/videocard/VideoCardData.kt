@@ -4,6 +4,8 @@ import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.app.util.toWanString
 import dev.frost819.newbv.biliapi.entity.ugc.UgcItem
 import dev.frost819.newbv.biliapi.entity.user.DynamicVideo
+import dev.frost819.newbv.biliapi.entity.user.HistoryItem
+import dev.frost819.newbv.biliapi.entity.user.ToViewItem
 import dev.frost819.newbv.biliapi.entity.video.RelatedVideo
 
 /**
@@ -94,6 +96,81 @@ data class VideoCardData(
                 upMid = item.authorMid,
                 pubTime = item.pubTime,
             )
+
+        /**
+         * 由历史记录条目 [HistoryItem] 转换。
+         *
+         * 已看完（progress == -1）显示"已看完 / 总时长"并拉满进度条；
+         * 有进度显示"已看 / 总时长"，否则只显示总时长。
+         */
+        fun fromHistoryItem(item: HistoryItem): VideoCardData {
+            val durationMs = item.duration * 1000L
+            val watched = item.progress == -1
+            val progressRatio =
+                when {
+                    watched -> 1f
+                    item.duration > 0 -> item.progress.toFloat() / item.duration.toFloat()
+                    else -> null
+                }
+            val timeString =
+                when {
+                    watched -> "已看完 / ${durationMs.formatHourMinSec()}"
+                    item.progress > 0 && item.duration > 0 ->
+                        "${(item.progress * 1000L).formatHourMinSec()} / ${durationMs.formatHourMinSec()}"
+                    else -> durationMs.formatHourMinSec()
+                }
+            return VideoCardData(
+                avid = item.oid,
+                bvid = item.bvid,
+                cid = item.cid,
+                epid = item.epid,
+                title = item.title,
+                cover = item.cover,
+                playString = item.play.toWanString(),
+                danmakuString = "",
+                timeString = timeString,
+                upName = item.author,
+                upMid = item.mid,
+                progress = progressRatio,
+            )
+        }
+
+        /**
+         * 由稍后再看条目 [ToViewItem] 转换。
+         *
+         * 已看完（progress == -1，看过后又被加入稍后再看）拉满进度条并标记"已看完"。
+         */
+        fun fromToViewItem(item: ToViewItem): VideoCardData {
+            val durationMs = item.duration * 1000L
+            val watched = item.progress == -1
+            val progressRatio =
+                when {
+                    watched -> 1f
+                    item.duration > 0 -> item.progress.toFloat() / item.duration.toFloat()
+                    else -> null
+                }
+            val timeString =
+                when {
+                    watched -> "已看完 / ${durationMs.formatHourMinSec()}"
+                    item.progress > 0 && item.duration > 0 ->
+                        "${(item.progress * 1000L).formatHourMinSec()} / ${durationMs.formatHourMinSec()}"
+                    else -> durationMs.formatHourMinSec()
+                }
+            return VideoCardData(
+                avid = item.oid,
+                bvid = item.bvid,
+                cid = item.cid,
+                epid = item.epid,
+                title = item.title,
+                cover = item.cover,
+                playString = "",
+                danmakuString = "",
+                timeString = timeString,
+                upName = item.author,
+                upMid = item.mid,
+                progress = progressRatio,
+            )
+        }
     }
 }
 

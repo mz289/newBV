@@ -19,8 +19,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.properties.ReadWriteProperty
@@ -54,18 +52,11 @@ class PrefDelegate<T, P>(
     /** 内存缓存流，初始值为默认值的持久化形式。 */
     internal val flow: MutableStateFlow<Any?> = MutableStateFlow(save(defaultValue))
 
-    /**
-     * 读取当前值。
-     *
-     * 直接读内存缓存，若无持久化值则返回 [defaultValue]。
-     */
+    /** 读取当前值：直接读内存缓存（初始值恒为默认值的持久化形式，永不为 null）。 */
     override fun getValue(
         thisRef: Any?,
         property: KProperty<*>,
-    ): T {
-        val rawValue = flow.value as? P
-        return if (rawValue != null) restore(rawValue) else defaultValue
-    }
+    ): T = restore(flow.value as P)
 
     /**
      * 写入新值。
@@ -138,9 +129,6 @@ object Prefs {
     /** 初始化状态标志，防止重复初始化。 */
     @Volatile
     private var initialized = false
-
-    /** 持久化写入互斥锁，避免并发 edit 冲突。 */
-    private val persistMutex = Mutex()
 
     // ===== 委托工厂 =====
 
@@ -501,40 +489,47 @@ object Prefs {
 
     /** 主题模式 Flow（实时响应设置变更）。 */
     val themeModeFlow: StateFlow<ThemeMode> by lazy {
-        (delegateMap[PrefKeys.themeMode] as? PrefDelegate<ThemeMode, Int>)
-            ?.flow
-            ?.map { ThemeMode.fromOrdinal(it as? Int ?: 0) }
-            ?.stateIn(scope, SharingStarted.Eagerly, ThemeMode.FollowSystem)
-            ?: MutableStateFlow(ThemeMode.FollowSystem)
+        @Suppress("UNCHECKED_CAST")
+        val delegate = delegateMap[PrefKeys.themeMode] as PrefDelegate<ThemeMode, Int>
+        delegate.flow
+            .map { ThemeMode.fromOrdinal(it as? Int ?: 0) }
+            .stateIn(scope, SharingStarted.Eagerly, ThemeMode.FollowSystem)
     }
 
     /** 强调色 Flow（实时响应设置变更）。 */
     val accentColorFlow: StateFlow<AccentColor> by lazy {
-        (delegateMap[PrefKeys.accentColor] as? PrefDelegate<AccentColor, String>)
-            ?.flow
-            ?.map { AccentColor.fromName(it as? String) }
-            ?.stateIn(scope, SharingStarted.Eagerly, AccentColor.Brand)
-            ?: MutableStateFlow(AccentColor.Brand)
+        @Suppress("UNCHECKED_CAST")
+        val delegate = delegateMap[PrefKeys.accentColor] as PrefDelegate<AccentColor, String>
+        delegate.flow
+            .map { AccentColor.fromName(it as? String) }
+            .stateIn(scope, SharingStarted.Eagerly, AccentColor.Brand)
     }
 
     /** Density Flow（实时响应设置变更）。 */
     val densityFlow: StateFlow<Float> by lazy {
-        (delegateMap[PrefKeys.density] as? PrefDelegate<Float, Float>)
-            ?.flow
-            ?.map { it as? Float ?: 2f }
-            ?.stateIn(scope, SharingStarted.Eagerly, 2f)
-            ?: MutableStateFlow(2f)
+        @Suppress("UNCHECKED_CAST")
+        val delegate = delegateMap[PrefKeys.density] as PrefDelegate<Float, Float>
+        delegate.flow
+            .map { it as? Float ?: 2f }
+            .stateIn(scope, SharingStarted.Eagerly, 2f)
+    }
+
+    /** 无痕模式 Flow（实时响应设置变更）。 */
+    val incognitoModeFlow: StateFlow<Boolean> by lazy {
+        @Suppress("UNCHECKED_CAST")
+        val delegate = delegateMap[PrefKeys.incognitoMode] as PrefDelegate<Boolean, Boolean>
+        delegate.flow
+            .map { it as? Boolean ?: false }
+            .stateIn(scope, SharingStarted.Eagerly, false)
     }
 
     /** 视频卡片宽度 Flow（实时响应设置变更）。 */
     val videoCardWidthFlow: StateFlow<Int> by lazy {
-        (delegateMap[PrefKeys.videoCardWidth] as? PrefDelegate<Int, Int>)
-            ?.flow
-            ?.map {
-                (it as? Int ?: VIDEO_CARD_WIDTH_DEFAULT)
-                    .coerceIn(VIDEO_CARD_WIDTH_MIN, VIDEO_CARD_WIDTH_MAX)
-            }?.stateIn(scope, SharingStarted.Eagerly, VIDEO_CARD_WIDTH_DEFAULT)
-            ?: MutableStateFlow(VIDEO_CARD_WIDTH_DEFAULT)
+        @Suppress("UNCHECKED_CAST")
+        val delegate = delegateMap[PrefKeys.videoCardWidth] as PrefDelegate<Int, Int>
+        delegate.flow
+            .map { (it as? Int ?: VIDEO_CARD_WIDTH_DEFAULT).coerceIn(VIDEO_CARD_WIDTH_MIN, VIDEO_CARD_WIDTH_MAX) }
+            .stateIn(scope, SharingStarted.Eagerly, VIDEO_CARD_WIDTH_DEFAULT)
     }
 
     // ===== 初始化 =====
@@ -562,6 +557,7 @@ object Prefs {
             }
         }
         migrateVideoColumnsToCardWidth(initialPrefs)
+        migrateDanmakuMergeMode(initialPrefs)
         checkAndInitBuvid(initialPrefs)
     }
 
@@ -583,25 +579,23 @@ object Prefs {
             }
     }
 
-    /** 检查 buvid / buvid3 是否缺失，缺失则自动生成并持久化。 */
-    private fun checkAndInitBuvid(prefs: Preferences) {
-        if (!prefs.contains(PrefKeys.buvid) || prefs[PrefKeys.buvid].isNullOrEmpty()) {
-            buvid = BuvidGenerator.generateBuvid()
-        }
-        if (!prefs.contains(PrefKeys.buvid3) || prefs[PrefKeys.buvid3].isNullOrEmpty()) {
-            buvid3 = BuvidGenerator.generateBuvid3()
-        }
+    /**
+     * 旧"合并模式"编码 1（相同文本合并）一次性迁移为 2（相似文本合并）。
+     * 两者在当前实现下行为一致（相似合并是相同合并的超集）。
+     */
+    private fun migrateDanmakuMergeMode(prefs: Preferences) {
+        if (prefs[PrefKeys.danmakuMergeMode] == 1) danmakuMergeMode = 2
     }
 
-    /**
-     * 在持久化协程作用域中执行写操作。
-     *
-     * 使用互斥锁保证写入串行（DataStore 内部已串行，此处做二次保护避免并发 edit）。
-     */
+    /** 检查 buvid / buvid3 是否缺失，缺失则自动生成并持久化。 */
+    private fun checkAndInitBuvid(prefs: Preferences) {
+        if (prefs[PrefKeys.buvid].isNullOrEmpty()) buvid = BuvidGenerator.generateBuvid()
+        if (prefs[PrefKeys.buvid3].isNullOrEmpty()) buvid3 = BuvidGenerator.generateBuvid3()
+    }
+
+    /** 在持久化协程作用域中执行写操作（DataStore 的 edit 自身保证串行）。 */
     internal fun launchPersist(block: suspend () -> Unit) {
-        scope.launch {
-            persistMutex.withLock { block() }
-        }
+        scope.launch { block() }
     }
 
     /**
@@ -614,10 +608,6 @@ object Prefs {
         dataStore.edit { it.clear() }
         delegateMap.forEach { (_, delegate) -> delegate.resetToDefault() }
     }
-
-    /** 获取指定偏好键对应的 [MutableStateFlow]（用于 Compose 观察偏好变化）。 */
-    @Suppress("UNCHECKED_CAST")
-    fun <T> flowOf(key: Preferences.Key<T>): MutableStateFlow<Any?>? = delegateMap[key]?.flow
 
     // ===== 测试辅助 =====
 

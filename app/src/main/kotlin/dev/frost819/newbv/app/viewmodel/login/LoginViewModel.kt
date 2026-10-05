@@ -189,16 +189,6 @@ class LoginViewModel
             pollingJob = null
         }
 
-        /**
-         * 重置为初始状态。
-         *
-         * 用户在 Expired/Error 状态下重新请求二维码前调用。
-         */
-        fun reset() {
-            cancelPolling()
-            _uiState.value = QrLoginUiState()
-        }
-
         override fun onCleared() {
             super.onCleared()
             cancelPolling()

@@ -89,54 +89,6 @@ class FavoriteRepositoryUnitTest {
         }
 
     // ------------------------------------------------------------------
-    // addVideoToFavoriteFolder
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `addVideoToFavoriteFolder Web passes aid, type, addMediaIds and csrf`() =
-        runTest {
-            coJustRun { BiliHttpApi.setVideoToFavorite(any(), any(), any(), any(), any(), any()) }
-            val addMediaIds = listOf(100L, 200L)
-
-            repository.addVideoToFavoriteFolder(aid = AID, addMediaIds = addMediaIds, preferApiType = ApiType.Web)
-
-            coVerify {
-                BiliHttpApi.setVideoToFavorite(
-                    avid = eq(AID),
-                    type = eq(VIDEO_TYPE_VALUE),
-                    addMediaIds = eq(addMediaIds),
-                    delMediaIds = any(),
-                    accessKey = isNull(),
-                    csrf = eq(BILI_JCT),
-                )
-            }
-        }
-
-    // ------------------------------------------------------------------
-    // delVideoFromFavoriteFolder
-    // ------------------------------------------------------------------
-
-    @Test
-    fun `delVideoFromFavoriteFolder Web passes delMediaIds and csrf`() =
-        runTest {
-            coJustRun { BiliHttpApi.setVideoToFavorite(any(), any(), any(), any(), any(), any()) }
-            val delMediaIds = listOf(300L)
-
-            repository.delVideoFromFavoriteFolder(aid = AID, delMediaIds = delMediaIds, preferApiType = ApiType.Web)
-
-            coVerify {
-                BiliHttpApi.setVideoToFavorite(
-                    avid = eq(AID),
-                    type = eq(VIDEO_TYPE_VALUE),
-                    addMediaIds = any(),
-                    delMediaIds = eq(delMediaIds),
-                    accessKey = isNull(),
-                    csrf = eq(BILI_JCT),
-                )
-            }
-        }
-
-    // ------------------------------------------------------------------
     // updateVideoToFavoriteFolder
     // ------------------------------------------------------------------
 

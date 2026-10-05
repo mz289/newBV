@@ -20,7 +20,7 @@ enum class DanmakuMergeMode(
     ;
 
     companion object {
-        /** 旧版相同文本（1）和相似文本（2）均迁移到相似文本。 */
-        fun fromPreference(value: Int): DanmakuMergeMode = if (value == 1 || value == 2) Similar else Off
+        /** 相似文本（2）→ Similar，其余（含历史遗留编码 1，已在 Prefs.init 迁移为 2）→ Off。 */
+        fun fromPreference(value: Int): DanmakuMergeMode = if (value == 2) Similar else Off
     }
 }

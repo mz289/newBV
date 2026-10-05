@@ -1,7 +1,6 @@
 package dev.frost819.newbv.app.ui.screen.personal
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,13 +13,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
+import dev.frost819.newbv.app.ui.component.EmptyTip
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
@@ -66,15 +65,7 @@ fun FavoriteScreen(
     CollectWatchLaterEffects(watchLaterViewModel)
 
     if (state.favoriteFolders.isEmpty() && !state.favoriteLoading && !state.favoriteError) {
-        Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            androidx.tv.material3.Text(
-                text = "没有收藏夹",
-                color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        EmptyTip(text = "没有收藏夹", modifier = modifier)
         return
     }
 

@@ -67,29 +67,6 @@ class WatchLaterViewModel
                 }
             }
         }
-
-        /**
-         * 从稍后再看移除视频。
-         *
-         * @param aid 视频 AV 号。
-         */
-        fun delToView(aid: Long) {
-            viewModelScope.launch {
-                runCatching {
-                    toViewRepository.delToView(
-                        aid = aid,
-                        viewed = false,
-                        preferApiType = Prefs.apiType,
-                    )
-                }.onSuccess {
-                    _effect.emit(WatchLaterEffect.ShowToast("已移除稍后再看"))
-                }.onFailure { error ->
-                    if (error is CancellationException) throw error
-                    logger.error(error) { "Failed to delete to view" }
-                    _effect.emit(WatchLaterEffect.ShowToast("移除失败: ${error.message ?: "未知错误"}"))
-                }
-            }
-        }
     }
 
 /**

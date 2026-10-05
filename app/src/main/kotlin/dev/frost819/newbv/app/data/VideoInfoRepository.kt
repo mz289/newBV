@@ -4,8 +4,13 @@ import dev.frost819.newbv.app.entity.player.VideoListItem
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.video.RelatedVideo
 import dev.frost819.newbv.biliapi.entity.video.VideoDetail
+import dev.frost819.newbv.biliapi.http.entity.video.OneClickTripleAction
+import dev.frost819.newbv.biliapi.repositories.CoinRepository
+import dev.frost819.newbv.biliapi.repositories.LikeRepository
+import dev.frost819.newbv.biliapi.repositories.OneClickTripleActionRepository
 import dev.frost819.newbv.biliapi.repositories.VideoDetailRepository
 import dev.frost819.newbv.core.log.Loggers
+import dev.frost819.newbv.data.datastore.Prefs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -47,6 +52,9 @@ class VideoInfoRepository
     @Inject
     constructor(
         private val videoDetailRepository: VideoDetailRepository,
+        private val likeRepository: LikeRepository,
+        private val coinRepository: CoinRepository,
+        private val oneClickTripleActionRepository: OneClickTripleActionRepository,
     ) {
         private val logger = Loggers.get("VideoInfoRepository")
 
@@ -74,16 +82,7 @@ class VideoInfoRepository
         fun updateVideoDetail(detail: VideoDetail) {
             _videoDetail.update { detail }
             _relatedVideos.update { detail.relatedVideos }
-            _videoSharedState.update {
-                VideoSharedState(
-                    aid = detail.aid,
-                    liked = detail.userActions.like,
-                    coined = detail.userActions.coin,
-                    favorited = detail.userActions.favorite,
-                    lastPlayedCid = detail.history.lastPlayedCid,
-                    lastPlayedTime = detail.history.progress,
-                )
-            }
+            publishDetail(detail)
         }
 
         /**
@@ -101,16 +100,7 @@ class VideoInfoRepository
                 val detail = videoDetailRepository.getVideoDetail(aid = aid, preferApiType = preferApiType, bvid = bvid)
                 _videoDetail.update { detail }
                 _relatedVideos.update { detail.relatedVideos }
-                _videoSharedState.update {
-                    VideoSharedState(
-                        aid = detail.aid,
-                        liked = detail.userActions.like,
-                        coined = detail.userActions.coin,
-                        favorited = detail.userActions.favorite,
-                        lastPlayedCid = detail.history.lastPlayedCid,
-                        lastPlayedTime = detail.history.progress,
-                    )
-                }
+                publishDetail(detail)
                 logger.info { "Loaded video detail: aid=$aid, related=${detail.relatedVideos.size}" }
             }.onFailure { e ->
                 logger.error(e) { "Failed to load video detail: aid=$aid" }
@@ -174,6 +164,8 @@ class VideoInfoRepository
         /**
          * 更新播放历史（仅历史字段，不影响交互状态）。
          *
+         * 详情未就绪（共享状态尚不存在）时忽略——调用方（播放器进度上报）必然先经过详情加载。
+         *
          * @param progress 播放进度（秒），-1 表示已看完
          * @param lastPlayedCid 最近播放的 CID
          */
@@ -181,9 +173,64 @@ class VideoInfoRepository
             progress: Int,
             lastPlayedCid: Long,
         ) {
-            _videoSharedState.update { old ->
-                old?.copy(lastPlayedCid = lastPlayedCid, lastPlayedTime = progress)
-                    ?: VideoSharedState(aid = 0, lastPlayedCid = lastPlayedCid, lastPlayedTime = progress)
+            _videoSharedState.update { old -> old?.copy(lastPlayedCid = lastPlayedCid, lastPlayedTime = progress) }
+        }
+
+        /**
+         * 点赞/取消点赞，成功后同步共享状态（详情页与播放器统一入口）。
+         */
+        suspend fun setVideoLiked(
+            aid: Long,
+            like: Boolean,
+            bvid: String? = null,
+        ) {
+            likeRepository.updateVideoLiked(aid = aid, like = like, preferApiType = Prefs.apiType, bvid = bvid)
+            updateVideoActionState(aid = aid, liked = like)
+        }
+
+        /**
+         * 投一枚硬币，成功后同步共享状态（详情页与播放器统一入口）。
+         */
+        suspend fun sendVideoCoin(
+            aid: Long,
+            bvid: String? = null,
+        ) {
+            coinRepository.sendVideoCoin(aid = aid, preferApiType = Prefs.apiType, bvid = bvid)
+            updateVideoActionState(aid = aid, coined = true)
+        }
+
+        /**
+         * 一键三连，接口有返回时同步共享状态（详情页与播放器统一入口）。
+         *
+         * @return 接口返回的三连结果；null 表示接口未返回数据（此时状态不变）。
+         */
+        suspend fun sendOneClickTriple(
+            aid: Long,
+            bvid: String? = null,
+        ): OneClickTripleAction? {
+            val result =
+                oneClickTripleActionRepository.sendVideoOneClickTripleAction(
+                    aid = aid,
+                    preferApiType = Prefs.apiType,
+                    bvid = bvid,
+                )
+            if (result != null) {
+                updateVideoActionState(aid = aid, liked = result.like, coined = result.coin, favorited = result.fav)
+            }
+            return result
+        }
+
+        /** 从详情构建并发布初始共享状态。 */
+        private fun publishDetail(detail: VideoDetail) {
+            _videoSharedState.update {
+                VideoSharedState(
+                    aid = detail.aid,
+                    liked = detail.userActions.like,
+                    coined = detail.userActions.coin,
+                    favorited = detail.userActions.favorite,
+                    lastPlayedCid = detail.history.lastPlayedCid,
+                    lastPlayedTime = detail.history.progress,
+                )
             }
         }
 
@@ -212,13 +259,5 @@ class VideoInfoRepository
                     lastPlayedTime = current?.lastPlayedTime ?: 0,
                 )
             }
-        }
-
-        /** 重置所有状态。 */
-        fun reset() {
-            _videoList.update { emptyList() }
-            _videoDetail.update { null }
-            _relatedVideos.update { emptyList() }
-            _videoSharedState.update { null }
         }
     }

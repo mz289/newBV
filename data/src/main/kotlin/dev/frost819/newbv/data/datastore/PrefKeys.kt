@@ -64,7 +64,7 @@ internal object PrefKeys {
     val danmakuBlockEnabled = booleanPreferencesKey("danmaku_block_enabled")
     val danmakuBlockRules = stringPreferencesKey("danmaku_block_rules")
 
-    /** 合并模式固定编码：0=关闭，1=旧版相同（迁移为相似），2=相似。 */
+    /** 合并模式固定编码：0=关闭，2=相似（历史编码 1 由 Prefs.init 一次性迁移为 2）。 */
     val danmakuMergeMode = intPreferencesKey("danmaku_merge_mode")
     val danmakuMergeConfig = stringPreferencesKey("danmaku_merge_config")
 

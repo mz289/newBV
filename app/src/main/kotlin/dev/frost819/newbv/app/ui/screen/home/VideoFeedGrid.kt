@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import dev.frost819.newbv.app.ui.component.EmptyTip
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
@@ -38,6 +39,7 @@ import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
  *
  * @param keyPrefix 焦点保存 key 前缀（各 Tab 不同，避免恢复串位）。
  * @param toCardData 条目到卡片数据的纯映射。
+ * @param emptyText 列表为空且不在加载/出错时的全屏空态文案；null 走底部提示的默认空态。
  */
 @Composable
 fun <T> VideoFeedGrid(
@@ -51,8 +53,14 @@ fun <T> VideoFeedGrid(
     onRetry: () -> Unit,
     navController: NavController,
     focusSaver: FocusSaver,
+    emptyText: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    if (emptyText != null && items.isEmpty() && !isLoading && !isError) {
+        EmptyTip(text = emptyText, modifier = modifier)
+        return
+    }
+
     val gridState = rememberLazyGridState()
     val watchLaterViewModel: WatchLaterViewModel = hiltViewModel()
 

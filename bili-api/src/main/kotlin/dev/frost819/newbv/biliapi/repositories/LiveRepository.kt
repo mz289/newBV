@@ -4,7 +4,6 @@ import dev.frost819.newbv.biliapi.http.BiliLiveHttpApi
 import dev.frost819.newbv.biliapi.http.entity.live.AreaLiveListResult
 import dev.frost819.newbv.biliapi.http.entity.live.FollowLiveResponse
 import dev.frost819.newbv.biliapi.http.entity.live.LiveAreaParent
-import dev.frost819.newbv.biliapi.http.entity.live.LiveListResponse
 import dev.frost819.newbv.biliapi.http.entity.live.LiveRecommendResponse
 import dev.frost819.newbv.biliapi.http.entity.live.PlayCodec
 import dev.frost819.newbv.biliapi.http.entity.live.RoomInfoData
@@ -20,11 +19,6 @@ import dev.frost819.newbv.biliapi.util.BiliLogger
  */
 class LiveRepository {
     private val logger = BiliLogger
-
-    /**
-     * 获取直播首页模块化列表。
-     */
-    suspend fun getLiveList(): LiveListResponse = BiliLiveHttpApi.getLiveList().getResponseData()
 
     /**
      * 获取推荐直播间列表。
@@ -115,36 +109,6 @@ class LiveRepository {
         }
 
     /**
-     * 获取直播流地址（取第一条线路）。
-     *
-     * @param roomId 真实房间号（长号）
-     * @param qn 画质（0 = 自动）
-     * @return 流地址 URL，或 null 表示无可用流
-     */
-    suspend fun getLiveStreamUrl(
-        roomId: Int,
-        qn: Int = 0,
-    ): String? = getLiveStreamInfo(roomId, qn).url
-
-    /**
-     * 获取直播流地址和当前画质（取第一条线路）。
-     *
-     * @param roomId 真实房间号（长号）
-     * @param qn 画质（0 = 自动）
-     * @return [LiveStreamInfo]，包含流 URL 和当前画质 qn
-     */
-    suspend fun getLiveStreamInfo(
-        roomId: Int,
-        qn: Int = 0,
-    ): LiveStreamInfo {
-        val playInfo = getLivePlayInfo(roomId, qn)
-        return LiveStreamInfo(
-            url = playInfo.lines.firstOrNull()?.url,
-            currentQn = playInfo.currentQn,
-        )
-    }
-
-    /**
      * 从 v2 流地址响应中解析出可用画质与多条线路。
      *
      * 策略：优先 http_stream（FLV），fallback 到 http_hls。
@@ -206,13 +170,6 @@ class LiveRepository {
         val firstFormat = firstStream.format.firstOrNull() ?: return null
         return firstFormat.codec.firstOrNull()
     }
-
-    /**
-     * 获取可用画质列表。
-     *
-     * 从 [getLivePlayInfo] 提取，失败时返回空列表。
-     */
-    suspend fun getAvailableQualities(roomId: Int): List<Pair<Int, String>> = getLivePlayInfo(roomId, 0).qualities
 }
 
 /**
@@ -237,15 +194,4 @@ data class LivePlayInfo(
     val currentQn: Int,
     val qualities: List<Pair<Int, String>>,
     val lines: List<LivePlayLine>,
-)
-
-/**
- * 直播流信息（单线路，向后兼容）。
- *
- * @param url 流地址 URL，null 表示无可用流
- * @param currentQn 当前实际画质 qn
- */
-data class LiveStreamInfo(
-    val url: String?,
-    val currentQn: Int,
 )

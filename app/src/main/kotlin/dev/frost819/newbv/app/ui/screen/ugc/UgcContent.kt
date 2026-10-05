@@ -1,32 +1,17 @@
 package dev.frost819.newbv.app.ui.screen.ugc
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import dev.frost819.newbv.app.ui.component.FocusSaver
-import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
-import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TabbedContent
-import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
-import dev.frost819.newbv.app.ui.component.videoCardGridCells
-import dev.frost819.newbv.app.ui.component.videoGridHSpacing
-import dev.frost819.newbv.app.ui.component.videoGridVSpacing
-import dev.frost819.newbv.app.ui.component.focusSaverItem
-import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
-import dev.frost819.newbv.app.ui.navigation.navigateFromVideoCard
+import dev.frost819.newbv.app.ui.screen.home.VideoFeedGrid
 import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.app.util.toWanString
 import dev.frost819.newbv.app.viewmodel.ugc.UgcViewModel
@@ -106,59 +91,29 @@ private fun UgcGrid(
     focusSaver: FocusSaver,
 ) {
     val state by viewModel.uiState.collectAsState()
-    val gridState = rememberLazyGridState()
 
-    InfiniteScrollEffect(
-        state = gridState,
-        itemCount = { state.items.size },
+    VideoFeedGrid(
+        items = state.items,
+        isLoading = state.loading,
+        isError = state.error,
+        hasMore = state.hasMore,
+        keyPrefix = "ugc",
+        toCardData = { item ->
+            VideoCardData(
+                avid = item.aid,
+                title = item.title,
+                cover = item.cover,
+                playString = item.play.takeIf { it != -1 }.toWanString(),
+                danmakuString = item.danmaku.takeIf { it != -1 }.toWanString(),
+                timeString = (item.duration * 1000L).formatHourMinSec(),
+                upName = item.author,
+                upMid = item.authorMid,
+                pubTime = item.pubTime,
+            )
+        },
         onLoadMore = viewModel::loadMore,
+        onRetry = viewModel::refresh,
+        navController = navController,
+        focusSaver = focusSaver,
     )
-
-    TvLazyVerticalGrid(
-        state = gridState,
-        columns = videoCardGridCells(),
-        contentPadding = PaddingValues(24.dp),
-        horizontalArrangement = Arrangement.spacedBy(videoGridHSpacing()),
-        verticalArrangement = Arrangement.spacedBy(videoGridVSpacing()),
-    ) {
-        itemsIndexed(
-            items = state.items,
-            key = { index, _ -> index },
-        ) { index, item ->
-            val cardData =
-                remember(item) {
-                    VideoCardData(
-                        avid = item.aid,
-                        title = item.title,
-                        cover = item.cover,
-                        playString = item.play.takeIf { it != -1 }.toWanString(),
-                        danmakuString = item.danmaku.takeIf { it != -1 }.toWanString(),
-                        timeString = (item.duration * 1000L).formatHourMinSec(),
-                        upName = item.author,
-                        upMid = item.authorMid,
-                        pubTime = item.pubTime,
-                    )
-                }
-            SmallVideoCard(
-                modifier = Modifier.focusSaverItem(focusSaver, "ugc_$index"),
-                data = cardData,
-                onClick = {
-                    navController.navigateFromVideoCard(cardData)
-                },
-                onGoToDetailPage = {
-                    navController.navigateFromVideoCard(cardData, forceDetail = true)
-                },
-            )
-        }
-
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            ListFooterTip(
-                isLoading = state.loading,
-                isError = state.error,
-                hasMore = state.hasMore,
-                itemsIsEmpty = state.items.isEmpty(),
-                onRetry = viewModel::refresh,
-            )
-        }
-    }
 }

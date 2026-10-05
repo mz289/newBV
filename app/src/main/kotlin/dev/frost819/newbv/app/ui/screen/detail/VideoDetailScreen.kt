@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -88,10 +89,12 @@ import dev.frost819.newbv.app.ui.navigation.SearchResultRoute
 import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
 import dev.frost819.newbv.app.ui.navigation.VideoDetailRoute
 import dev.frost819.newbv.app.ui.navigation.VideoPlayerRoute
+import dev.frost819.newbv.app.ui.navigation.navigateToVideoPlayer
 import dev.frost819.newbv.app.ui.navigation.navigateFromVideoCard
 import dev.frost819.newbv.app.util.ToastUtils
 import dev.frost819.newbv.app.util.toWanString
 import dev.frost819.newbv.app.viewmodel.comment.CommentViewModel
+import dev.frost819.newbv.app.data.VideoSharedState
 import dev.frost819.newbv.app.viewmodel.common.CollectWatchLaterEffects
 import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
 import dev.frost819.newbv.app.viewmodel.detail.VideoDetailUiEffect
@@ -145,6 +148,9 @@ private fun VideoDetailScreen(
 ) {
     val viewModel: VideoDetailViewModel = hiltViewModel()
     val state by viewModel.uiState.collectAsState()
+    val sharedState by viewModel.videoSharedState.collectAsState()
+    // 仅采纳当前视频的共享状态，避免上一个视频的交互状态串入
+    val shared = sharedState?.takeIf { it.aid == aid }
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -170,10 +176,11 @@ private fun VideoDetailScreen(
             VideoDetailContent(
                 detail = state.detail!!,
                 state = state,
+                shared = shared,
                 viewModel = viewModel,
                 navController = navController,
-                lastPlayedCid = state.historyLastPlayedCid,
-                lastPlayedTime = state.historyLastPlayedTime,
+                lastPlayedCid = shared?.lastPlayedCid ?: 0L,
+                lastPlayedTime = shared?.lastPlayedTime ?: 0,
                 commentViewModel = commentViewModel,
             )
         }
@@ -239,6 +246,7 @@ private fun ErrorScreen(
 private fun VideoDetailContent(
     detail: VideoDetail,
     state: VideoDetailUiState,
+    shared: VideoSharedState?,
     viewModel: VideoDetailViewModel,
     navController: NavController,
     lastPlayedCid: Long,
@@ -267,15 +275,15 @@ private fun VideoDetailContent(
     ) {
         VideoInfoHeader(
             detail = detail,
-            isLiked = state.isLiked,
-            isCoined = state.isCoined,
-            isFavorite = state.isFavorite,
+            isLiked = shared?.liked ?: false,
+            isCoined = shared?.coined ?: false,
+            isFavorite = shared?.favorited ?: false,
             isFollowing = state.isFollowing,
-            onToggleLike = { viewModel.toggleLike(!state.isLiked) },
+            onToggleLike = { viewModel.toggleLike((shared?.liked ?: false).not()) },
             onSendCoin = { viewModel.sendCoin() },
             onOneClickTriple = { viewModel.oneClickTripleAction() },
             onToggleFavorite = {
-                if (state.isFavorite) {
+                if (shared?.favorited == true) {
                     showFavoriteDialog = true
                 } else {
                     viewModel.toggleFavorite()
@@ -289,7 +297,7 @@ private fun VideoDetailContent(
             onPlayVideo = {
                 val playCid = lastPlayedCid.takeIf { it != 0L } ?: detail.cid
                 viewModel.updateVideoList(detail.aid, playCid, detail.title)
-                navController.navigate(
+                navController.navigateToVideoPlayer(
                     VideoPlayerRoute(
                         aid = detail.aid,
                         cid = playCid,
@@ -297,10 +305,7 @@ private fun VideoDetailContent(
                         title = detail.title,
                         cover = detail.cover,
                     ),
-                ) {
-                    popUpTo<VideoPlayerRoute> { inclusive = true }
-                    launchSingleTop = true
-                }
+                )
             },
             onClickUp = {
                 navController.navigate(
@@ -317,49 +322,63 @@ private fun VideoDetailContent(
             )
         }
 
-        VideoPartRow(
-            pages = detail.pages,
-            currentCid = detail.cid,
+        EpisodeRow(
+            title = "分P",
+            cells =
+                detail.pages.map { page ->
+                    EpisodeCell(
+                        cid = page.cid,
+                        title = page.title,
+                        duration = page.duration,
+                        isCurrent = page.cid == detail.cid,
+                    )
+                },
+            rowKey = "parts",
+            itemKeyPrefix = "part_",
             lastPlayedCid = lastPlayedCid,
             lastPlayedTime = lastPlayedTime,
-            onClick = { page ->
-                viewModel.updateVideoList(detail.aid, page.cid, detail.title)
-                navController.navigate(
+            onClick = { cell ->
+                viewModel.updateVideoList(detail.aid, cell.cid, detail.title)
+                navController.navigateToVideoPlayer(
                     VideoPlayerRoute(
                         aid = detail.aid,
-                        cid = page.cid,
+                        cid = cell.cid,
                         title = detail.title,
                         cover = detail.cover,
                     ),
-                ) {
-                    popUpTo<VideoPlayerRoute> { inclusive = true }
-                    launchSingleTop = true
-                }
+                )
             },
-            onShowPartListDialog = { showPartListDialog = true },
+            onShowListDialog = { showPartListDialog = true },
             focusSaver = focusSaver,
         )
 
         detail.ugcSeason?.let { season ->
             season.sections.forEachIndexed { sectionIndex, section ->
-                VideoUgcSeasonRow(
+                EpisodeRow(
                     title = if (season.sections.size == 1) season.title else section.title,
-                    episodes = section.episodes,
+                    cells =
+                        section.episodes.map { episode ->
+                            EpisodeCell(
+                                cid = episode.cid,
+                                title = episode.title,
+                                duration = episode.duration,
+                            )
+                        },
+                    rowKey = "seasons",
+                    itemKeyPrefix = "episode_",
                     lastPlayedCid = lastPlayedCid,
                     lastPlayedTime = lastPlayedTime,
-                    onClick = { episode ->
+                    onClick = { cell ->
+                        val episode = section.episodes.first { it.cid == cell.cid }
                         viewModel.updateVideoList(sectionIndex)
-                        navController.navigate(
+                        navController.navigateToVideoPlayer(
                             VideoPlayerRoute(
                                 aid = episode.aid,
                                 cid = episode.cid,
                                 title = episode.title,
                                 cover = episode.cover,
                             ),
-                        ) {
-                            popUpTo<VideoPlayerRoute> { inclusive = true }
-                            launchSingleTop = true
-                        }
+                        )
                     },
                     onShowListDialog = {
                         seasonDialogSectionIndex = sectionIndex
@@ -392,17 +411,14 @@ private fun VideoDetailContent(
             onSelect = { page ->
                 showPartListDialog = false
                 viewModel.updateVideoList(detail.aid, page.cid, detail.title)
-                navController.navigate(
+                navController.navigateToVideoPlayer(
                     VideoPlayerRoute(
                         aid = detail.aid,
                         cid = page.cid,
                         title = detail.title,
                         cover = detail.cover,
                     ),
-                ) {
-                    popUpTo<VideoPlayerRoute> { inclusive = true }
-                    launchSingleTop = true
-                }
+                )
             },
         )
     }
@@ -560,12 +576,6 @@ private fun VideoInfoHeader(
     focusSaver: FocusSaver,
 ) {
     val coverFocusRequester = focusSaver.focusRequesterFor("cover")
-    val upFocusRequester = focusSaver.focusRequesterFor("up")
-    val followFocusRequester = focusSaver.focusRequesterFor("follow")
-    val likeFocusRequester = focusSaver.focusRequesterFor("like")
-    val coinFocusRequester = focusSaver.focusRequesterFor("coin")
-    val favoriteFocusRequester = focusSaver.focusRequesterFor("favorite")
-    val commentsFocusRequester = focusSaver.focusRequesterFor("comments")
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
     LaunchedEffect(Unit) {
@@ -585,8 +595,7 @@ private fun VideoInfoHeader(
         Card(
             modifier =
                 Modifier
-                    .focusRequester(coverFocusRequester)
-                    .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("cover") }
+                    .focusSaverItem(focusSaver, "cover")
                     .weight(4f)
                     .fillMaxHeight()
                     .aspectRatio(1.6f)
@@ -662,8 +671,7 @@ private fun VideoInfoHeader(
                     onClick = onClickUp,
                     modifier =
                         Modifier
-                            .focusRequester(upFocusRequester)
-                            .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("up") }
+                            .focusSaverItem(focusSaver, "up")
                             .touchClickable(onClick = onClickUp),
                     shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
                     colors =
@@ -703,8 +711,7 @@ private fun VideoInfoHeader(
                     onClick = onToggleFollow,
                     modifier =
                         Modifier
-                            .focusRequester(followFocusRequester)
-                            .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("follow") },
+                            .focusSaverItem(focusSaver, "follow"),
                 )
             }
 
@@ -721,8 +728,7 @@ private fun VideoInfoHeader(
                     onLongClick = onOneClickTriple,
                     modifier =
                         Modifier
-                            .focusRequester(likeFocusRequester)
-                            .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("like") },
+                            .focusSaverItem(focusSaver, "like"),
                 )
                 ActionButton(
                     text = "投币",
@@ -731,8 +737,7 @@ private fun VideoInfoHeader(
                     onClick = onSendCoin,
                     modifier =
                         Modifier
-                            .focusRequester(coinFocusRequester)
-                            .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("coin") },
+                            .focusSaverItem(focusSaver, "coin"),
                 )
                 ActionButton(
                     text = "收藏",
@@ -741,8 +746,7 @@ private fun VideoInfoHeader(
                     onClick = onToggleFavorite,
                     modifier =
                         Modifier
-                            .focusRequester(favoriteFocusRequester)
-                            .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("favorite") },
+                            .focusSaverItem(focusSaver, "favorite"),
                 )
                 ActionButton(
                     text = "评论",
@@ -751,8 +755,7 @@ private fun VideoInfoHeader(
                     onClick = onShowComments,
                     modifier =
                         Modifier
-                            .focusRequester(commentsFocusRequester)
-                            .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("comments") },
+                            .focusSaverItem(focusSaver, "comments"),
                 )
             }
 
@@ -778,8 +781,7 @@ private fun VideoInfoHeader(
                             onClick = { onClickTag(tag) },
                             modifier =
                                 Modifier
-                                    .focusRequester(focusSaver.focusRequesterFor(tagKey))
-                                    .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey(tagKey) }
+                                    .focusSaverItem(focusSaver, tagKey)
                                     .touchClickable(onClick = { onClickTag(tag) }),
                             // 标签不放大，避免挤占相邻标签的焦点留白。
                             scale = SuggestionChipDefaults.scale(focusedScale = 1f),
@@ -874,15 +876,13 @@ private fun VideoDescription(
     focusSaver: FocusSaver,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val focusRequester = focusSaver.focusRequesterFor("description")
 
     Surface(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 50.dp)
-                .focusRequester(focusRequester)
-                .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("description") }
+                .focusSaverItem(focusSaver, "description")
                 .touchClickable(onClick = { expanded = !expanded }),
         colors =
             ControlFocusDefaults.surfaceColors(
@@ -908,156 +908,45 @@ private fun VideoDescription(
 }
 
 /**
- * 分 P 列表行。
+ * 选集单元（分 P 与 UGC 合集分集的公共展示模型）。
  *
- * 始终显示（即使只有 1 个分 P），让用户看到历史进度。
- * 超过 [PART_LIST_DIALOG_THRESHOLD] 个分 P 时显示网格按钮，点击弹出分页弹窗。
- * 有历史记录且分 P 数 > 1 时显示历史跳转按钮。
- *
- * @param pages 分 P 列表。
- * @param currentCid 当前播放的 CID。
- * @param lastPlayedCid 上次播放的 CID。
- * @param lastPlayedTime 上次播放进度（秒）。
- * @param onClick 点击分 P 回调。
- * @param onShowPartListDialog 点击网格按钮回调。
+ * @property cid 分集 CID（焦点 key 与续播匹配用）。
+ * @property title 分集标题。
+ * @property duration 时长（秒）。
+ * @property isCurrent 是否为正在播放的分集（仅 UGC 单视频分 P 使用）。
  */
-@Composable
-private fun VideoPartRow(
-    pages: List<VideoPage>,
-    currentCid: Long,
-    lastPlayedCid: Long,
-    lastPlayedTime: Int,
-    onClick: (VideoPage) -> Unit,
-    onShowPartListDialog: () -> Unit,
-    focusSaver: FocusSaver,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 50.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = "分P",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (pages.size > PART_LIST_DIALOG_THRESHOLD) {
-                Surface(
-                    onClick = onShowPartListDialog,
-                    modifier = Modifier.touchClickable(onClick = onShowPartListDialog),
-                    shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                    colors =
-                        ControlFocusDefaults.surfaceColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                    border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
-                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Apps,
-                        contentDescription = "网格列表",
-                        modifier =
-                            Modifier
-                                .padding(4.dp)
-                                .size(20.dp),
-                    )
-                }
-            }
-            if (pages.size > 1 && lastPlayedCid != 0L) {
-                val lastPage = pages.find { it.cid == lastPlayedCid }
-                if (lastPage != null) {
-                    Surface(
-                        onClick = { onClick(lastPage) },
-                        modifier = Modifier.touchClickable(onClick = { onClick(lastPage) }),
-                        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                        // 不放大，避免盖住相邻的选集按钮。
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-                        colors =
-                            ControlFocusDefaults.surfaceColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.History,
-                                contentDescription = "历史",
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Text(
-                                text = "上次看到 P${lastPage.index}",
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        val focusRequester = focusSaver.focusRequesterFor("parts")
-        LazyRow(
-            modifier =
-                Modifier
-                    .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("parts") }
-                    .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding =
-                androidx.compose.foundation.layout
-                    .PaddingValues(horizontal = 50.dp),
-        ) {
-            items(pages) { page ->
-                val played = if (page.cid == lastPlayedCid) lastPlayedTime else 0
-                EpisodeListButton(
-                    title = page.title,
-                    duration = page.duration,
-                    played = played,
-                    isCurrent = page.cid == currentCid,
-                    onClick = { onClick(page) },
-                    modifier =
-                        if (page == pages.first()) {
-                            Modifier.focusRequester(focusRequester).focusSaverItem(focusSaver, "part_${page.cid}")
-                        } else {
-                            Modifier.focusSaverItem(focusSaver, "part_${page.cid}")
-                        },
-                )
-            }
-        }
-    }
-}
+private data class EpisodeCell(
+    val cid: Long,
+    val title: String,
+    val duration: Int,
+    val isCurrent: Boolean = false,
+)
 
 /**
- * UGC 合集分集列表行。
+ * 选集列表行（分 P 与 UGC 合集共用）。
  *
- * 文字按钮样式（无封面），带历史进度条。
+ * 标题行（含网格按钮与续播按钮）+ 横向滚动选集按钮列表。
  * 超过 [PART_LIST_DIALOG_THRESHOLD] 个分集时显示网格按钮，点击弹出分页弹窗。
- * 有历史记录且分集数 > 1 时显示历史跳转按钮。
+ * 有历史记录且分集数 > 1 时显示"上次看到：{分集标题}"续播按钮。
  *
  * @param title 行标题。
- * @param episodes 分集列表。
+ * @param cells 分集列表。
+ * @param rowKey 行级焦点保存 key（如 "parts"）。
+ * @param itemKeyPrefix 分集焦点 key 前缀（如 "part_"，拼 cid）。
  * @param lastPlayedCid 上次播放的 CID。
  * @param lastPlayedTime 上次播放进度（秒）。
  * @param onClick 点击分集回调。
  * @param onShowListDialog 点击网格按钮回调。
  */
 @Composable
-private fun VideoUgcSeasonRow(
+private fun EpisodeRow(
     title: String,
-    episodes: List<Episode>,
+    cells: List<EpisodeCell>,
+    rowKey: String,
+    itemKeyPrefix: String,
     lastPlayedCid: Long,
     lastPlayedTime: Int,
-    onClick: (Episode) -> Unit,
+    onClick: (EpisodeCell) -> Unit,
     onShowListDialog: () -> Unit,
     focusSaver: FocusSaver,
 ) {
@@ -1078,7 +967,7 @@ private fun VideoUgcSeasonRow(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            if (episodes.size > PART_LIST_DIALOG_THRESHOLD) {
+            if (cells.size > PART_LIST_DIALOG_THRESHOLD) {
                 Surface(
                     onClick = onShowListDialog,
                     modifier = Modifier.touchClickable(onClick = onShowListDialog),
@@ -1101,12 +990,12 @@ private fun VideoUgcSeasonRow(
                     )
                 }
             }
-            if (episodes.size > 1 && lastPlayedCid != 0L) {
-                val lastEpisode = episodes.find { it.cid == lastPlayedCid }
-                if (lastEpisode != null) {
+            if (cells.size > 1 && lastPlayedCid != 0L) {
+                val lastCell = cells.find { it.cid == lastPlayedCid }
+                if (lastCell != null) {
                     Surface(
-                        onClick = { onClick(lastEpisode) },
-                        modifier = Modifier.touchClickable(onClick = { onClick(lastEpisode) }),
+                        onClick = { onClick(lastCell) },
+                        modifier = Modifier.touchClickable(onClick = { onClick(lastCell) }),
                         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
                         // 不放大，避免盖住相邻的选集按钮。
                         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
@@ -1128,7 +1017,7 @@ private fun VideoUgcSeasonRow(
                                 modifier = Modifier.size(20.dp),
                             )
                             Text(
-                                text = "上次播放到：${lastEpisode.title}",
+                                text = "上次看到：${lastCell.title}",
                                 style = MaterialTheme.typography.labelSmall,
                             )
                         }
@@ -1136,36 +1025,37 @@ private fun VideoUgcSeasonRow(
                 }
             }
         }
-        val focusRequester = focusSaver.focusRequesterFor("seasons")
+        val focusRequester = focusSaver.focusRequesterFor(rowKey)
         LazyRow(
             modifier =
                 Modifier
-                    .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey("seasons") }
+                    .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey(rowKey) }
                     .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding =
                 androidx.compose.foundation.layout
                     .PaddingValues(horizontal = 50.dp),
         ) {
-            items(episodes) { episode ->
-                val played = if (episode.cid == lastPlayedCid) lastPlayedTime else 0
+            itemsIndexed(cells) { index, cell ->
+                val played = if (cell.cid == lastPlayedCid) lastPlayedTime else 0
                 EpisodeListButton(
-                    title = episode.title,
-                    duration = episode.duration,
+                    title = cell.title,
+                    duration = cell.duration,
                     played = played,
-                    isCurrent = false,
-                    onClick = { onClick(episode) },
+                    isCurrent = cell.isCurrent,
+                    onClick = { onClick(cell) },
                     modifier =
-                        if (episode == episodes.first()) {
-                            Modifier.focusRequester(focusRequester).focusSaverItem(focusSaver, "episode_${episode.cid}")
+                        if (index == 0) {
+                            Modifier.focusRequester(focusRequester).focusSaverItem(focusSaver, itemKeyPrefix + cell.cid)
                         } else {
-                            Modifier.focusSaverItem(focusSaver, "episode_${episode.cid}")
+                            Modifier.focusSaverItem(focusSaver, itemKeyPrefix + cell.cid)
                         },
                 )
             }
         }
     }
 }
+
 
 @Composable
 private fun RelatedVideoRow(

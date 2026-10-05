@@ -47,8 +47,6 @@ data class SearchResultData(
     val inWhiteKey: Int? = null,
     val result: List<JsonElement> = emptyList(),
     @Transient
-    val searchAllResults: MutableList<SearchResult<SearchResultItem>> = mutableListOf(),
-    @Transient
     val searchTypeResults: MutableList<SearchResultItem> = mutableListOf(),
     @SerialName("is_search_page_grayed")
     val isSearchPageGrayed: Int? = null,
@@ -88,12 +86,6 @@ data class SearchResultData(
                         }
                     }
 
-                val resultResult =
-                    SearchResult(
-                        resultType = searchResultJsonObject["result_type"]!!.jsonPrimitive.content,
-                        data = data,
-                    )
-                searchAllResults.add(resultResult)
                 if (resultType == "video" || resultType == "media_bangumi" || resultType == "media_ft") {
                     searchTypeResults.addAll(data)
                 }
@@ -220,10 +212,3 @@ data class SearchResultData(
         val isSearchPageGrayed: Int,
     )
 }
-
-@Serializable
-data class SearchResult<T>(
-    @SerialName("result_type")
-    val resultType: String,
-    val data: List<T>,
-)

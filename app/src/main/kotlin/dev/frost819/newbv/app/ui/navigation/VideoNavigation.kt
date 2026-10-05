@@ -36,7 +36,7 @@ fun NavController.navigateFromVideoCard(
         }
 
         else -> {
-            navigate(
+            navigateToVideoPlayer(
                 VideoPlayerRoute(
                     aid = data.avid,
                     cid = data.cid ?: 0L,
@@ -44,11 +44,18 @@ fun NavController.navigateFromVideoCard(
                     title = data.title,
                     cover = data.cover,
                 ),
-            ) {
-                popUpTo<VideoPlayerRoute> { inclusive = true }
-                launchSingleTop = true
-            }
+            )
         }
+    }
+}
+
+/**
+ * 跳转播放器，并弹出已有播放器实例，保证播放器页面在返回栈中单例。
+ */
+fun NavController.navigateToVideoPlayer(route: VideoPlayerRoute) {
+    navigate(route) {
+        popUpTo<VideoPlayerRoute> { inclusive = true }
+        launchSingleTop = true
     }
 }
 

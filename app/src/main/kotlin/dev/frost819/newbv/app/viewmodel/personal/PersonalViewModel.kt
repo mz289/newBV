@@ -45,6 +45,7 @@ sealed interface PersonalUiEffect {
  *
  * 管理稍后再看、历史、收藏、订阅、追番五个 Tab 的数据。
  *
+ * @property toViewItems 稍后再看列表。
  * @property toViewLoading 稍后再看加载中。
  * @property toViewError 稍后再看加载失败。
  * @property historyItems 历史列表。
@@ -75,6 +76,7 @@ sealed interface PersonalUiEffect {
  * @property isLogin 是否已登录。
  */
 data class PersonalUiState(
+    val toViewItems: List<ToViewItem> = emptyList(),
     val toViewLoading: Boolean = false,
     val toViewError: Boolean = false,
     val historyItems: List<HistoryItem> = emptyList(),
@@ -133,8 +135,6 @@ class PersonalViewModel
         private val _uiState = MutableStateFlow(PersonalUiState())
         val uiState: StateFlow<PersonalUiState> = _uiState.asStateFlow()
 
-        val toViewItems = mutableStateListOf<ToViewItem>()
-
         private var historyCursor: Long = 0L
         private var favoritePageNumber: Int = 1
         private var subscriptionPageNumber: Int = 1
@@ -168,14 +168,13 @@ class PersonalViewModel
 
                 runCatching {
                     withTimeout(LOAD_TIMEOUT_MS) {
-                        val data =
-                            toViewRepository.getToView(
-                                cursor = 0,
-                                preferApiType = Prefs.apiType,
-                            )
-                        toViewItems.clear()
-                        toViewItems.addAll(data.data)
+                        toViewRepository.getToView(
+                            cursor = 0,
+                            preferApiType = Prefs.apiType,
+                        ).data
                     }
+                }.onSuccess { items ->
+                    _uiState.update { it.copy(toViewItems = items) }
                 }.onFailure { error ->
                     error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load toview" }
@@ -202,7 +201,9 @@ class PersonalViewModel
                         viewed = viewed,
                         preferApiType = Prefs.apiType,
                     )
-                    toViewItems.removeAll { it.oid == aid }
+                    _uiState.update { state ->
+                        state.copy(toViewItems = state.toViewItems.filterNot { it.oid == aid })
+                    }
                     _effect.emit(PersonalUiEffect.ShowToast("已移除稍后再看"))
                 }.onFailure { error ->
                     error.rethrowUnlessTimeout()
@@ -216,8 +217,7 @@ class PersonalViewModel
          * 刷新稍后再看列表。
          */
         fun refreshToView() {
-            toViewItems.clear()
-            _uiState.update { it.copy(toViewError = false) }
+            _uiState.update { it.copy(toViewItems = emptyList(), toViewError = false) }
             loadToView()
         }
 

@@ -146,31 +146,4 @@ class SearchRepositoryTest {
             assertThat(reply.pgcs).isNotEmpty()
         }
 
-    @Test
-    fun `search all with web api`() =
-        runBlocking {
-            // 查询类：搜索"奥特曼"应返回视频结果（若为空说明接口异常或风控）
-            val result =
-                searchRepository.searchAll(
-                    keyword = "奥特曼",
-                    page = 1,
-                    preferApiType = ApiType.Web,
-                )
-            println("web searchAll videos: ${result.videos.size}, pgcs: ${result.pgcs.size}")
-            assertThat(result.videos).isNotEmpty()
-        }
-
-    @Test
-    fun `search all with gRPC api`() =
-        runBlocking {
-            // 查询类：gRPC SearchAll 应返回视频结果（若为空说明接口异常或风控）
-            val result =
-                searchRepository.searchAll(
-                    keyword = "奥特曼",
-                    page = 1,
-                    preferApiType = ApiType.App,
-                )
-            println("gRPC searchAll videos: ${result.videos.size}, pgcs: ${result.pgcs.size}")
-            assertThat(result.videos).isNotEmpty()
-        }
 }

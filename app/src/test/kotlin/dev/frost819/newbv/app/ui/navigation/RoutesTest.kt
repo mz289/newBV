@@ -59,16 +59,6 @@ class RoutesTest {
         val encoded = json.encodeToString(route)
         val decoded = json.decodeFromString<VideoDetailRoute>(encoded)
         assertThat(decoded.aid).isEqualTo(12345L)
-        assertThat(decoded.epid).isNull()
-    }
-
-    @Test
-    fun `VideoDetailRoute serializes with optional epid`() {
-        val route = VideoDetailRoute(aid = 12345L, epid = 67890L)
-        val encoded = json.encodeToString(route)
-        val decoded = json.decodeFromString<VideoDetailRoute>(encoded)
-        assertThat(decoded.aid).isEqualTo(12345L)
-        assertThat(decoded.epid).isEqualTo(67890L)
     }
 
     @Test

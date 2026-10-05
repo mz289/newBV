@@ -122,41 +122,7 @@ class SeasonDetailViewModel
          * 超时或失败时标记 error，不崩溃。
          */
         fun loadSeasonDetail() {
-            viewModelScope.launch {
-                _uiState.update {
-                    it.copy(loading = true, error = false, errorTip = "")
-                }
-
-                runCatching {
-                    withTimeout(LOAD_TIMEOUT_MS) {
-                        val detail =
-                            videoDetailRepository.getPgcVideoDetail(
-                                epid = epid,
-                                seasonId = seasonId.takeIf { it != 0 },
-                                preferApiType = Prefs.apiType,
-                            )
-                        _uiState.update {
-                            it.copy(
-                                seasonDetail = detail,
-                                isFollowing = detail.userStatus.follow,
-                                historyLastPlayedCid = serverLastPlayedCid(detail),
-                                historyLastPlayedTime = detail.userStatus.progress?.lastTime ?: 0,
-                            )
-                        }
-                    }
-                }.onFailure { error ->
-                    error.rethrowUnlessTimeout()
-                    logger.error(error) { "Failed to load season detail: seasonId=$seasonId, epid=$epid" }
-                    _uiState.update {
-                        it.copy(
-                            error = true,
-                            errorTip = error.localizedMessage ?: "加载失败",
-                        )
-                    }
-                }
-
-                _uiState.update { it.copy(loading = false) }
-            }
+            loadSeason(seasonId = seasonId.takeIf { it != 0 }, epid = epid, logContext = "seasonId=$seasonId, epid=$epid")
         }
 
         /**
@@ -238,6 +204,17 @@ class SeasonDetailViewModel
          * 切换到同系列的其他季。
          */
         fun onSwitchSeason(targetSeasonId: Int) {
+            loadSeason(seasonId = targetSeasonId, epid = null, logContext = "seasonId=$targetSeasonId")
+        }
+
+        /**
+         * 加载一季的详情并回填追番状态与观看进度，失败时标记 error。
+         */
+        private fun loadSeason(
+            seasonId: Int?,
+            epid: Int?,
+            logContext: String,
+        ) {
             viewModelScope.launch {
                 _uiState.update {
                     it.copy(loading = true, error = false, errorTip = "")
@@ -247,7 +224,8 @@ class SeasonDetailViewModel
                     withTimeout(LOAD_TIMEOUT_MS) {
                         val detail =
                             videoDetailRepository.getPgcVideoDetail(
-                                seasonId = targetSeasonId,
+                                epid = epid,
+                                seasonId = seasonId,
                                 preferApiType = Prefs.apiType,
                             )
                         _uiState.update {
@@ -261,7 +239,7 @@ class SeasonDetailViewModel
                     }
                 }.onFailure { error ->
                     error.rethrowUnlessTimeout()
-                    logger.error(error) { "Failed to switch season: $targetSeasonId" }
+                    logger.error(error) { "Failed to load season detail: $logContext" }
                     _uiState.update {
                         it.copy(
                             error = true,

@@ -25,7 +25,6 @@ class DanmakuMergeConfigTest {
     @Test
     fun `旧模式迁移保留合并开关`() {
         assertThat(DanmakuMergeMode.fromPreference(0)).isEqualTo(DanmakuMergeMode.Off)
-        assertThat(DanmakuMergeMode.fromPreference(1)).isEqualTo(DanmakuMergeMode.Similar)
         assertThat(DanmakuMergeMode.fromPreference(2)).isEqualTo(DanmakuMergeMode.Similar)
         assertThat(DanmakuMergeMode.fromPreference(99)).isEqualTo(DanmakuMergeMode.Off)
         assertThat(DanmakuMergeMode.Similar.preferenceValue).isEqualTo(2)

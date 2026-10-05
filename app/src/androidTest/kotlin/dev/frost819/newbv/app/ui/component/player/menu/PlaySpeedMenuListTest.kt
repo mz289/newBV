@@ -13,6 +13,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import androidx.tv.material3.MaterialTheme as TvMaterialTheme
+import dev.frost819.newbv.data.datastore.PlaySpeed
 
 /**
  * [PlaySpeedMenuList] 的插桩测试。
@@ -24,12 +25,12 @@ class PlaySpeedMenuListTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private fun setContent(selectedSpeed: PlaySpeedItem) {
+    private fun setContent(selectedSpeed: PlaySpeed) {
         composeRule.setContent {
             TvMaterialTheme {
                 Box(modifier = Modifier.fillMaxSize().width(300.dp)) {
                     PlaySpeedMenuList(
-                        currentSelectedPlaySpeedItem = selectedSpeed,
+                        selectedSpeed = selectedSpeed,
                         onPlaySpeedChange = {},
                         onFocusStateChange = {},
                     )
@@ -41,7 +42,7 @@ class PlaySpeedMenuListTest {
 
     @Test
     fun displays_allSpeedOptions() {
-        setContent(PlaySpeedItem.X1)
+        setContent(PlaySpeed.X1)
 
         composeRule.onNodeWithText("2.0x").assertIsDisplayed()
         composeRule.onNodeWithText("1.5x").assertIsDisplayed()
@@ -52,7 +53,7 @@ class PlaySpeedMenuListTest {
 
     @Test
     fun displays_speeds_when_X2_selected() {
-        setContent(PlaySpeedItem.X2)
+        setContent(PlaySpeed.X2)
 
         composeRule.onNodeWithText("2.0x").assertIsDisplayed()
         composeRule.onNodeWithText("0.5x").assertIsDisplayed()
@@ -60,7 +61,7 @@ class PlaySpeedMenuListTest {
 
     @Test
     fun displays_speeds_when_X0_5_selected() {
-        setContent(PlaySpeedItem.X0_5)
+        setContent(PlaySpeed.X0_5)
 
         composeRule.onNodeWithText("0.5x").assertIsDisplayed()
         composeRule.onNodeWithText("2.0x").assertIsDisplayed()

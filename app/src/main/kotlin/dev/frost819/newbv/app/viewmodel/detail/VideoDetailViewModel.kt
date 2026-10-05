@@ -5,15 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.VideoInfoRepository
+import dev.frost819.newbv.app.data.VideoSharedState
 import dev.frost819.newbv.app.entity.player.VideoListItem
 import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.FavoriteFolderMetadata
 import dev.frost819.newbv.biliapi.entity.video.VideoDetail
-import dev.frost819.newbv.biliapi.repositories.CoinRepository
 import dev.frost819.newbv.biliapi.repositories.FavoriteRepository
-import dev.frost819.newbv.biliapi.repositories.LikeRepository
-import dev.frost819.newbv.biliapi.repositories.OneClickTripleActionRepository
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.biliapi.repositories.VideoDetailRepository
 import dev.frost819.newbv.core.log.Loggers
@@ -45,22 +43,15 @@ private const val LOAD_TIMEOUT_MS = 15_000L
  * @property isFollowing 是否已关注 UP 主。
  * @property favoriteFolders 用户收藏夹列表。
  * @property videoFavoriteFolderIds 视频已加入的收藏夹 ID 集合。
- * @property historyLastPlayedCid 播放器返回后的历史进度 CID。
- * @property historyLastPlayedTime 播放器返回后的历史进度时间（秒）。
  */
 data class VideoDetailUiState(
     val detail: VideoDetail? = null,
     val loading: Boolean = false,
     val error: Boolean = false,
     val errorTip: String = "",
-    val isLiked: Boolean = false,
-    val isCoined: Boolean = false,
-    val isFavorite: Boolean = false,
     val isFollowing: Boolean = false,
     val favoriteFolders: List<FavoriteFolderMetadata> = emptyList(),
     val videoFavoriteFolderIds: Set<Long> = emptySet(),
-    val historyLastPlayedCid: Long = 0L,
-    val historyLastPlayedTime: Int = 0,
 )
 
 /**
@@ -80,10 +71,7 @@ sealed interface VideoDetailUiEffect {
  * 使用 [StateFlow] 暴露状态，[SharedFlow] 暴露一次性事件。
  *
  * @property videoDetailRepository 视频详情数据仓库。
- * @property likeRepository 点赞仓库。
- * @property coinRepository 投币仓库。
  * @property favoriteRepository 收藏仓库。
- * @property oneClickTripleActionRepository 一键三连仓库。
  * @property savedStateHandle Navigation 参数（用于读取 [VideoDetailRoute.aid]）。
  */
 @HiltViewModel
@@ -91,10 +79,7 @@ class VideoDetailViewModel
     @Inject
     constructor(
         private val videoDetailRepository: VideoDetailRepository,
-        private val likeRepository: LikeRepository,
-        private val coinRepository: CoinRepository,
         private val favoriteRepository: FavoriteRepository,
-        private val oneClickTripleActionRepository: OneClickTripleActionRepository,
         private val userRepository: UserRepository,
         private val videoInfoRepository: VideoInfoRepository,
         savedStateHandle: SavedStateHandle,
@@ -111,23 +96,16 @@ class VideoDetailViewModel
         private val _uiEffect = MutableSharedFlow<VideoDetailUiEffect>()
         val uiEffect: SharedFlow<VideoDetailUiEffect> = _uiEffect.asSharedFlow()
 
+        /**
+         * 交互状态与观看进度的唯一事实源（[VideoInfoRepository] 持有）。
+         *
+         * 点赞/投币/收藏与"上次看到"不再复制进 [VideoDetailUiState]，
+         * UI 直接观察本 Flow，操作成功后由仓库单点写入，播放器与详情页天然一致。
+         */
+        val videoSharedState: StateFlow<VideoSharedState?> = videoInfoRepository.videoSharedState
+
         init {
             loadVideoDetail()
-            viewModelScope.launch {
-                videoInfoRepository.videoSharedState
-                    .collect { state ->
-                        val matched = state?.takeIf { it.aid == aid }
-                        _uiState.update {
-                            it.copy(
-                                isLiked = matched?.liked ?: it.isLiked,
-                                isCoined = matched?.coined ?: it.isCoined,
-                                isFavorite = matched?.favorited ?: it.isFavorite,
-                                historyLastPlayedCid = state?.lastPlayedCid ?: it.historyLastPlayedCid,
-                                historyLastPlayedTime = state?.lastPlayedTime ?: it.historyLastPlayedTime,
-                            )
-                        }
-                    }
-            }
         }
 
         /**
@@ -185,14 +163,7 @@ class VideoDetailViewModel
                                 preferApiType = ApiType.Web,
                                 bvid = routeBvid,
                             )
-                        _uiState.update {
-                            it.copy(
-                                detail = detail,
-                                isLiked = detail.userActions.like,
-                                isCoined = detail.userActions.coin,
-                                isFavorite = detail.userActions.favorite,
-                            )
-                        }
+                        _uiState.update { it.copy(detail = detail) }
 
                         // 同步到 VideoInfoRepository（相关视频、历史进度）
                         videoInfoRepository.updateVideoDetail(detail)
@@ -289,15 +260,7 @@ class VideoDetailViewModel
             val currentDetail = _uiState.value.detail ?: return
             viewModelScope.launch {
                 runCatching {
-                    likeRepository.updateVideoLiked(
-                        aid = currentDetail.aid,
-                        bvid = currentDetail.bvid,
-                        like = like,
-                        preferApiType = Prefs.apiType,
-                    )
-                }.onSuccess {
-                    _uiState.update { it.copy(isLiked = like) }
-                    videoInfoRepository.updateVideoActionState(aid = currentDetail.aid, liked = like)
+                    videoInfoRepository.setVideoLiked(aid = currentDetail.aid, like = like, bvid = currentDetail.bvid)
                 }.onFailure { error ->
                     logger.error(error) { "Failed to toggle like" }
                     _uiEffect.emit(
@@ -319,14 +282,7 @@ class VideoDetailViewModel
             logger.info { "Sending coin: aid=${currentDetail.aid}, bvid=${currentDetail.bvid}" }
             viewModelScope.launch {
                 runCatching {
-                    coinRepository.sendVideoCoin(
-                        aid = currentDetail.aid,
-                        bvid = currentDetail.bvid,
-                        preferApiType = Prefs.apiType,
-                    )
-                }.onSuccess {
-                    _uiState.update { it.copy(isCoined = true) }
-                    videoInfoRepository.updateVideoActionState(aid = currentDetail.aid, coined = true)
+                    videoInfoRepository.sendVideoCoin(aid = currentDetail.aid, bvid = currentDetail.bvid)
                 }.onFailure { error ->
                     logger.error(error) { "Failed to send coin" }
                     _uiEffect.emit(
@@ -353,12 +309,8 @@ class VideoDetailViewModel
                         preferApiType = Prefs.apiType,
                     )
                 }.onSuccess {
-                    _uiState.update {
-                        it.copy(
-                            isFavorite = folderIds.isNotEmpty(),
-                            videoFavoriteFolderIds = folderIds.toSet(),
-                        )
-                    }
+                    _uiState.update { it.copy(videoFavoriteFolderIds = folderIds.toSet()) }
+                    videoInfoRepository.updateVideoActionState(aid = currentDetail.aid, favorited = folderIds.isNotEmpty())
                 }.onFailure { error ->
                     logger.error(error) { "Failed to update favorite" }
                     _uiEffect.emit(
@@ -366,10 +318,6 @@ class VideoDetailViewModel
                     )
                 }
             }
-            videoInfoRepository.updateVideoActionState(
-                aid = currentDetail.aid,
-                favorited = folderIds.isNotEmpty(),
-            )
         }
 
         /**
@@ -379,7 +327,7 @@ class VideoDetailViewModel
          * TODO(后续实现收藏夹选择弹窗)。
          */
         fun toggleFavorite() {
-            val isFav = _uiState.value.isFavorite
+            val isFav = currentVideoFavorited()
             logger.info { "toggleFavorite called, isFavorite=$isFav, folders=${_uiState.value.favoriteFolders.size}" }
             if (isFav) {
                 updateFavorite(emptyList())
@@ -407,34 +355,18 @@ class VideoDetailViewModel
             val currentDetail = _uiState.value.detail ?: return
             viewModelScope.launch {
                 runCatching {
-                    oneClickTripleActionRepository.sendVideoOneClickTripleAction(
-                        aid = currentDetail.aid,
-                        bvid = currentDetail.bvid,
-                        preferApiType = Prefs.apiType,
-                    )
+                    videoInfoRepository.sendOneClickTriple(aid = currentDetail.aid, bvid = currentDetail.bvid)
                 }.onSuccess { data ->
                     if (data != null) {
                         val defaultFolderId =
                             _uiState.value.favoriteFolders
                                 .firstOrNull { it.title == "默认收藏夹" }
                                 ?.id
-                        _uiState.update {
-                            it.copy(
-                                isLiked = data.like,
-                                isCoined = data.coin,
-                                isFavorite = data.fav,
-                                videoFavoriteFolderIds =
-                                    defaultFolderId?.let { id ->
-                                        it.videoFavoriteFolderIds + id
-                                    } ?: it.videoFavoriteFolderIds,
-                            )
+                        if (defaultFolderId != null) {
+                            _uiState.update {
+                                it.copy(videoFavoriteFolderIds = it.videoFavoriteFolderIds + defaultFolderId)
+                            }
                         }
-                        videoInfoRepository.updateVideoActionState(
-                            aid = currentDetail.aid,
-                            liked = data.like,
-                            coined = data.coin,
-                            favorited = data.fav,
-                        )
                         _uiEffect.emit(VideoDetailUiEffect.ShowToast("一键三连"))
                     }
                 }.onFailure { error ->
@@ -445,4 +377,10 @@ class VideoDetailViewModel
                 }
             }
         }
+
+        /** 当前视频是否已收藏（读共享状态）。 */
+        private fun currentVideoFavorited(): Boolean =
+            videoInfoRepository.videoSharedState.value
+                ?.takeIf { it.aid == aid }
+                ?.favorited ?: false
     }
