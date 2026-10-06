@@ -1,5 +1,6 @@
 package dev.frost819.newbv.app.ui.component.player.menu.component
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -42,6 +44,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -415,6 +419,9 @@ private fun DanmakuBlockRuleType.displayLabel(): String =
  * 添加时校验：空白值拒绝；正则类型实时校验合法性；颜色须为 6 位十六进制；
  * 与已有规则（类型+值相同）去重。
  *
+ * 返回键：首次收起输入法并清除输入框焦点（否则焦点残留会反复拉起输入法，
+ * 导致无法返回），再次返回关闭弹窗。
+ *
  * @param existingRules 已有规则（用于去重）
  * @param onAdd 添加成功回调（携带新规则）
  * @param onDismiss 关闭回调
@@ -429,6 +436,10 @@ private fun DanmakuBlockAddDialog(
     var input by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val inputFocusRequester = remember { FocusRequester() }
+    val softwareKeyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    // 返回键是否已收起输入法并清除输入框焦点（此时再次返回才关闭弹窗）
+    var imeCollapsed by remember { mutableStateOf(false) }
 
     fun tryAdd() {
         val value = input.trim()
@@ -468,6 +479,18 @@ private fun DanmakuBlockAddDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        // 返回键收起输入法后 Compose 输入框仍持有焦点（b/193748743），
+        // 下一次返回键会再次拉起输入法，形成"收起→弹出"循环导致无法退出。
+        // 首次返回收起输入法并强制清除焦点，之后返回才关闭弹窗。
+        BackHandler {
+            if (imeCollapsed) {
+                onDismiss()
+            } else {
+                imeCollapsed = true
+                softwareKeyboard?.hide()
+                focusManager.clearFocus(force = true)
+            }
+        }
         Box(
             modifier =
                 Modifier
@@ -513,6 +536,7 @@ private fun DanmakuBlockAddDialog(
                             modifier =
                                 Modifier
                                     .width(360.dp)
+                                    .onFocusChanged { if (it.isFocused) imeCollapsed = false }
                                     .focusRequester(inputFocusRequester),
                             value = input,
                             onValueChange = {
