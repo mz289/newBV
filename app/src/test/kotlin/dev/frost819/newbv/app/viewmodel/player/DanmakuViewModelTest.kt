@@ -3,6 +3,7 @@ package dev.frost819.newbv.app.viewmodel.player
 import com.google.common.truth.Truth.assertThat
 import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
+import dev.frost819.newbv.app.data.DanmakuBlockHitStats
 import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
 import dev.frost819.newbv.app.data.DanmakuMergeConfigStore
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
@@ -13,6 +14,7 @@ import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRuleType
 import dev.frost819.newbv.danmaku.config.DanmakuMergeConfig
+import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
@@ -23,17 +25,21 @@ import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
+import kotlin.coroutines.CoroutineContext
 import dev.frost819.newbv.data.datastore.DanmakuType as DataDanmakuType
 
 /**
@@ -52,6 +58,7 @@ class DanmakuViewModelTest {
 
     @BeforeEach
     fun setUp() {
+        DanmakuBlockHitStats.reset()
         Dispatchers.setMain(testDispatcher)
         mockkStatic(android.util.Log::class)
         every { android.util.Log.d(any(), any()) } returns 0
@@ -80,7 +87,7 @@ class DanmakuViewModelTest {
         every { Prefs.apiType } returns ApiType.Web
 
         videoPlayRepository = mockk()
-        viewModel = DanmakuViewModel(videoPlayRepository)
+        viewModel = DanmakuViewModel(videoPlayRepository).apply { preprocessingDispatcher = testDispatcher }
     }
 
     @AfterEach
@@ -491,6 +498,169 @@ class DanmakuViewModelTest {
     // === 引擎时钟对齐 ===
 
     @Test
+    fun `分段边界合并并在断点续播时读取前段且切换配置无需重拉`() =
+        runTest(testDispatcher) {
+            every { Prefs.danmakuMergeMode } returns 2
+            every { Prefs.danmakuMergeMode = any() } answers {}
+            val vm = DanmakuViewModel(videoPlayRepository).apply { preprocessingDispatcher = testDispatcher }
+            val player = mockk<DanmakuPlayer>(relaxed = true)
+            val outputs = mutableListOf<List<DanmakuItemData>>()
+            every { player.updateData(any()) } answers {
+                outputs.add(firstArg())
+                emptyList()
+            }
+            vm.danmakuPlayer = player
+            coEvery { videoPlayRepository.getDanmakuMeta(any(), any()) } returns DanmakuMeta(360_000, 2, false, 2)
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), 1, any()) } returns
+                listOf(fakeDanmakuData(1, 359f).copy(text = "边界弹幕"))
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), 2, any()) } returns
+                listOf(fakeDanmakuData(2, 361f).copy(text = "边界弹幕"))
+            vm.loadDanmaku(1, 2, initialPositionMs = 360_000)
+            advanceUntilIdle()
+            assertThat(outputs.last().single().content).isEqualTo("边界弹幕 ×2")
+            assertThat(outputs.last().single().position).isEqualTo(359_000)
+            vm.updateDanmakuState(DanmakuSettingAction.SetMergeMode(DanmakuMergeMode.Off))
+            advanceUntilIdle()
+            assertThat(outputs.last()).hasSize(2)
+            vm.updateDanmakuState(DanmakuSettingAction.SetMergeMode(DanmakuMergeMode.Similar))
+            advanceUntilIdle()
+            assertThat(outputs.last().single().mergedCount).isEqualTo(2)
+            coVerify(exactly = 2) { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) }
+            vm.clearDanmaku()
+        }
+
+    @Test
+    fun `切换显示类型从缓存恢复同文弹幕且保留接口权重`() =
+        runTest(testDispatcher) {
+            every { Prefs.danmakuMergeMode } returns 2
+            val vm = DanmakuViewModel(videoPlayRepository).apply { preprocessingDispatcher = testDispatcher }
+            val player = mockk<DanmakuPlayer>(relaxed = true)
+            val outputs = mutableListOf<List<DanmakuItemData>>()
+            every { player.updateData(any()) } answers {
+                outputs.add(firstArg())
+                emptyList()
+            }
+            vm.danmakuPlayer = player
+            coEvery { videoPlayRepository.getDanmakuMeta(any(), any()) } returns DanmakuMeta(360_000, 1, false, 2)
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) } returns
+                listOf(
+                    fakeDanmakuData(1, 0f).copy(text = "同文", level = 4),
+                    fakeDanmakuData(2, 1f).copy(text = "同文", type = 5, level = 8),
+                )
+            vm.loadDanmaku(1, 2)
+            advanceUntilIdle()
+            assertThat(outputs.last().single().score).isEqualTo(8)
+            vm.updateDanmakuState(DanmakuSettingAction.SetEnabledTypes(listOf(DanmakuType.Top)))
+            advanceUntilIdle()
+            assertThat(outputs.last().single().mode).isEqualTo(5)
+            assertThat(outputs.last().single().mergedCount).isEqualTo(1)
+            vm.updateDanmakuState(DanmakuSettingAction.SetEnabledTypes(listOf(DanmakuType.All)))
+            advanceUntilIdle()
+            assertThat(outputs.last().single().mergedCount).isEqualTo(2)
+            coVerify(exactly = 1) { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) }
+            vm.clearDanmaku()
+        }
+
+    @Test
+    fun `后台处理切视频后旧快照不能提交且新视频不沿用缓存`() =
+        runTest(testDispatcher) {
+            val pending = ArrayDeque<Runnable>()
+            viewModel.preprocessingDispatcher =
+                object : CoroutineDispatcher() {
+                    override fun dispatch(
+                        context: CoroutineContext,
+                        block: Runnable,
+                    ) {
+                        pending.add(block)
+                    }
+                }
+            val player = mockk<DanmakuPlayer>(relaxed = true)
+            val outputs = mutableListOf<List<DanmakuItemData>>()
+            every { player.updateData(any()) } answers {
+                outputs.add(firstArg())
+                emptyList()
+            }
+            viewModel.danmakuPlayer = player
+            coEvery { videoPlayRepository.getDanmakuMeta(any(), any()) } returns DanmakuMeta(360_000, 1, false, 1)
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), 2, any(), any()) } returns
+                listOf(fakeDanmakuData(1, 0f))
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), 3, any(), any()) } returns
+                listOf(fakeDanmakuData(2, 0f))
+            viewModel.loadDanmaku(1, 2)
+            runCurrent()
+            assertThat(pending).hasSize(1)
+            assertThat(outputs).isEmpty()
+            viewModel.clearDanmaku()
+            viewModel.loadDanmaku(1, 3)
+            pending.removeFirst().run()
+            runCurrent()
+            assertThat(outputs).isEmpty()
+            assertThat(pending).hasSize(1)
+            pending.removeFirst().run()
+            advanceUntilIdle()
+            assertThat(outputs.single().single().danmakuId).isEqualTo(2)
+            viewModel.clearDanmaku()
+        }
+
+    @Test
+    fun `后台处理期间改变类型只提交最新配置且不重复请求`() =
+        runTest(testDispatcher) {
+            val pending = ArrayDeque<Runnable>()
+            viewModel.preprocessingDispatcher =
+                object : CoroutineDispatcher() {
+                    override fun dispatch(
+                        context: CoroutineContext,
+                        block: Runnable,
+                    ) {
+                        pending.add(block)
+                    }
+                }
+            val player = mockk<DanmakuPlayer>(relaxed = true)
+            val outputs = mutableListOf<List<DanmakuItemData>>()
+            every { player.updateData(any()) } answers {
+                outputs.add(firstArg())
+                emptyList()
+            }
+            viewModel.danmakuPlayer = player
+            coEvery { videoPlayRepository.getDanmakuMeta(any(), any()) } returns DanmakuMeta(360_000, 1, false, 2)
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) } returns
+                listOf(
+                    fakeDanmakuData(1, 0f),
+                    fakeDanmakuData(2, 1f).copy(type = 5),
+                )
+            viewModel.loadDanmaku(1, 2)
+            runCurrent()
+            viewModel.updateDanmakuState(DanmakuSettingAction.SetEnabledTypes(listOf(DanmakuType.Top)))
+            pending.removeFirst().run()
+            runCurrent()
+            assertThat(outputs).isEmpty()
+            pending.removeFirst().run()
+            advanceUntilIdle()
+            assertThat(outputs.single().single().danmakuId).isEqualTo(2)
+            coVerify(exactly = 1) { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) }
+            viewModel.clearDanmaku()
+        }
+
+    @Test
+    fun `取消分段请求不留下预取段加载标记`() =
+        runTest(testDispatcher) {
+            coEvery { videoPlayRepository.getDanmakuMeta(any(), any()) } returns DanmakuMeta(360_000, 4, false, 1)
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), 1, any()) } coAnswers {
+                delay(1000)
+                listOf(fakeDanmakuData(1, 0f))
+            }
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), 2, any()) } returns
+                listOf(fakeDanmakuData(2, 360f))
+            coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), 3, any()) } returns emptyList()
+            viewModel.loadDanmaku(1, 2)
+            runCurrent()
+            viewModel.onVideoPositionChanged(360_000)
+            advanceUntilIdle()
+            coVerify(exactly = 1) { videoPlayRepository.getDanmakuSegment(any(), any(), 2, any()) }
+            viewModel.clearDanmaku()
+        }
+
+    @Test
     fun `onVideoPositionChanged seeks engine when position jumps beyond threshold`() {
         // 回归：断点续播/切集使视频位置跳变（如恢复到 20 分钟）而引擎时钟仍在 0，
         // 引擎按自身时钟渲染会长时间无弹幕，喂入位置时必须自动对齐引擎
@@ -561,10 +731,10 @@ class DanmakuViewModelTest {
             mockkObject(DanmakuBlockRuleStore)
             every { DanmakuBlockRuleStore.state } returns blockState
             mockkObject(DanmakuMergeConfigStore)
-            every { DanmakuMergeConfigStore.load() } returns DanmakuMergeConfig(filterBeforeMerge = true)
+            every { DanmakuMergeConfigStore.load() } returns DanmakuMergeConfig()
             every { DanmakuMergeConfigStore.save(any()) } answers {}
             every { Prefs.danmakuMergeMode } returns 2
-            val vm = DanmakuViewModel(videoPlayRepository)
+            val vm = DanmakuViewModel(videoPlayRepository).apply { preprocessingDispatcher = testDispatcher }
             val player = mockk<DanmakuPlayer>(relaxed = true)
             val outputs = mutableListOf<List<DanmakuItemData>>()
             every { player.updateData(any()) } answers {
@@ -582,9 +752,11 @@ class DanmakuViewModelTest {
             vm.loadDanmaku(1, 2)
             advanceUntilIdle()
             assertThat(outputs.last().single().mergedCount).isEqualTo(2)
+            assertThat(DanmakuBlockHitStats.totalHits.value).isEqualTo(1)
             blockState.value = blockState.value.copy(enabled = false)
             advanceUntilIdle()
             assertThat(outputs.last().single().mergedCount).isEqualTo(3)
+            assertThat(DanmakuBlockHitStats.totalHits.value).isEqualTo(1)
             blockState.value =
                 blockState.value.copy(
                     enabled = true,
@@ -595,6 +767,7 @@ class DanmakuViewModelTest {
                 )
             advanceUntilIdle()
             assertThat(outputs.last().single().mergedCount).isEqualTo(1)
-            coVerify(exactly = 3) { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) }
+            assertThat(DanmakuBlockHitStats.totalHits.value).isEqualTo(3)
+            coVerify(exactly = 1) { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) }
         }
 }

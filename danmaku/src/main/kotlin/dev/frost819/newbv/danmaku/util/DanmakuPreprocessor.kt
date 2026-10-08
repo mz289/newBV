@@ -3,6 +3,7 @@ package dev.frost819.newbv.danmaku.util
 import com.kuaishou.akdanmaku.data.DanmakuItemData
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.danmaku.config.DanmakuState
+import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.danmaku.filter.DanmakuBlockFilter
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -13,25 +14,40 @@ object DanmakuPreprocessor {
         items: List<DanmakuItemData>,
         state: DanmakuState,
         onBlockHit: ((String) -> Unit)? = null,
+        onItemBlockHit: ((Long, String) -> Unit)? = null,
     ): List<DanmakuItemData> {
         val config = state.mergeConfig.sanitized()
         val filtered =
-            if (config.filterBeforeMerge && state.blockEnabled) {
+            if (state.blockEnabled) {
                 val filter =
                     DanmakuBlockFilter().apply {
                         enable = true
                         setRules(state.blockRules)
-                        onHit = onBlockHit
                     }
-                items.filterNot { filter.blocks(it) }
+                items.filterNot { item ->
+                    val key = filter.matchedRuleKey(item.content, item.userId, item.textColor)
+                    if (key != null) {
+                        onBlockHit?.invoke(key)
+                        onItemBlockHit?.invoke(item.danmakuId, key)
+                    }
+                    key != null
+                }
             } else {
                 items
             }
-        val merged =
-            if (state.mergeMode == DanmakuMergeMode.Off) {
+        // 先按原始类型过滤，避免被隐藏的簇首吞掉允许显示的其他类型。
+        val visible =
+            if (DanmakuType.All in state.enabledTypes) {
                 filtered
             } else {
-                DanmakuMerger.mergeSimilar(filtered, config = config)
+                val modes = state.enabledTypes.map { it.modeValue }.toSet()
+                filtered.filter { it.mode in modes }
+            }
+        val merged =
+            if (state.mergeMode == DanmakuMergeMode.Off) {
+                visible
+            } else {
+                DanmakuMerger.mergeSimilar(visible, config = config)
             }
         return selectByDensity(merged, config.dropThreshold)
     }

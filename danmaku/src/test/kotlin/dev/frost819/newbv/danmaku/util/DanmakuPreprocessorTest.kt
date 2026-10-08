@@ -25,7 +25,6 @@ class DanmakuPreprocessorTest {
         val state =
             DanmakuState(
                 mergeMode = DanmakuMergeMode.Similar,
-                mergeConfig = DanmakuMergeConfig(filterBeforeMerge = true),
                 blockEnabled = true,
                 blockRules = listOf(DanmakuBlockRule(DanmakuBlockRuleType.User, "ab")),
             )
@@ -47,7 +46,6 @@ class DanmakuPreprocessorTest {
         val state =
             DanmakuState(
                 mergeMode = DanmakuMergeMode.Similar,
-                mergeConfig = DanmakuMergeConfig(filterBeforeMerge = true),
                 blockEnabled = true,
                 blockRules =
                     listOf(
@@ -59,13 +57,50 @@ class DanmakuPreprocessorTest {
             )
         val items = listOf(item(1), item(2), item(3, "red", color = 0xff0000), item(4, "hide"), item(5, "keep"))
         assertThat(DanmakuPreprocessor.process(items, state).map { it.content }).containsExactly("keep")
-        assertThat(
-            DanmakuPreprocessor.process(
-                items,
-                state.copy(mergeConfig = state.mergeConfig.copy(filterBeforeMerge = false)),
-            ),
-        ).hasSize(4)
         assertThat(DanmakuPreprocessor.process(items, state.copy(mergeMode = DanmakuMergeMode.Off))).hasSize(1)
+    }
+
+    @Test
+    fun `用户颜色屏蔽不受簇首顺序影响`() {
+        val state =
+            DanmakuState(
+                mergeMode = DanmakuMergeMode.Similar,
+                blockEnabled = true,
+                blockRules =
+                    listOf(
+                        DanmakuBlockRule(DanmakuBlockRuleType.User, "ab"),
+                        DanmakuBlockRule(DanmakuBlockRuleType.Color, "ff0000"),
+                    ),
+            )
+        val items = listOf(item(1, user = 0xab), item(2, color = 0xff0000), item(3, user = 0xcd), item(4, user = 0xcd))
+        for (input in listOf(items, items.reversed())) {
+            assertThat(DanmakuPreprocessor.process(input, state).single().mergedCount).isEqualTo(2)
+        }
+    }
+
+    @Test
+    fun `隐藏类型不能吞掉允许显示的同文弹幕且切换类型可恢复`() {
+        val items =
+            listOf(
+                DanmakuItemData(1, 0, "same", 1, 25, 0),
+                DanmakuItemData(2, 1000, "same", 5, 25, 0),
+            )
+        val state =
+            DanmakuState(
+                mergeMode = DanmakuMergeMode.Similar,
+                enabledTypes = listOf(dev.frost819.newbv.danmaku.entity.DanmakuType.Top),
+            )
+        val result = DanmakuPreprocessor.process(items, state).single()
+        assertThat(result.mode).isEqualTo(5)
+        assertThat(result.mergedCount).isEqualTo(1)
+        assertThat(
+            DanmakuPreprocessor
+                .process(
+                    items,
+                    state.copy(enabledTypes = dev.frost819.newbv.danmaku.entity.DanmakuType.entries),
+                ).single()
+                .mergedCount,
+        ).isEqualTo(2)
     }
 
     @Test

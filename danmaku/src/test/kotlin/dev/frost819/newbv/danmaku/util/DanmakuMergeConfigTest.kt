@@ -59,28 +59,26 @@ class DanmakuMergeConfigTest {
     }
 
     @Test
-    fun `字幕高级和底部豁免保留每条原文`() {
+    fun `字幕和底部豁免保留每条原文`() {
         val config = DanmakuMergeConfig(skipBottom = true)
         val items =
             listOf(
                 item("同文", pool = 1),
                 item("同文", pool = 1),
-                item("同文", originalMode = 7),
-                item("同文", originalMode = 7),
                 item("同文", mode = 4),
                 item("同文", mode = 4),
             )
-        assertThat(DanmakuMerger.mergeSimilar(items, config = config)).hasSize(6)
+        assertThat(DanmakuMerger.mergeSimilar(items, config = config)).hasSize(4)
         assertThat(
             DanmakuMerger.mergeSimilar(
                 items,
-                config = config.copy(skipSubtitle = false, skipAdvanced = false, skipBottom = false),
+                config = config.copy(skipSubtitle = false, skipBottom = false),
             ),
         ).hasSize(1)
     }
 
     @Test
-    fun `隐藏标记或提高阈值仍然合并并保留元数据`() {
+    fun `隐藏前缀后缀标记仍然合并并保留元数据`() {
         val items = listOf(item("字幕", pool = 1), item("字幕", pool = 1))
         val config = DanmakuMergeConfig(skipSubtitle = false, markPosition = DanmakuCountMark.Off)
         val result = DanmakuMerger.mergeSimilar(items, config = config).single()
@@ -99,22 +97,17 @@ class DanmakuMergeConfigTest {
             DanmakuMerger
                 .mergeSimilar(
                     items,
-                    config = config.copy(markPosition = DanmakuCountMark.Suffix, markThreshold = 2),
+                    config = config.copy(markPosition = DanmakuCountMark.Suffix),
                 ).single()
                 .content,
-        ).isEqualTo("字幕")
+        ).isEqualTo("字幕 ×2")
     }
 
     @Test
-    fun `字号只在超过五条时放大且有上限`() {
-        val config = DanmakuMergeConfig(enlarge = true)
-        assertThat(DanmakuMerger.mergeSimilar(List(5) { item("测试") }, config = config).single().textSize).isEqualTo(25)
-        assertThat(
-            DanmakuMerger.mergeSimilar(List(6) { item("测试") }, config = config).single().textSize,
-        ).isGreaterThan(25)
-        assertThat(
-            DanmakuMerger.mergeSimilar(List(100) { item("测试") }, config = config).single().textSize,
-        ).isEqualTo(50)
+    fun `合并数量增加时始终保留原始字号`() {
+        for (count in listOf(2, 6, 100)) {
+            assertThat(DanmakuMerger.mergeSimilar(List(count) { item("测试") }).single().textSize).isEqualTo(25)
+        }
     }
 
     @Test
@@ -126,17 +119,28 @@ class DanmakuMergeConfigTest {
     }
 
     @Test
+    fun `高密度下重复变体复用已有簇且过期后正确清理别名`() {
+        val input =
+            listOf(item("abcdef"), item("abcdeg", 1)) +
+                List(64) { item("x".repeat(81) + it, 2L + it) } + item("abcdeg", 100)
+        val result = DanmakuMerger.mergeSimilar(input)
+        assertThat(result.first().content).isEqualTo("abcdef ×3")
+        assertThat(result.none { it.content == "abcdeg" }).isTrue()
+        val expired = DanmakuMerger.mergeSimilar(input + listOf(item("abcdeg", 40_000), item("abcdeg", 40_001)))
+        assertThat(expired.last().content).isEqualTo("abcdeg ×2")
+        assertThat(expired.last().position).isEqualTo(40_000)
+    }
+
+    @Test
     fun `非法配置会限制到可用范围`() {
         val result =
             DanmakuMergeConfig(
                 windowSeconds = -1,
                 editDistanceThreshold = -2,
                 cosineThreshold = 999,
-                markThreshold = -2,
             ).sanitized()
         assertThat(result.windowSeconds).isEqualTo(1)
         assertThat(result.editDistanceThreshold).isEqualTo(0)
         assertThat(result.cosineThreshold).isEqualTo(101)
-        assertThat(result.markThreshold).isEqualTo(1)
     }
 }

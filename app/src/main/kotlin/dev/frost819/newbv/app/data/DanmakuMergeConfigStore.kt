@@ -41,20 +41,14 @@ object DanmakuMergeConfigStore {
                 trimEnding = json.optBoolean("trimEnding", defaults.trimEnding),
                 crossMode = json.optBoolean("crossMode", defaults.crossMode),
                 skipSubtitle = json.optBoolean("skipSubtitle", defaults.skipSubtitle),
-                skipAdvanced = json.optBoolean("skipAdvanced", defaults.skipAdvanced),
                 skipBottom = json.optBoolean("skipBottom", defaults.skipBottom),
                 markPosition =
                     DanmakuCountMark.entries.firstOrNull {
                         it.name == (json["markPosition"] as? JsonPrimitive)?.content
                     }
                         ?: defaults.markPosition,
-                markThreshold = json.optInt("markThreshold", defaults.markThreshold),
-                enlarge = json.optBoolean("enlarge", defaults.enlarge),
-                representativePercent = json.optInt("representativePercent", defaults.representativePercent),
-                preferFixedMode = json.optBoolean("preferFixedMode", defaults.preferFixedMode),
                 scrollThreshold = json.optInt("scrollThreshold", defaults.scrollThreshold),
                 dropThreshold = json.optInt("dropThreshold", defaults.dropThreshold),
-                filterBeforeMerge = json.optBoolean("filterBeforeMerge", defaults.filterBeforeMerge),
             ).sanitized()
         }.getOrDefault(DanmakuMergeConfig())
 
@@ -74,16 +68,10 @@ object DanmakuMergeConfigStore {
             put("trimEnding", value.trimEnding)
             put("crossMode", value.crossMode)
             put("skipSubtitle", value.skipSubtitle)
-            put("skipAdvanced", value.skipAdvanced)
             put("skipBottom", value.skipBottom)
             put("markPosition", value.markPosition.name)
-            put("markThreshold", value.markThreshold)
-            put("enlarge", value.enlarge)
-            put("representativePercent", value.representativePercent)
-            put("preferFixedMode", value.preferFixedMode)
             put("scrollThreshold", value.scrollThreshold)
             put("dropThreshold", value.dropThreshold)
-            put("filterBeforeMerge", value.filterBeforeMerge)
         }.toString()
     }
 

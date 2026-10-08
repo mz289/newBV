@@ -147,11 +147,8 @@ private enum class MergeSetting(
     Window("时间窗口"),
     CrossMode("合并不同类型"),
     SkipSubtitle("放过字幕弹幕"),
-    SkipAdvanced("放过高级弹幕"),
     SkipBottom("放过底部弹幕"),
     MarkPosition("数量标记"),
-    MarkThreshold("数量标记阈值"),
-    Enlarge("合并后增大字号"),
     Drop("自动弹幕优选"),
     Scroll("超长固定弹幕转滚动"),
     Advanced("高级设置"),
@@ -162,9 +159,6 @@ private enum class MergeSetting(
     TrimWidth("全角转半角", true),
     TrimSpace("忽略空白", true),
     TrimEnding("忽略尾部标点", true),
-    Representative("显示时间百分位", true),
-    PreferFixed("优先固定弹幕", true),
-    FilterBeforeMerge("合并前执行屏蔽", true),
     Return("返回", true),
 }
 
@@ -185,15 +179,11 @@ private fun MergeSettingValue(
             MergeSetting.Switch -> mode != DanmakuMergeMode.Off
             MergeSetting.CrossMode -> config.crossMode
             MergeSetting.SkipSubtitle -> config.skipSubtitle
-            MergeSetting.SkipAdvanced -> config.skipAdvanced
             MergeSetting.SkipBottom -> config.skipBottom
-            MergeSetting.Enlarge -> config.enlarge
             MergeSetting.Pinyin -> config.recognizePinyin
             MergeSetting.TrimWidth -> config.trimWidth
             MergeSetting.TrimSpace -> config.trimSpace
             MergeSetting.TrimEnding -> config.trimEnding
-            MergeSetting.PreferFixed -> config.preferFixedMode
-            MergeSetting.FilterBeforeMerge -> config.filterBeforeMerge
             else -> null
         }
     if (toggleValue != null) {
@@ -210,15 +200,11 @@ private fun MergeSettingValue(
                         when (setting) {
                             MergeSetting.CrossMode -> config.copy(crossMode = enabled)
                             MergeSetting.SkipSubtitle -> config.copy(skipSubtitle = enabled)
-                            MergeSetting.SkipAdvanced -> config.copy(skipAdvanced = enabled)
                             MergeSetting.SkipBottom -> config.copy(skipBottom = enabled)
-                            MergeSetting.Enlarge -> config.copy(enlarge = enabled)
                             MergeSetting.Pinyin -> config.copy(recognizePinyin = enabled)
                             MergeSetting.TrimWidth -> config.copy(trimWidth = enabled)
                             MergeSetting.TrimSpace -> config.copy(trimSpace = enabled)
                             MergeSetting.TrimEnding -> config.copy(trimEnding = enabled)
-                            MergeSetting.PreferFixed -> config.copy(preferFixedMode = enabled)
-                            MergeSetting.FilterBeforeMerge -> config.copy(filterBeforeMerge = enabled)
                             else -> config
                         },
                     )
@@ -232,16 +218,6 @@ private fun MergeSettingValue(
         MergeSetting.Window ->
             MergeNumberValue(modifier, config.windowSeconds, 1..120, "${config.windowSeconds} 秒", onFocusBackToParent) {
                 onConfigChange(config.copy(windowSeconds = it))
-            }
-        MergeSetting.MarkThreshold ->
-            MergeNumberValue(
-                modifier,
-                config.markThreshold,
-                1..1000,
-                "大于 ${config.markThreshold} 条",
-                onFocusBackToParent,
-            ) {
-                onConfigChange(config.copy(markThreshold = it))
             }
         MergeSetting.EditDistance ->
             MergeNumberValue(
@@ -274,16 +250,6 @@ private fun MergeSettingValue(
                 onFocusBackToParent,
             ) {
                 onConfigChange(config.copy(cosineThreshold = it))
-            }
-        MergeSetting.Representative ->
-            MergeNumberValue(
-                modifier,
-                config.representativePercent,
-                0..100,
-                "${config.representativePercent}%",
-                onFocusBackToParent,
-            ) {
-                onConfigChange(config.copy(representativePercent = it))
             }
         MergeSetting.Drop ->
             MergeNumberValue(

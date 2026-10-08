@@ -16,12 +16,27 @@ class DanmakuSimilarityTest {
         DanmakuSimilarity.matches(DanmakuSimilarity.prepare(a, config), DanmakuSimilarity.prepare(b, config), config)
 
     @Test
-    fun `编辑距离阈值计字符频次差且可禁用`() {
+    fun `有序编辑预算计替换成本且可禁用`() {
         val config = disabled.copy(editDistanceThreshold = 5)
         assertThat(matches("你指尖跃动的电光", "你之间跃动的电光", config)).isTrue()
         assertThat(matches("你指尖跃动的电光", "你之间跃动的电光", config.copy(editDistanceThreshold = 1))).isFalse()
         assertThat(matches("abcdef", "abcdeg", disabled)).isFalse()
         assertThat(matches("abcdef", "abcdef", disabled)).isTrue()
+    }
+
+    @Test
+    fun `所有默认算法保留字序否定词和数字差异`() {
+        for ((a, b) in listOf(
+            "我喜欢你" to "你喜欢我",
+            "abcd" to "bcda",
+            "这波操作可以" to "这波操作不可以",
+            "这波操作不可以" to "这波操作没可以",
+            "今年是2025年" to "今年是2026年",
+            "😀😁😂😃" to "😃😂😁😀",
+        )) {
+            assertThat(matches(a, b, DanmakuMergeConfig())).isFalse()
+        }
+        assertThat(matches("不要", "不要不要", disabled.copy(cosineThreshold = 45))).isTrue()
     }
 
     @Test
@@ -74,26 +89,18 @@ class DanmakuSimilarityTest {
     }
 
     @Test
-    fun `代表时间和固定模式取自原始簇并且可关闭`() {
+    fun `合并始终保留首条时间类型字号并汇总数量和最高分`() {
         val items =
             listOf(
-                DanmakuItemData(1, 0, "测试", 1, 25, 0),
-                DanmakuItemData(2, 1000, "测试", 5, 25, 0),
-                DanmakuItemData(3, 2000, "测试", 1, 25, 0),
+                DanmakuItemData(1, 0, "测试", 1, 18, 0, score = 2, mergedCount = 2),
+                DanmakuItemData(2, 1000, "测试", 5, 25, 0, score = 8),
+                DanmakuItemData(3, 2000, "测试", 1, 25, 0, score = 4),
             )
-        val result =
-            DanmakuMerger
-                .mergeSimilar(
-                    items,
-                    config = disabled.copy(representativePercent = 50, preferFixedMode = true),
-                ).single()
-        assertThat(result.position).isEqualTo(1000)
-        assertThat(result.mode).isEqualTo(5)
-        val original = DanmakuMerger.mergeSimilar(items, config = disabled).single()
-        assertThat(original.position).isEqualTo(0)
-        assertThat(original.mode).isEqualTo(1)
-        assertThat(
-            DanmakuMerger.mergeSimilar(items, config = disabled.copy(representativePercent = 100)).single().position,
-        ).isEqualTo(2000)
+        val result = DanmakuMerger.mergeSimilar(items, config = disabled).single()
+        assertThat(result.position).isEqualTo(0)
+        assertThat(result.mode).isEqualTo(1)
+        assertThat(result.textSize).isEqualTo(18)
+        assertThat(result.mergedCount).isEqualTo(4)
+        assertThat(result.score).isEqualTo(8)
     }
 }

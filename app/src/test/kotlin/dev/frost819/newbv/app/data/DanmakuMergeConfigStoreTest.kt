@@ -24,23 +24,51 @@ class DanmakuMergeConfigStoreTest {
                 editDistanceThreshold = 8,
                 cosineThreshold = 30,
                 recognizePinyin = false,
-                representativePercent = 20,
-                preferFixedMode = true,
                 trimWidth = false,
                 trimSpace = false,
                 trimEnding = false,
                 crossMode = false,
                 skipSubtitle = false,
-                skipAdvanced = false,
                 skipBottom = true,
                 markPosition = DanmakuCountMark.Prefix,
-                markThreshold = 8,
-                enlarge = true,
                 scrollThreshold = 640,
                 dropThreshold = 75,
-                filterBeforeMerge = true,
             )
         assertThat(DanmakuMergeConfigStore.decode(DanmakuMergeConfigStore.encode(value))).isEqualTo(value)
+    }
+
+    @Test
+    fun `删除的显示配置不会恢复或再次写入且保留有效设置`() {
+        val config =
+            DanmakuMergeConfigStore.decode(
+                """{"windowSeconds":42,"markPosition":"Prefix","markThreshold":1000,"enlarge":true,"representativePercent":100,"preferFixedMode":true}""",
+            )
+        assertThat(config).isEqualTo(DanmakuMergeConfig(windowSeconds = 42, markPosition = DanmakuCountMark.Prefix))
+        val encoded = DanmakuMergeConfigStore.encode(config)
+        for (key in listOf("markThreshold", "enlarge", "representativePercent", "preferFixedMode")) {
+            assertThat(encoded).doesNotContain(key)
+        }
+    }
+
+    @Test
+    fun `忽略旧版合并前屏蔽开关且不再保存该字段`() {
+        for (value in listOf(true, false)) {
+            val config = DanmakuMergeConfigStore.decode("""{"filterBeforeMerge":$value,"windowSeconds":42}""")
+            assertThat(config.windowSeconds).isEqualTo(42)
+            assertThat(DanmakuMergeConfigStore.encode(config)).doesNotContain("filterBeforeMerge")
+        }
+    }
+
+    @Test
+    fun `忽略旧版高级弹幕豁免且保留其他设置`() {
+        for (value in listOf(true, false)) {
+            val config =
+                DanmakuMergeConfigStore.decode(
+                    """{"skipAdvanced":$value,"skipSubtitle":false,"windowSeconds":42}""",
+                )
+            assertThat(config).isEqualTo(DanmakuMergeConfig(skipSubtitle = false, windowSeconds = 42))
+            assertThat(DanmakuMergeConfigStore.encode(config)).doesNotContain("skipAdvanced")
+        }
     }
 
     @Test

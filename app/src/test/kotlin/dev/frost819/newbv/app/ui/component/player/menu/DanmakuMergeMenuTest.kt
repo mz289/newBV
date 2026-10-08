@@ -48,6 +48,9 @@ class DanmakuMergeMenuTest {
             }
         }
         compose.onNodeWithText("开关").assertExists()
+        compose.onNodeWithText("放过高级弹幕").assertDoesNotExist()
+        compose.onNodeWithText("数量标记阈值").assertDoesNotExist()
+        compose.onNodeWithText("合并后增大字号").assertDoesNotExist()
         compose.onNodeWithText("关闭").assertExists()
         compose.onNodeWithText("开启").performClick()
         compose.runOnIdle { assertThat(mode).isEqualTo(DanmakuMergeMode.Similar) }
@@ -58,6 +61,8 @@ class DanmakuMergeMenuTest {
         compose.onNodeWithText("时间窗口").assertDoesNotExist()
         compose.onNodeWithText("编辑距离阈值").assertExists()
         compose.onNodeWithText("词频向量阈值").assertExists()
+        compose.onNodeWithText("显示时间百分位").assertDoesNotExist()
+        compose.onNodeWithText("优先固定弹幕").assertDoesNotExist()
         compose.onNodeWithText("识别谐音弹幕").assertExists()
         compose.onNodeWithContentDescription("增加").performClick()
         compose.runOnIdle { assertThat(config.editDistanceThreshold).isEqualTo(6) }
@@ -79,7 +84,7 @@ class DanmakuMergeMenuTest {
     }
 
     @Test
-    fun `三个新增配置在对应菜单生效`() {
+    fun `优选和滚动配置生效且高级菜单不再提供屏蔽顺序开关`() {
         var config by mutableStateOf(DanmakuMergeConfig())
         compose.setContent {
             MaterialTheme {
@@ -99,8 +104,7 @@ class DanmakuMergeMenuTest {
         compose.onNodeWithContentDescription("增加").performClick()
         compose.runOnIdle { assertThat(config.scrollThreshold).isEqualTo(1) }
         compose.onNodeWithText("高级设置").performScrollTo().performClick()
-        compose.onNodeWithText("合并前执行屏蔽").performScrollTo().performClick()
-        compose.onNodeWithText("开启").performClick()
-        compose.runOnIdle { assertThat(config.filterBeforeMerge).isTrue() }
+        compose.onNodeWithText("编辑距离阈值").assertExists()
+        compose.onNodeWithText("合并前执行屏蔽").assertDoesNotExist()
     }
 }

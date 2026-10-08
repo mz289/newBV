@@ -14,8 +14,7 @@ import dev.frost819.newbv.danmaku.config.DanmakuMergeConfig
  *   会关闭旧簇并开启新簇（刷屏持续超过窗口时分成多簇展示）
  * - 合并项属性取簇首（位置/类型/颜色/字号），仅 content 变化
  *
- * 屏蔽顺序由 DanmakuPreprocessor 决定：可先匹配原始数据再合并，
- * 或保留原来的引擎侧屏蔽行为。
+ * DanmakuPreprocessor 始终先屏蔽原始数据，再按显示类型过滤并合并。
  *
  * 输入需按时间排序（B 站分段数据天然有序，内部仍会兜底排序）；
  * 输出为簇定案顺序（非严格时间序），引擎内部会懒排序，无需预先排序。
@@ -63,11 +62,14 @@ object DanmakuMerger {
         val features: DanmakuSimilarity.Features? = null,
     ) {
         var count = 1
-        val members = arrayListOf(first)
+        private var mergedCount = first.mergedCount
+        private var score = first.score
+        val aliases = hashSetOf(normKey)
 
         fun add(item: DanmakuItemData) {
             count++
-            members.add(item)
+            mergedCount += item.mergedCount
+            score = maxOf(score, item.score)
         }
 
         /** 定案：重复数 >1 时生成带 ×N 后缀的合并项，否则原样返回簇首。 */
@@ -75,39 +77,24 @@ object DanmakuMerger {
             if (count > 1) {
                 DanmakuItemData(
                     danmakuId = first.danmakuId,
-                    position = members[(members.size - 1) * config.representativePercent / 100].position,
+                    position = first.position,
                     content =
-                        if (count <= config.markThreshold) {
-                            first.content
-                        } else {
-                            when (config.markPosition) {
-                                DanmakuCountMark.Off -> first.content
-                                DanmakuCountMark.Prefix -> "×$count ${first.content}"
-                                DanmakuCountMark.Suffix -> "${first.content} ×$count"
-                            }
+                        when (config.markPosition) {
+                            DanmakuCountMark.Off -> first.content
+                            DanmakuCountMark.Prefix -> "×$count ${first.content}"
+                            DanmakuCountMark.Suffix -> "${first.content} ×$count"
                         },
-                    mode =
-                        if (config.preferFixedMode) {
-                            members.firstOrNull { it.mode == 4 || it.mode == 5 }?.mode
-                                ?: first.mode
-                        } else {
-                            first.mode
-                        },
-                    textSize =
-                        if (config.enlarge && count > 5) {
-                            (first.textSize * (1f + (count - 5) * 0.05f).coerceAtMost(2f)).toInt()
-                        } else {
-                            first.textSize
-                        },
+                    mode = first.mode,
+                    textSize = first.textSize,
                     textColor = first.textColor,
-                    score = members.maxOf { it.score },
+                    score = score,
                     danmakuStyle = first.danmakuStyle,
                     rank = first.rank,
                     userId = first.userId,
                     mergedType = DanmakuItemData.MERGED_TYPE_MERGED,
                     pool = first.pool,
                     originalMode = first.originalMode,
-                    mergedCount = members.sumOf { it.mergedCount },
+                    mergedCount = mergedCount,
                 )
             } else {
                 first
@@ -127,7 +114,7 @@ object DanmakuMerger {
 
     /**
      * 相似合并：在 [mergeDuplicate] 的精确语义基础上，归一化后相同
-     * （全角转半角/压缩空白/去尾部标点），再比较字符频次差、拼音和循环 2-Gram 向量。
+     * （全角转半角/去空白/去尾部标点），再比较有序编辑距离、拼音和循环 2-Gram 向量。
      *
      * 合并项显示簇首原文 ×N（pakku.js 取簇内最常见变体，此处从简取簇首）。
      * 为控制计算量：进行中簇超过 [MAX_SIMILAR_CLUSTERS] 条或文本超长时，
@@ -164,12 +151,13 @@ object DanmakuMerger {
             while (openClusters.isNotEmpty() && item.position - openClusters.first().first.position > mergeWindow) {
                 val expired = openClusters.removeAt(0)
                 result.add(expired.flush(options))
-                clustersByNorm.remove(expired.normKey to if (options.crossMode) 0 else expired.first.originalMode)
+                expired.aliases.forEach {
+                    clustersByNorm.remove(it to if (options.crossMode) 0 else expired.first.originalMode)
+                }
             }
             val skipSubtitle = options.skipSubtitle && item.pool == 1
-            val skipAdvanced = options.skipAdvanced && item.originalMode !in listOf(1, 4, 5)
             val skipBottom = options.skipBottom && item.mode == 4
-            if (skipSubtitle || skipAdvanced || skipBottom) {
+            if (skipSubtitle || skipBottom) {
                 result.add(item)
                 continue
             }
@@ -196,11 +184,15 @@ object DanmakuMerger {
                 clustersByNorm[key] = newCluster
             } else if (item.position - cluster.first.position <= mergeWindow) {
                 cluster.add(item)
+                cluster.aliases.add(norm)
+                clustersByNorm[key] = cluster
             } else {
                 // 簇首已超出窗口：定案旧簇，当前弹幕成为新簇首
                 result.add(cluster.flush(options))
                 openClusters.remove(cluster)
-                clustersByNorm.remove(cluster.normKey to if (options.crossMode) 0 else cluster.first.originalMode)
+                cluster.aliases.forEach {
+                    clustersByNorm.remove(it to if (options.crossMode) 0 else cluster.first.originalMode)
+                }
                 val newCluster = Cluster(item, norm, features)
                 openClusters.add(newCluster)
                 clustersByNorm[key] = newCluster
