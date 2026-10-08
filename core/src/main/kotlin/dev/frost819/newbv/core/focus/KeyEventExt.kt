@@ -20,3 +20,6 @@ fun KeyEvent.isDpadLeft(): Boolean = key == Key.DirectionLeft
 
 /** 按键是否为 D-Pad 右方向键。 */
 fun KeyEvent.isDpadRight(): Boolean = key == Key.DirectionRight
+
+/** 按键是否为确认键（遥控器 OK 或键盘 Enter）。 */
+fun KeyEvent.isConfirmKey(): Boolean = key == Key.DirectionCenter || key == Key.Enter

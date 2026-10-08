@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.OutlinedTextField
@@ -61,7 +60,10 @@ import androidx.tv.material3.Text
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
 import dev.frost819.newbv.app.network.DanmakuBlockServer
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.confirmImeKeyboardOptions
+import dev.frost819.newbv.core.focus.confirmOpenIme
 import dev.frost819.newbv.core.focus.outerFocusBorder
+import dev.frost819.newbv.core.focus.rememberConfirmImeBehavior
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRuleType
@@ -412,8 +414,8 @@ private fun DanmakuBlockRuleType.displayLabel(): String =
 /**
  * 添加屏蔽规则对话框。
  *
- * 左侧为规则编辑区：类型选择、直接可输入的文本框（遥控器/实体键盘输入，
- * 输入法确认键或"添加"按钮提交）、类型说明与错误提示。
+ * 左侧为规则编辑区：类型选择、直接可输入的文本框（打开即聚焦但不拉起输入法，
+ * 确认键唤起输入法后输入，输入法确认键或"添加"按钮提交）、类型说明与错误提示。
  * 右侧内嵌远程管理二维码——电视端输入不便时可扫码在手机上输入并导入屏蔽串。
  *
  * 添加时校验：空白值拒绝；正则类型实时校验合法性；颜色须为 6 位十六进制；
@@ -436,6 +438,7 @@ private fun DanmakuBlockAddDialog(
     var input by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val inputFocusRequester = remember { FocusRequester() }
+    val confirmIme = rememberConfirmImeBehavior()
     val softwareKeyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     // 返回键是否已收起输入法并清除输入框焦点（此时再次返回才关闭弹窗）
@@ -470,7 +473,7 @@ private fun DanmakuBlockAddDialog(
         }
     }
 
-    // 打开即聚焦输入框，直接开始输入
+    // 打开即聚焦输入框；软键盘不随聚焦弹出，按确认键才唤起（confirmOpenIme）
     LaunchedEffect(Unit) {
         runCatching { inputFocusRequester.requestFocus() }
     }
@@ -537,6 +540,7 @@ private fun DanmakuBlockAddDialog(
                                 Modifier
                                     .width(360.dp)
                                     .onFocusChanged { if (it.isFocused) imeCollapsed = false }
+                                    .confirmOpenIme(confirmIme)
                                     .focusRequester(inputFocusRequester),
                             value = input,
                             onValueChange = {
@@ -564,7 +568,7 @@ private fun DanmakuBlockAddDialog(
                                         },
                                 )
                             },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardOptions = confirmImeKeyboardOptions(confirmIme, ImeAction.Done),
                             keyboardActions =
                                 KeyboardActions(
                                     onDone = { tryAdd() },

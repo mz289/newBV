@@ -48,6 +48,9 @@ import dev.frost819.newbv.app.ui.component.search.SearchKeyword
 import dev.frost819.newbv.app.ui.component.search.SoftKeyboard
 import dev.frost819.newbv.app.viewmodel.search.SearchInputViewModel
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.confirmImeKeyboardOptions
+import dev.frost819.newbv.core.focus.confirmOpenIme
+import dev.frost819.newbv.core.focus.rememberConfirmImeBehavior
 import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.data.datastore.Prefs
 
@@ -125,6 +128,7 @@ private fun SearchInputColumn(
     onKeywordChange: (String) -> Unit,
     onSearch: () -> Unit,
 ) {
+    val confirmIme = rememberConfirmImeBehavior()
     androidx.compose.foundation.layout.Box(
         modifier =
             Modifier
@@ -138,7 +142,7 @@ private fun SearchInputColumn(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             OutlinedTextField(
-                modifier = Modifier.width(258.dp),
+                modifier = Modifier.width(258.dp).confirmOpenIme(confirmIme),
                 value = keyword,
                 onValueChange = onKeywordChange,
                 maxLines = 1,
@@ -152,6 +156,7 @@ private fun SearchInputColumn(
                         cursorColor = MaterialTheme.colorScheme.primary,
                     ),
                 placeholder = { Text("搜索") },
+                keyboardOptions = confirmImeKeyboardOptions(confirmIme),
             )
             SoftKeyboard(
                 firstButtonFocusRequester = focusRequester,
