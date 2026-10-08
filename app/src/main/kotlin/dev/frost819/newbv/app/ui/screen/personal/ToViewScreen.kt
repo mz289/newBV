@@ -92,7 +92,7 @@ fun ToViewScreen(
                 val cardData =
                     remember(item) { VideoCardData.fromToViewItem(item) }
                 SmallVideoCard(
-                    modifier = Modifier.focusSaverItem(focusSaver, "toview_unwatched_$index"),
+                    modifier = Modifier.focusSaverItem(focusSaver, "toview_unwatched_$index", gridIndex = index),
                     data = cardData,
                     onClick = {
                         navController.navigateFromVideoCard(cardData)
@@ -119,7 +119,7 @@ fun ToViewScreen(
                 val cardData =
                     remember(item) { VideoCardData.fromToViewItem(item) }
                 SmallVideoCard(
-                    modifier = Modifier.focusSaverItem(focusSaver, "toview_watched_$index"),
+                    modifier = Modifier.focusSaverItem(focusSaver, "toview_watched_$index", gridIndex = index),
                     data = cardData,
                     onClick = {
                         navController.navigateFromVideoCard(cardData)

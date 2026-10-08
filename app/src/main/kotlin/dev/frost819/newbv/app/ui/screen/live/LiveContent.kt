@@ -160,9 +160,9 @@ fun LiveContent(
             itemsIndexed(
                 items = state.followItems.take(4),
                 key = { _, item -> "follow_${item.roomId}" },
-            ) { _, item ->
+            ) { index, item ->
                 LiveRoomCard(
-                    modifier = Modifier.focusSaverItem(focusSaver, "live_follow_${item.roomId}"),
+                    modifier = Modifier.focusSaverItem(focusSaver, "live_follow_${item.roomId}", gridIndex = index),
                     data = item,
                     onClick = {
                         navController.navigate(
@@ -207,9 +207,9 @@ fun LiveContent(
         itemsIndexed(
             items = state.recommendItems,
             key = { _, item -> "rec_${item.roomId}" },
-        ) { _, item ->
+        ) { index, item ->
             LiveRoomCard(
-                modifier = Modifier.focusSaverItem(focusSaver, "live_rec_${item.roomId}"),
+                modifier = Modifier.focusSaverItem(focusSaver, "live_rec_${item.roomId}", gridIndex = index),
                 data = item,
                 onClick = {
                     navController.navigate(

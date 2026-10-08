@@ -177,7 +177,7 @@ private fun LiveAreaListScreen(
                 key = { _, item -> item.roomId },
             ) { index, item ->
                 LiveRoomCard(
-                    modifier = Modifier.focusSaverItem(focusSaver, "live_area_list_$index"),
+                    modifier = Modifier.focusSaverItem(focusSaver, "live_area_list_$index", gridIndex = index),
                     data = item,
                     onClick = {
                         navController.navigate(

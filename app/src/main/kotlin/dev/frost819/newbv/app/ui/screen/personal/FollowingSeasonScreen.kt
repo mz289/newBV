@@ -168,7 +168,7 @@ fun FollowingSeasonScreen(
                     onClick = {
                         navController.navigate(PgcFeatureRoute(seasonId = item.seasonId.toLong()))
                     },
-                    modifier = Modifier.focusSaverItem(focusSaver, "season_$index"),
+                    modifier = Modifier.focusSaverItem(focusSaver, "season_$index", gridIndex = index),
                 )
             }
 

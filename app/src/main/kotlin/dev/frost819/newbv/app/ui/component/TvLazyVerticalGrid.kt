@@ -181,6 +181,7 @@ fun TvLazyVerticalGrid(
 
     CompositionLocalProvider(
         LocalBringIntoViewSpec provides bringIntoViewSpec,
+        LocalLazyGridFocusScope provides remember(state) { LazyGridFocusScope(state) },
     ) {
         LazyVerticalGrid(
             columns = columns,

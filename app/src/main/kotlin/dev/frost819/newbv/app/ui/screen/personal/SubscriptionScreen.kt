@@ -141,7 +141,7 @@ fun SubscriptionScreen(
                 SubscriptionFolderCard(
                     folder = folder,
                     onClick = { viewModel.loadSubscriptionItems(folder, forceRefresh = true) },
-                    modifier = Modifier.focusSaverItem(focusSaver, "subscription_folder_$index"),
+                    modifier = Modifier.focusSaverItem(focusSaver, "subscription_folder_$index", gridIndex = index),
                 )
             }
         } else {
@@ -163,7 +163,7 @@ fun SubscriptionScreen(
                         )
                     }
                 SmallVideoCard(
-                    modifier = Modifier.focusSaverItem(focusSaver, "subscription_item_$index"),
+                    modifier = Modifier.focusSaverItem(focusSaver, "subscription_item_$index", gridIndex = index),
                     data = cardData,
                     onClick = {
                         navController.navigateFromVideoCard(cardData)

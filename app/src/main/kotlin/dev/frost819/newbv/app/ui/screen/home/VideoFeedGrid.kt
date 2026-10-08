@@ -93,7 +93,7 @@ fun <T> VideoFeedGrid(
             val cardData =
                 remember(item) { toCardData(item) }
             SmallVideoCard(
-                modifier = Modifier.focusSaverItem(focusSaver, "${keyPrefix}_$index"),
+                modifier = Modifier.focusSaverItem(focusSaver, "${keyPrefix}_$index", gridIndex = index),
                 data = cardData,
                 onClick = {
                     navController.navigateFromVideoCard(cardData)
