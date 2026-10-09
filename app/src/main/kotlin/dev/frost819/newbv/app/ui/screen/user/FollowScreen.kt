@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -125,7 +124,7 @@ private fun FollowScreen(
                 key = { _, user -> user.mid },
             ) { index, user ->
                 FollowedUserCard(
-                    modifier = Modifier.focusSaverItem(focusSaver, "follow_$index", gridIndex = index),
+                    modifier = Modifier.focusSaverItem(focusSaver, "follow_$index"),
                     user = user,
                     onClick = {
                         navController.navigate(UserSpaceRoute(mid = user.mid, name = user.name, face = user.avatar))

@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -87,6 +89,7 @@ fun LeftNaviContent(
     onFocusToContent: () -> Boolean,
     onLogin: () -> Unit,
     focusSaver: FocusSaver,
+    selectedItemFocusRequester: FocusRequester? = null,
 ) {
     val focusManager = LocalFocusManager.current
     NavigationRail(
@@ -184,7 +187,13 @@ fun LeftNaviContent(
                     },
                     modifier =
                         Modifier
-                            .onFocusChanged { isFocused = it.hasFocus }
+                            .then(
+                                if (item == selectedItem && selectedItemFocusRequester != null) {
+                                    Modifier.focusRequester(selectedItemFocusRequester)
+                                } else {
+                                    Modifier
+                                },
+                            ).onFocusChanged { isFocused = it.hasFocus }
                             .selectionIndicator(indicatorColor)
                             .controlFocusOutline(),
                     colors =

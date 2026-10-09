@@ -103,28 +103,22 @@ fun rememberFocusSaver(): FocusSaver {
  * 封装 `.focusRequester()` + `.onFocusChanged()` 两行 boilerplate 为一行。
  * 适用于列表/网格和混合布局中所有可聚焦元素的焦点追踪。
  *
- * [gridIndex] 传入元素在 [TvLazyVerticalGrid] 中的索引，启用 D-Pad 左右键行锁定：
- * 网格行首/行末继续按左右键不再让焦点跳到其他行，只触发撞墙抖动（[dpadGridRowLock]）。
- *
  * 用法：
  * ```
  * SmallVideoCard(
- *     modifier = Modifier.focusSaverItem(focusSaver, "rcmd_$index", gridIndex = index),
+ *     modifier = Modifier.focusSaverItem(focusSaver, "rcmd_$index"),
  *     ...
  * )
  * ```
  *
  * @param focusSaver 焦点恢复器。
  * @param key 元素的唯一标识（如 `"cover"`、`"tag_${tag.id}"`、`"rcmd_$index"`）。
- * @param gridIndex 元素在网格中的线性索引；非网格元素不传。
  */
 fun Modifier.focusSaverItem(
     focusSaver: FocusSaver,
     key: String,
-    gridIndex: Int? = null,
 ): Modifier =
     this
-        .dpadGridRowLock(gridIndex)
         .focusRequester(focusSaver.focusRequesterFor(key))
         .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey(key) }
 

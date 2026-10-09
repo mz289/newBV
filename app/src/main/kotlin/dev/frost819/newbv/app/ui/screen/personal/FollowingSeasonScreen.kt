@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FilterList
@@ -168,7 +167,7 @@ fun FollowingSeasonScreen(
                     onClick = {
                         navController.navigate(PgcFeatureRoute(seasonId = item.seasonId.toLong()))
                     },
-                    modifier = Modifier.focusSaverItem(focusSaver, "season_$index", gridIndex = index),
+                    modifier = Modifier.focusSaverItem(focusSaver, "season_$index"),
                 )
             }
 

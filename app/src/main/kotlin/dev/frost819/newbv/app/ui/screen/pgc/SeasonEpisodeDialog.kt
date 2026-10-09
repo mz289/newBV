@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +46,7 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.videocard.BadgeChip
@@ -238,7 +237,10 @@ internal fun SeasonEpisodeDialog(
                                 contentAlignment = Alignment.Center,
                             ) { Text("暂无选集") }
                         } else {
-                            LazyVerticalGrid(
+                            TvLazyVerticalGrid(
+                                leftExitRequester =
+                                    if (groupCount > 1) focusSaver.focusRequesterFor("group_$group") else null,
+                                scrollLock = { true },
                                 columns = GridCells.Fixed(columns),
                                 state = gridState,
                                 modifier =
@@ -283,15 +285,7 @@ internal fun SeasonEpisodeDialog(
                                         modifier =
                                             Modifier
                                                 .testTag("episode_choice_${episode.id}")
-                                                .focusSaverItem(focusSaver, "episode_${episode.id}")
-                                                .focusProperties {
-                                                    if (groupCount > 1 &&
-                                                        index % columns == 0
-                                                    ) {
-                                                        left =
-                                                            focusSaver.focusRequesterFor("group_$group")
-                                                    }
-                                                },
+                                                .focusSaverItem(focusSaver, "episode_${episode.id}"),
                                     )
                                 }
                             }

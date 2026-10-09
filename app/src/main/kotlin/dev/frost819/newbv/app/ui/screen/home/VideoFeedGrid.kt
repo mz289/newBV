@@ -3,7 +3,6 @@ package dev.frost819.newbv.app.ui.screen.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,10 +19,10 @@ import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.SKELETON_FIRST_SCREEN_COUNT
 import dev.frost819.newbv.app.ui.component.SkeletonVideoCard
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.videoCardGridCells
 import dev.frost819.newbv.app.ui.component.videoGridHSpacing
 import dev.frost819.newbv.app.ui.component.videoGridVSpacing
-import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
 import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
@@ -93,7 +92,7 @@ fun <T> VideoFeedGrid(
             val cardData =
                 remember(item) { toCardData(item) }
             SmallVideoCard(
-                modifier = Modifier.focusSaverItem(focusSaver, "${keyPrefix}_$index", gridIndex = index),
+                modifier = Modifier.focusSaverItem(focusSaver, "${keyPrefix}_$index"),
                 data = cardData,
                 onClick = {
                     navController.navigateFromVideoCard(cardData)

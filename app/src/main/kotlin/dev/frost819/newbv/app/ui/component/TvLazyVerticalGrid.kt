@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -15,21 +14,27 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.frost819.newbv.core.focus.isKeyDown
 import dev.frost819.newbv.data.datastore.Prefs
 import kotlin.math.ceil
 import kotlin.math.max
 
 /** 应用实际布局屏宽：应用覆盖了 [LocalDensity]，须用覆盖后密度换算物理像素。 */
 @Composable
-private fun appScreenWidthDp(): Dp = with(LocalDensity.current) {
-    LocalView.current.resources.displayMetrics.widthPixels.toDp()
-}
+private fun appScreenWidthDp(): Dp =
+    with(LocalDensity.current) {
+        LocalView.current.resources.displayMetrics.widthPixels
+            .toDp()
+    }
 
 /**
  * 视频网格水平间距：与卡宽同比例分档。
@@ -69,9 +74,7 @@ fun videoGridVSpacing(): Dp {
 @Composable
 fun animeCardScale(): Float = animeCardScale(appScreenWidthDp())
 
-internal fun animeCardScale(
-    screenWidth: Dp,
-): Float =
+internal fun animeCardScale(screenWidth: Dp): Float =
     when {
         screenWidth >= 1600.dp -> 1.3f
         screenWidth >= 1100.dp -> 1.15f
@@ -87,7 +90,10 @@ internal fun animeCardScale(
 private class MaxCardWidthCells(
     private val maxWidth: Dp,
 ) : GridCells {
-    override fun Density.calculateCrossAxisCellSizes(availableSize: Int, spacing: Int): List<Int> {
+    override fun Density.calculateCrossAxisCellSizes(
+        availableSize: Int,
+        spacing: Int,
+    ): List<Int> {
         val count =
             max(1, ceil(availableSize / (maxWidth.roundToPx() + spacing.toFloat())).toInt())
         val cellSize = (availableSize - spacing * (count - 1)) / count
@@ -144,6 +150,7 @@ internal val minimalBringIntoViewSpec =
  *   反复拉去对齐 30% 线、把看板推出视口；保留最少滚动是为了焦点从板块外进入时
  *   仍能被带入视口（板块整体在屏内时页面纹丝不动）。滚算发生在焦点请求期，
  *   lambda 每次调用都会执行，须读取 remember 的状态才能当帧感知锁的切换。
+ * @param leftExitRequester 首列左键的出口；主页面默认回到选中侧边栏项，独立页面或弹窗传 null。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -156,8 +163,11 @@ fun TvLazyVerticalGrid(
     horizontalArrangement: Arrangement.Horizontal = Arrangement.spacedBy(0.dp),
     pivotFraction: Float = 0.3f,
     scrollLock: () -> Boolean = { false },
-    content: LazyGridScope.() -> Unit,
+    leftExitRequester: FocusRequester? = LocalGridLeftExit.current,
+    content: TvLazyGridScope.() -> Unit,
 ) {
+    val leftExit by rememberUpdatedState(leftExitRequester)
+    val navigation = remember(state) { GridFocusNavigation(state) { leftExit } }
     val bringIntoViewSpec =
         remember(pivotFraction, scrollLock) {
             object : BringIntoViewSpec {
@@ -181,16 +191,19 @@ fun TvLazyVerticalGrid(
 
     CompositionLocalProvider(
         LocalBringIntoViewSpec provides bringIntoViewSpec,
-        LocalLazyGridFocusScope provides remember(state) { LazyGridFocusScope(state) },
     ) {
         LazyVerticalGrid(
             columns = columns,
-            modifier = modifier,
+            modifier =
+                modifier.onPreviewKeyEvent {
+                    navigation.initialKeyDown = it.isKeyDown() && it.nativeKeyEvent.repeatCount == 0
+                    false
+                },
             state = state,
             contentPadding = contentPadding,
             verticalArrangement = verticalArrangement,
             horizontalArrangement = horizontalArrangement,
-            content = content,
+            content = { content(TvLazyGridScope(this, navigation)) },
         )
     }
 }

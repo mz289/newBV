@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FilterList
@@ -48,15 +46,16 @@ import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TopNav
+import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.app.ui.component.focusSaverItem
-import dev.frost819.newbv.app.ui.component.videoCardGridCells
-import dev.frost819.newbv.app.ui.component.videoGridHSpacing
-import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.search.SearchResultFilter
 import dev.frost819.newbv.app.ui.component.search.UpCard
+import dev.frost819.newbv.app.ui.component.videoCardGridCells
+import dev.frost819.newbv.app.ui.component.videoGridHSpacing
+import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.videocard.SeasonCard
 import dev.frost819.newbv.app.ui.component.videocard.SeasonCardData
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
@@ -191,7 +190,9 @@ fun SearchResultContent(
             Spacer(modifier = Modifier.height(6.dp))
 
             // 结果网格
-            LazyVerticalGrid(
+            TvLazyVerticalGrid(
+                leftExitRequester = null,
+                scrollLock = { true },
                 modifier =
                     Modifier
                         .fillMaxSize()

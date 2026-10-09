@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -141,7 +140,7 @@ fun SubscriptionScreen(
                 SubscriptionFolderCard(
                     folder = folder,
                     onClick = { viewModel.loadSubscriptionItems(folder, forceRefresh = true) },
-                    modifier = Modifier.focusSaverItem(focusSaver, "subscription_folder_$index", gridIndex = index),
+                    modifier = Modifier.focusSaverItem(focusSaver, "subscription_folder_$index"),
                 )
             }
         } else {
@@ -163,7 +162,7 @@ fun SubscriptionScreen(
                         )
                     }
                 SmallVideoCard(
-                    modifier = Modifier.focusSaverItem(focusSaver, "subscription_item_$index", gridIndex = index),
+                    modifier = Modifier.focusSaverItem(focusSaver, "subscription_item_$index"),
                     data = cardData,
                     onClick = {
                         navController.navigateFromVideoCard(cardData)

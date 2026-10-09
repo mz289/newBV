@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -51,11 +50,10 @@ import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
-import dev.frost819.newbv.app.ui.component.videoCardGridCells
-import dev.frost819.newbv.app.ui.component.videoGridHSpacing
-import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
+import dev.frost819.newbv.app.ui.component.videoCardGridCells
+import dev.frost819.newbv.app.ui.component.videoGridHSpacing
 import dev.frost819.newbv.app.ui.navigation.LiveAreaRoute
 import dev.frost819.newbv.app.ui.navigation.LiveFollowRoute
 import dev.frost819.newbv.app.ui.navigation.LivePlayerRoute
@@ -160,9 +158,9 @@ fun LiveContent(
             itemsIndexed(
                 items = state.followItems.take(4),
                 key = { _, item -> "follow_${item.roomId}" },
-            ) { index, item ->
+            ) { _, item ->
                 LiveRoomCard(
-                    modifier = Modifier.focusSaverItem(focusSaver, "live_follow_${item.roomId}", gridIndex = index),
+                    modifier = Modifier.focusSaverItem(focusSaver, "live_follow_${item.roomId}"),
                     data = item,
                     onClick = {
                         navController.navigate(
@@ -207,9 +205,9 @@ fun LiveContent(
         itemsIndexed(
             items = state.recommendItems,
             key = { _, item -> "rec_${item.roomId}" },
-        ) { index, item ->
+        ) { _, item ->
             LiveRoomCard(
-                modifier = Modifier.focusSaverItem(focusSaver, "live_rec_${item.roomId}", gridIndex = index),
+                modifier = Modifier.focusSaverItem(focusSaver, "live_rec_${item.roomId}"),
                 data = item,
                 onClick = {
                     navController.navigate(

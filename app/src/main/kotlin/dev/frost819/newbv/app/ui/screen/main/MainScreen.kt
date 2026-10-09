@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,6 +34,7 @@ import androidx.navigation.NavController
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.rememberDrawerState
+import dev.frost819.newbv.app.ui.component.LocalGridLeftExit
 import dev.frost819.newbv.app.ui.component.rememberDoublePressExit
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.user.UserPanel
@@ -67,6 +69,7 @@ fun MainScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
     val homeFocusRequester = remember { FocusRequester() }
+    val sidebarFocusRequester = remember { FocusRequester() }
     val focusSaver = rememberFocusSaver()
 
     // 仅"返回 MainScreen"时恢复焦点；首次进入不恢复，
@@ -121,74 +124,77 @@ fun MainScreen(
                     navController.navigate(dev.frost819.newbv.app.ui.navigation.LoginRoute)
                 },
                 focusSaver = focusSaver,
+                selectedItemFocusRequester = sidebarFocusRequester,
             )
         },
         drawerState = drawerState,
     ) {
         Box(modifier = Modifier) {
-            AnimatedContent(
-                targetState = selectedDrawerItem,
-                label = "main-animated-content",
-                transitionSpec = {
-                    val coefficient = 20
-                    if (targetState.ordinal < initialState.ordinal) {
-                        fadeIn() + slideInVertically { -it / coefficient } togetherWith
-                            fadeOut() + slideOutVertically { it / coefficient }
-                    } else {
-                        fadeIn() + slideInVertically { it / coefficient } togetherWith
-                            fadeOut() + slideOutVertically { -it / coefficient }
+            CompositionLocalProvider(LocalGridLeftExit provides sidebarFocusRequester) {
+                AnimatedContent(
+                    targetState = selectedDrawerItem,
+                    label = "main-animated-content",
+                    transitionSpec = {
+                        val coefficient = 20
+                        if (targetState.ordinal < initialState.ordinal) {
+                            fadeIn() + slideInVertically { -it / coefficient } togetherWith
+                                fadeOut() + slideOutVertically { it / coefficient }
+                        } else {
+                            fadeIn() + slideInVertically { it / coefficient } togetherWith
+                                fadeOut() + slideOutVertically { -it / coefficient }
+                        }
+                    },
+                ) { screen ->
+                    when (screen) {
+                        LeftNaviItem.Home ->
+                            HomeContent(
+                                navFocusRequester = homeFocusRequester,
+                                navController = navController,
+                                focusSaver = focusSaver,
+                            )
+                        LeftNaviItem.Search -> {
+                            val searchInputViewModel: dev.frost819.newbv.app.viewmodel.search.SearchInputViewModel =
+                                androidx.hilt.navigation.compose
+                                    .hiltViewModel()
+                            dev.frost819.newbv.app.ui.screen.search.SearchInputContent(
+                                viewModel = searchInputViewModel,
+                                focusRequester = homeFocusRequester,
+                                focusSaver = focusSaver,
+                                onSearch = { keyword ->
+                                    searchInputViewModel.commitSearch(keyword) {
+                                        navController.navigate(
+                                            dev.frost819.newbv.app.ui.navigation
+                                                .SearchResultRoute(keyword = keyword),
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                        LeftNaviItem.Personal ->
+                            dev.frost819.newbv.app.ui.screen.personal.PersonalContent(
+                                navFocusRequester = homeFocusRequester,
+                                navController = navController,
+                                focusSaver = focusSaver,
+                            )
+                        LeftNaviItem.UGC ->
+                            dev.frost819.newbv.app.ui.screen.ugc.UgcContent(
+                                navFocusRequester = homeFocusRequester,
+                                navController = navController,
+                                focusSaver = focusSaver,
+                            )
+                        LeftNaviItem.PGC ->
+                            dev.frost819.newbv.app.ui.screen.pgc.PgcContent(
+                                navFocusRequester = homeFocusRequester,
+                                navController = navController,
+                                focusSaver = focusSaver,
+                            )
+                        LeftNaviItem.Live ->
+                            dev.frost819.newbv.app.ui.screen.live.LiveContent(
+                                navFocusRequester = homeFocusRequester,
+                                navController = navController,
+                                focusSaver = focusSaver,
+                            )
                     }
-                },
-            ) { screen ->
-                when (screen) {
-                    LeftNaviItem.Home ->
-                        HomeContent(
-                            navFocusRequester = homeFocusRequester,
-                            navController = navController,
-                            focusSaver = focusSaver,
-                        )
-                    LeftNaviItem.Search -> {
-                        val searchInputViewModel: dev.frost819.newbv.app.viewmodel.search.SearchInputViewModel =
-                            androidx.hilt.navigation.compose
-                                .hiltViewModel()
-                        dev.frost819.newbv.app.ui.screen.search.SearchInputContent(
-                            viewModel = searchInputViewModel,
-                            focusRequester = homeFocusRequester,
-                            focusSaver = focusSaver,
-                            onSearch = { keyword ->
-                                searchInputViewModel.commitSearch(keyword) {
-                                    navController.navigate(
-                                        dev.frost819.newbv.app.ui.navigation
-                                            .SearchResultRoute(keyword = keyword),
-                                    )
-                                }
-                            },
-                        )
-                    }
-                    LeftNaviItem.Personal ->
-                        dev.frost819.newbv.app.ui.screen.personal.PersonalContent(
-                            navFocusRequester = homeFocusRequester,
-                            navController = navController,
-                            focusSaver = focusSaver,
-                        )
-                    LeftNaviItem.UGC ->
-                        dev.frost819.newbv.app.ui.screen.ugc.UgcContent(
-                            navFocusRequester = homeFocusRequester,
-                            navController = navController,
-                            focusSaver = focusSaver,
-                        )
-                    LeftNaviItem.PGC ->
-                        dev.frost819.newbv.app.ui.screen.pgc.PgcContent(
-                            navFocusRequester = homeFocusRequester,
-                            navController = navController,
-                            focusSaver = focusSaver,
-                        )
-                    LeftNaviItem.Live ->
-                        dev.frost819.newbv.app.ui.screen.live.LiveContent(
-                            navFocusRequester = homeFocusRequester,
-                            navController = navController,
-                            focusSaver = focusSaver,
-                        )
                 }
             }
 

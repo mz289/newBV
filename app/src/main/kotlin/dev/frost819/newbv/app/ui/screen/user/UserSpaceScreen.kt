@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -36,11 +35,11 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
+import dev.frost819.newbv.app.ui.component.focusSaverItem
+import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.videoCardGridCells
 import dev.frost819.newbv.app.ui.component.videoGridHSpacing
 import dev.frost819.newbv.app.ui.component.videoGridVSpacing
-import dev.frost819.newbv.app.ui.component.focusSaverItem
-import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
 import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
@@ -146,7 +145,7 @@ private fun UserSpaceScreen(
                     )
                 }
             SmallVideoCard(
-                modifier = Modifier.focusSaverItem(focusSaver, "user_space_$index", gridIndex = index),
+                modifier = Modifier.focusSaverItem(focusSaver, "user_space_$index"),
                 data = cardData,
                 onClick = { navController.navigateFromVideoCard(cardData) },
                 onGoToDetailPage = {

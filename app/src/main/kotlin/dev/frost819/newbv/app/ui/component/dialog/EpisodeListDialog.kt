@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -237,6 +236,7 @@ fun <T> EpisodeListDialog(
                 val end = minOf(start + pageSize, entries.size)
                 val slice = entries.subList(start, end)
                 TvLazyVerticalGrid(
+                    leftExitRequester = null,
                     modifier =
                         Modifier
                             .fillMaxSize()

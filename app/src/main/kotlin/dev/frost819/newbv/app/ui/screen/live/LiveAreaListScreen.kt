@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -27,14 +26,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
-import dev.frost819.newbv.app.ui.component.videoCardGridCells
-import dev.frost819.newbv.app.ui.component.videoGridHSpacing
-import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCard
 import dev.frost819.newbv.app.ui.component.livecard.LiveRoomCardData
 import dev.frost819.newbv.app.ui.component.livecard.toCardData
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
+import dev.frost819.newbv.app.ui.component.videoCardGridCells
+import dev.frost819.newbv.app.ui.component.videoGridHSpacing
+import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.navigation.LiveAreaRoute
 import dev.frost819.newbv.app.ui.navigation.LivePlayerRoute
 import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
@@ -177,7 +176,7 @@ private fun LiveAreaListScreen(
                 key = { _, item -> item.roomId },
             ) { index, item ->
                 LiveRoomCard(
-                    modifier = Modifier.focusSaverItem(focusSaver, "live_area_list_$index", gridIndex = index),
+                    modifier = Modifier.focusSaverItem(focusSaver, "live_area_list_$index"),
                     data = item,
                     onClick = {
                         navController.navigate(
