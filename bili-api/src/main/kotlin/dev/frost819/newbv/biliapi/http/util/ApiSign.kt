@@ -210,6 +210,7 @@ fun HttpClient.encApiSign() =
  *
  * - App 请求（含 access_key）不注入 Cookie，使用 access_key 鉴权
  * - SPI/导航等无登录请求：buvid3 + b_nut 仍会被注入（设备标识）
+ * - 请求已显式设置 Cookie 头（如双账号解析的 cookieOverride）时不覆盖
  */
 fun HttpClient.injectCookies() =
     plugin(HttpSend).intercept { request ->
@@ -217,7 +218,7 @@ fun HttpClient.injectCookies() =
             request.url.encodedPath.contains("/x/player/playurl") ||
                 request.url.encodedPath.contains("/x/player/wbi/playurl")
 
-        if (!request.isAppRequest) {
+        if (!request.isAppRequest && request.headers["Cookie"] == null) {
             val cookieParts = mutableListOf<String>()
 
             // 登录凭证（playurl 也需要 SESSDATA 才能返回高画质）

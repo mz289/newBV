@@ -10,6 +10,13 @@
     <string name="login_error">登录失败</string>
     <string name="login_retry">重试</string>
     <string name="login_title">登录</string>
+    <string name="login_tab_qr">扫码登录</string>
+    <string name="login_tab_cookie">Cookie 登录</string>
+    <string name="login_cookie_hint">粘贴浏览器 Cookie（含 SESSDATA、bili_jct、DedeUserID）或凭证 JSON</string>
+    <string name="login_cookie_submit">登录</string>
+    <string name="login_cookie_import_file">从文件导入</string>
+    <string name="login_cookie_clear">清空</string>
+    <string name="login_cookie_submitting">正在登录…</string>
 
     <!-- User Switch -->
     <string name="user_switch_title">账号管理</string>
@@ -22,6 +29,10 @@
     <string name="user_switch_delete">删除账号</string>
     <string name="user_switch_no_users">暂无账号，请登录</string>
     <string name="user_switch_current">当前</string>
+    <string name="user_switch_parse_active">解析账号</string>
+    <string name="user_switch_parse_set">设为解析账号</string>
+    <string name="user_switch_parse_unset">取消解析账号</string>
+    <string name="user_switch_export">导出凭证</string>
 
     <!-- User Panel -->
     <string name="user_panel_incognito">无痕模式</string>

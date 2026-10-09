@@ -285,6 +285,12 @@ object BiliHttpApi {
     /**
      * 获取视频流
      */
+    /**
+     * 获取视频流
+     *
+     * @param cookieOverride 覆写 Cookie 头（双账号解析：以指定解析账号身份请求）。
+     * 非空时 injectCookies 拦截器不再注入全局登录 Cookie；视为已登录，不附加 try_look。
+     */
     suspend fun getVideoPlayUrl(
         av: Long? = null,
         bv: String? = null,
@@ -297,6 +303,7 @@ object BiliHttpApi {
         otype: String = "json",
         type: String = "",
         platform: String = "oc",
+        cookieOverride: String? = null,
     ): BiliResponse<PlayUrlData> {
         val response =
             client.get("/x/player/playurl") {
@@ -312,7 +319,10 @@ object BiliHttpApi {
                 parameter("otype", otype)
                 parameter("type", type)
                 parameter("platform", platform)
-                if (sessData.isEmpty()) {
+                if (cookieOverride != null) {
+                    header("Cookie", cookieOverride)
+                }
+                if (cookieOverride == null && sessData.isEmpty()) {
                     parameter("web_location", "1315873")
                     parameter("gaia_source", "pre-load")
                     parameter("isGaiaAvoided", "true")
@@ -338,6 +348,8 @@ object BiliHttpApi {
      *
      * @param epId 剧集 EP ID
      * @param cid 视频 CID
+     * @param cookieOverride 覆写 Cookie 头（双账号解析：以指定解析账号身份请求），
+     * 非空时视为已登录，不附加 try_look。
      */
     suspend fun getPgcPlayUrl(
         epId: Int,
@@ -346,6 +358,7 @@ object BiliHttpApi {
         fnval: Int? = 4048,
         fnver: Int? = 0,
         fourk: Int? = 1,
+        cookieOverride: String? = null,
     ): BiliResponse<PgcPlayUrlData> =
         client.get("/pgc/player/web/v2/playurl") {
             header("Referer", "https://www.bilibili.com")
@@ -358,7 +371,10 @@ object BiliHttpApi {
             parameter("fourk", fourk)
             parameter("platform", "web")
             parameter("high_quality", "1")
-            if (sessData.isEmpty()) {
+            if (cookieOverride != null) {
+                header("Cookie", cookieOverride)
+            }
+            if (cookieOverride == null && sessData.isEmpty()) {
                 parameter("try_look", "1")
             }
         }.body()

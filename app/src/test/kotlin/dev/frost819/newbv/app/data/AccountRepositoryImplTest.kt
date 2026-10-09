@@ -10,6 +10,7 @@ import dev.frost819.newbv.biliapi.http.entity.user.LevelInfo
 import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
 import dev.frost819.newbv.biliapi.repositories.ChannelRepository
+import dev.frost819.newbv.biliapi.repositories.ParseAccountRepository
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.db.dao.UserDao
 import dev.frost819.newbv.data.db.entity.UserEntity
@@ -87,7 +88,7 @@ class AccountRepositoryImplTest {
             )
         coEvery { BiliHttpApi.getUserSelfInfo() } returns mockResponse
 
-        repository = AccountRepositoryImpl(userDao, authRepository, ChannelRepository())
+        repository = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), ParseAccountRepository())
     }
 
     @AfterEach
@@ -338,7 +339,7 @@ class AccountRepositoryImplTest {
         Prefs.biliJct = "test-jct"
         Prefs.accessToken = "test-token"
 
-        val newRepo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository())
+        val newRepo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), ParseAccountRepository())
 
         assertThat(authRepository.mid).isEqualTo(300L)
         assertThat(authRepository.sessionData).isEqualTo("test-sess")
@@ -352,13 +353,129 @@ class AccountRepositoryImplTest {
     fun `initFromPrefs does nothing when not logged in`() {
         Prefs.isLogin = false
 
-        val newRepo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository())
+        val newRepo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), ParseAccountRepository())
 
         assertThat(authRepository.mid).isNull()
         assertThat(newRepo.uiState.value.isLogin).isFalse()
     }
 
     // ── refreshUserInfo ──────────────────────────────────────────────
+
+    // ── 双账号解析账号 ────────────────────────────────────────────────
+
+    @Test
+    fun `setParseAccount syncs credentials from userDao`() =
+        runTest {
+            val authData =
+                AuthData(
+                    uid = 222L,
+                    uidCkMd5 = "md5",
+                    sid = "sid",
+                    biliJct = "jct-b",
+                    sessData = "sess-b",
+                    tokenExpiredDate = 0L,
+                )
+            coEvery { userDao.findUserByUid(222L) } returns
+                UserEntity(uid = 222L, username = "vip", avatar = "", auth = authData.toJson())
+
+            val parseRepo = ParseAccountRepository()
+            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+            repo.setParseAccount(222L)
+
+            assertThat(Prefs.parseAccountUid).isEqualTo(222L)
+            assertThat(parseRepo.uid).isEqualTo(222L)
+            assertThat(parseRepo.sessData).isEqualTo("sess-b")
+            assertThat(parseRepo.biliJct).isEqualTo("jct-b")
+        }
+
+    @Test
+    fun `setParseAccount zero clears parse account`() =
+        runTest {
+            val authData =
+                AuthData(
+                    uid = 222L,
+                    uidCkMd5 = "md5",
+                    sid = "sid",
+                    biliJct = "jct-b",
+                    sessData = "sess-b",
+                    tokenExpiredDate = 0L,
+                )
+            coEvery { userDao.findUserByUid(222L) } returns
+                UserEntity(uid = 222L, username = "vip", avatar = "", auth = authData.toJson())
+            val parseRepo = ParseAccountRepository()
+            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+            repo.setParseAccount(222L)
+            assertThat(parseRepo.uid).isEqualTo(222L)
+
+            repo.setParseAccount(0L)
+
+            assertThat(parseRepo.uid).isEqualTo(0L)
+            assertThat(parseRepo.sessData).isEmpty()
+            assertThat(Prefs.parseAccountUid).isEqualTo(0L)
+        }
+
+    @Test
+    fun `setParseAccount with unknown user clears parse account`() =
+        runTest {
+            coEvery { userDao.findUserByUid(999L) } returns null
+            val parseRepo = ParseAccountRepository()
+            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+
+            repo.setParseAccount(999L)
+
+            assertThat(parseRepo.uid).isEqualTo(0L)
+            assertThat(Prefs.parseAccountUid).isEqualTo(0L)
+        }
+
+    @Test
+    fun `deleteUser clears parse account when deleted user is parse account`() =
+        runTest {
+            val authData =
+                AuthData(
+                    uid = 222L,
+                    uidCkMd5 = "md5",
+                    sid = "sid",
+                    biliJct = "jct-b",
+                    sessData = "sess-b",
+                    tokenExpiredDate = 0L,
+                )
+            coEvery { userDao.findUserByUid(222L) } returns
+                UserEntity(uid = 222L, username = "vip", avatar = "", auth = authData.toJson())
+            val parseRepo = ParseAccountRepository()
+            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+            repo.setParseAccount(222L)
+            assertThat(parseRepo.uid).isEqualTo(222L)
+
+            val user = UserEntity(uid = 222L, username = "vip", avatar = "", auth = authData.toJson())
+            repo.deleteUser(user)
+
+            assertThat(parseRepo.uid).isEqualTo(0L)
+            assertThat(Prefs.parseAccountUid).isEqualTo(0L)
+        }
+
+    @Test
+    fun `syncParseAccountFromPrefs restores parse account on startup`() =
+        runTest {
+            val authData =
+                AuthData(
+                    uid = 222L,
+                    uidCkMd5 = "md5",
+                    sid = "sid",
+                    biliJct = "jct-b",
+                    sessData = "sess-b",
+                    tokenExpiredDate = 0L,
+                )
+            coEvery { userDao.findUserByUid(222L) } returns
+                UserEntity(uid = 222L, username = "vip", avatar = "", auth = authData.toJson())
+            Prefs.parseAccountUid = 222L
+
+            val parseRepo = ParseAccountRepository()
+            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+            repo.syncParseAccountFromPrefs()
+
+            assertThat(parseRepo.uid).isEqualTo(222L)
+            assertThat(parseRepo.sessData).isEqualTo("sess-b")
+        }
 
     @Test
     fun `refreshUserInfo updates username avatar and level from API`() =

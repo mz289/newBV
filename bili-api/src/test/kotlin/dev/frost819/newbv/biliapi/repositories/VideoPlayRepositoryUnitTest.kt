@@ -54,7 +54,7 @@ class VideoPlayRepositoryUnitTest {
         authRepository.biliJct = BILI_JCT
         authRepository.accessToken = ACCESS_TOKEN
         channelRepository = ChannelRepository()
-        repository = VideoPlayRepository(authRepository, channelRepository)
+        repository = VideoPlayRepository(authRepository, channelRepository, ParseAccountRepository())
     }
 
     @AfterEach

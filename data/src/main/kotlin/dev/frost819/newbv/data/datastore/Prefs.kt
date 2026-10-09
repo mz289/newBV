@@ -220,6 +220,14 @@ object Prefs {
     /** 无痕模式（不记录历史）。 */
     var incognitoMode by pref(PrefKeys.incognitoMode, false)
 
+    /**
+     * 双账号解析账号 UID。
+     *
+     * 参考「哔哩哔哩双账号助手-A身份-B大会员权益」：当前账号保持身份浏览互动，
+     * 该账号（通常为大会员）仅用于播放地址解析。0 表示关闭。
+     */
+    var parseAccountUid by pref(PrefKeys.parseAccountUid, 0L)
+
     // --- 网络 & API（PRD 7.5） ---
 
     /** 接口类型（Web/App）。 */

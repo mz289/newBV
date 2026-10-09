@@ -32,6 +32,9 @@ internal object PrefKeys {
     val deviceCookies = stringPreferencesKey("device_cookies")
     val incognitoMode = booleanPreferencesKey("im")
 
+    /** 双账号解析：仅用于播放地址解析的账号 UID（0 = 关闭）。 */
+    val parseAccountUid = longPreferencesKey("parse_account_uid")
+
     // ===== 网络 & API =====
     val apiType = intPreferencesKey("api_type")
     val crashReportEnabled = booleanPreferencesKey("crash_report_enabled")

@@ -6,6 +6,7 @@ import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
 import dev.frost819.newbv.biliapi.repositories.ChannelRepository
+import dev.frost819.newbv.biliapi.repositories.ParseAccountRepository
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.db.dao.UserDao
 import dev.frost819.newbv.data.db.entity.UserEntity
@@ -37,6 +38,7 @@ class AccountRepositoryImpl
         private val userDao: UserDao,
         private val authRepository: AuthRepository,
         private val channelRepository: ChannelRepository,
+        private val parseAccountRepository: ParseAccountRepository,
     ) {
         /** UI 状态：当前登录用户信息。 */
         private val _uiState = MutableStateFlow(AccountUiState())
@@ -111,6 +113,52 @@ class AccountRepositoryImpl
 
         suspend fun findUserByUid(uid: Long): UserEntity? = userDao.findUserByUid(uid)
 
+        /** 当前解析账号 UID（0 = 关闭）。 */
+        fun parseAccountUid(): Long = Prefs.parseAccountUid
+
+        /**
+         * 设置双账号解析账号。
+         *
+         * 写入 Prefs 并同步凭证到 [ParseAccountRepository]（bili-api 层播放解析读取）。
+         *
+         * @param uid 解析账号 UID，0 表示关闭。
+         */
+        suspend fun setParseAccount(uid: Long) {
+            Prefs.parseAccountUid = uid
+            syncParseAccount(uid)
+        }
+
+        /**
+         * 从 Prefs 同步解析账号凭证到 [ParseAccountRepository]。
+         *
+         * 在应用启动时调用（播放解析可能早于任何账号操作）。
+         */
+        suspend fun syncParseAccountFromPrefs() {
+            syncParseAccount(Prefs.parseAccountUid)
+        }
+
+        /**
+         * 加载指定 UID 的凭证并同步到 [ParseAccountRepository]。
+         *
+         * UID 为 0、用户不存在或凭证无效（SESSDATA 为空）时清空解析账号。
+         */
+        private suspend fun syncParseAccount(uid: Long) {
+            if (uid == 0L) {
+                parseAccountRepository.clear()
+                return
+            }
+            val authData =
+                userDao.findUserByUid(uid)?.let { user ->
+                    runCatching { AuthData.fromJson(user.auth) }.getOrNull()
+                }
+            if (authData != null) {
+                parseAccountRepository.update(authData.uid, authData.sessData, authData.biliJct)
+            } else {
+                parseAccountRepository.clear()
+                Prefs.parseAccountUid = 0L
+            }
+        }
+
         suspend fun upsertUser(user: UserEntity) {
             val existing = userDao.findUserByUid(user.uid)
             if (existing != null) {
@@ -123,6 +171,9 @@ class AccountRepositoryImpl
 
         suspend fun deleteUser(user: UserEntity) {
             userDao.delete(user)
+            if (Prefs.parseAccountUid == user.uid) {
+                setParseAccount(0L)
+            }
         }
 
         fun isLogin(): Boolean = Prefs.isLogin

@@ -32,6 +32,7 @@ import kotlinx.coroutines.withContext
 class VideoPlayRepository(
     private val authRepository: AuthRepository,
     private val channelRepository: ChannelRepository,
+    private val parseAccountRepository: ParseAccountRepository,
 ) {
     private val playerStub
         get() =
@@ -51,13 +52,36 @@ class VideoPlayRepository(
                 DMGrpcKt.DMCoroutineStub(channelRepository.requireDefaultChannel())
             }.getOrNull()
 
+    /**
+     * 获取播放数据。
+     *
+     * 双账号解析（参考油猴脚本「哔哩哔哩双账号助手-A身份-B大会员权益」）：
+     * 启用解析账号（B，大会员）且与当前账号（A）不同时，播放地址优先以 B 的 Cookie
+     * 走 Web 通道解析（解锁会员画质/会员专享内容），心跳、历史等仍以 A 身份上报；
+     * B 解析失败（网络/风控/权限）时回退 A 的正常解析路径，保证始终可播。
+     *
+     * @param epid 非 0 时走 PGC（番剧/影视）通道
+     */
     suspend fun getPlayData(
         aid: Long,
         cid: Long,
         preferApiType: ApiType,
         epid: Int = 0,
-    ): PlayData =
-        if (epid != 0) {
+    ): PlayData {
+        val parseCookie = parseAccountRepository.playCookie(authRepository.mid)
+        if (parseCookie != null) {
+            try {
+                val playData = getWebPlayDataWithCookie(aid = aid, cid = cid, epid = epid, cookie = parseCookie)
+                BiliLogger.info { "play data resolved with parse account: [aid=$aid, cid=$cid, epid=$epid]" }
+                return playData
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                BiliLogger.error(e) { "parse account play data failed, fallback to current account: [aid=$aid, cid=$cid, epid=$epid]" }
+            }
+        }
+
+        return if (epid != 0) {
             try {
                 getPgcPlayData(cid = cid, epid = epid, preferApiType = preferApiType)
             } catch (e: CancellationException) {
@@ -71,6 +95,43 @@ class VideoPlayRepository(
             }
         } else {
             getUgcPlayData(aid = aid, cid = cid, preferApiType = preferApiType)
+        }
+    }
+
+    /**
+     * 以指定 Cookie（解析账号身份）走 Web 通道获取播放数据。
+     *
+     * 解析账号可能仅有 Cookie（无 access_token），故固定走 Web playurl 通道；
+     * fnval=4048 + qn=127 + fourk=1 与 UGC Web 通道一致，会员账号可返回全部画质。
+     */
+    private suspend fun getWebPlayDataWithCookie(
+        aid: Long,
+        cid: Long,
+        epid: Int,
+        cookie: String,
+    ): PlayData =
+        if (epid != 0) {
+            PlayData.fromPgcWebPlayUrlData(
+                BiliHttpApi
+                    .getPgcPlayUrl(
+                        epId = epid,
+                        cid = cid,
+                        cookieOverride = cookie,
+                    ).getResponseData(),
+            )
+        } else {
+            PlayData.fromPlayUrlData(
+                BiliHttpApi
+                    .getVideoPlayUrl(
+                        av = aid,
+                        cid = cid,
+                        fnval = 4048,
+                        qn = 127,
+                        fnver = 0,
+                        fourk = 1,
+                        cookieOverride = cookie,
+                    ).getResponseData(),
+            )
         }
 
     /** 错误消息是否携带权限引导信息（会员/充电/付费），此类错误直接抛出供 UI 引导。 */

@@ -19,6 +19,7 @@ import dev.frost819.newbv.biliapi.repositories.LikeRepository
 import dev.frost819.newbv.biliapi.repositories.LiveRepository
 import dev.frost819.newbv.biliapi.repositories.LoginRepository
 import dev.frost819.newbv.biliapi.repositories.OneClickTripleActionRepository
+import dev.frost819.newbv.biliapi.repositories.ParseAccountRepository
 import dev.frost819.newbv.biliapi.repositories.PgcRepository
 import dev.frost819.newbv.biliapi.repositories.RecommendVideoRepository
 import dev.frost819.newbv.biliapi.repositories.SearchRepository
@@ -104,6 +105,16 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideLoginRepository(): LoginRepository = LoginRepository()
+
+    /**
+     * 提供 [ParseAccountRepository] 单例。
+     *
+     * 双账号解析：指定账号（通常为大会员）仅用于播放地址解析，
+     * 凭证由 app 层从多账号库同步。
+     */
+    @Provides
+    @Singleton
+    fun provideParseAccountRepository(): ParseAccountRepository = ParseAccountRepository()
 
     /**
      * 提供 [ChannelRepository] 单例。
@@ -271,7 +282,8 @@ object NetworkModule {
     fun provideVideoPlayRepository(
         authRepository: AuthRepository,
         channelRepository: ChannelRepository,
-    ): VideoPlayRepository = VideoPlayRepository(authRepository, channelRepository)
+        parseAccountRepository: ParseAccountRepository,
+    ): VideoPlayRepository = VideoPlayRepository(authRepository, channelRepository, parseAccountRepository)
 
     /**
      * 提供 [SearchRepository] 单例。

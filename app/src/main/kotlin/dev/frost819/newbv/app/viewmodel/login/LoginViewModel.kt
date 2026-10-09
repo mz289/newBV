@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.AccountRepositoryImpl
+import dev.frost819.newbv.app.data.CookieLoginParser
 import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
 import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.login.QrLoginState
@@ -36,6 +37,19 @@ data class QrLoginUiState(
 )
 
 /**
+ * Cookie 登录 UI 状态。
+ *
+ * @property submitting 是否正在提交登录。
+ * @property success 是否登录成功。
+ * @property errorMessage 错误信息（解析失败/保存失败时非空）。
+ */
+data class CookieLoginUiState(
+    val submitting: Boolean = false,
+    val success: Boolean = false,
+    val errorMessage: String = "",
+)
+
+/**
  * 扫码登录 ViewModel。
  *
  * 支持 TV QR 登录（App 接口）和 Web QR 登录（Web 接口）。
@@ -45,6 +59,9 @@ data class QrLoginUiState(
  * 2. 自动启动轮询，每 1 秒检查扫码状态
  * 3. 状态流转：Ready → RequestingQRCode → WaitingForScan → WaitingForConfirm → Success
  * 4. Success 时：构造 [AuthData]，调用 [AccountRepositoryImpl.addUser] 持久化
+ *
+ * 另支持 Cookie 登录（[loginWithCookie]）：粘贴浏览器 Cookie 串或凭证 JSON 直接登录，
+ * 适用于无法扫码的场景与双账号（解析账号）添加。
  *
  * @property loginRepository 登录接口仓库。
  * @property accountRepository 账户管理仓库。
@@ -60,6 +77,9 @@ class LoginViewModel
 
         private val _uiState = MutableStateFlow(QrLoginUiState())
         val uiState: StateFlow<QrLoginUiState> = _uiState.asStateFlow()
+
+        private val _cookieUiState = MutableStateFlow(CookieLoginUiState())
+        val cookieUiState: StateFlow<CookieLoginUiState> = _cookieUiState.asStateFlow()
 
         /** 轮询协程 Job，用于取消轮询。 */
         private var pollingJob: Job? = null
@@ -171,6 +191,45 @@ class LoginViewModel
             accountRepository.addUser(authData)
             currentCoroutineContext().ensureActive()
             _uiState.update { it.copy(state = QrLoginState.Success) }
+        }
+
+        /**
+         * Cookie 登录。
+         *
+         * 解析输入（浏览器 Cookie 串 / 凭证 JSON，见 [CookieLoginParser]）后
+         * 调用 [AccountRepositoryImpl.addUser] 持久化并登录。
+         * Cookie 登录无 access_token，仅 Web 通道可用（不影响播放解析账号用途）。
+         *
+         * @param input Cookie 串或凭证 JSON。
+         */
+        fun loginWithCookie(input: String) {
+            if (_cookieUiState.value.submitting) return
+            _cookieUiState.value = CookieLoginUiState(submitting = true)
+            viewModelScope.launch {
+                runCatching { CookieLoginParser.parse(input) }
+                    .mapCatching { authData ->
+                        accountRepository.addUser(authData)
+                    }.fold(
+                        onSuccess = {
+                            logger.info { "cookie login success" }
+                            _cookieUiState.value = CookieLoginUiState(success = true)
+                        },
+                        onFailure = { error ->
+                            logger.error(error) { "cookie login failed" }
+                            _cookieUiState.value =
+                                CookieLoginUiState(
+                                    errorMessage = error.message ?: "登录失败，请检查 Cookie",
+                                )
+                        },
+                    )
+            }
+        }
+
+        /**
+         * 重置 Cookie 登录状态（清空提交中/错误信息）。
+         */
+        fun resetCookieLogin() {
+            _cookieUiState.value = CookieLoginUiState()
         }
 
         /**

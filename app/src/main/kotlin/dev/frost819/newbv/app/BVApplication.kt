@@ -12,6 +12,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import dagger.hilt.android.HiltAndroidApp
 import dev.frost819.newbv.app.cast.CastReceiverService
+import dev.frost819.newbv.app.data.AccountRepositoryImpl
 import dev.frost819.newbv.app.network.HttpServer
 import dev.frost819.newbv.app.util.CacheManager
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
@@ -61,6 +62,9 @@ class BVApplication : Application() {
     @Inject
     lateinit var channelRepository: ChannelRepository
 
+    @Inject
+    lateinit var accountRepository: AccountRepositoryImpl
+
     override fun onCreate() {
         super.onCreate()
 
@@ -91,6 +95,11 @@ class BVApplication : Application() {
             CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
                 channelRepository.initDefaultChannel(accessToken, Prefs.buvid)
             }
+        }
+
+        // 双账号解析：启动时从多账号库同步解析账号凭证到 bili-api 层
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            accountRepository.syncParseAccountFromPrefs()
         }
 
         if (!Prefs.buvid3FromSpi) {
