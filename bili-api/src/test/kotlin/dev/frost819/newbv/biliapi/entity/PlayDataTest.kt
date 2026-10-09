@@ -35,7 +35,7 @@ import bilibili.playershared.vodInfo as sharedVodInfo
  * [PlayData] 实体的单元测试。
  *
  * 覆盖 [PlayData.fromPlayUrlData] 的 Web API 响应解析（DASH 视频/音频、杜比/FLAC、
- * 试看流 durl、codec 映射、空值处理）以及 [PlayData.plus] 合并算子的
+ * 试看流 durl、空值处理）以及 [PlayData.plus] 合并算子的
  * 去重、排序、优先级与 needPay 聚合逻辑。所有测试为纯数据变换，不依赖网络。
  */
 class PlayDataTest {
@@ -168,9 +168,8 @@ class PlayDataTest {
         dashAudios: List<DashAudio> = emptyList(),
         dolby: DashAudio? = null,
         flac: DashAudio? = null,
-        codec: Map<Int, List<String>> = emptyMap(),
         needPay: Boolean = false,
-    ) = PlayData(dashVideos, dashAudios, dolby, flac, codec, needPay)
+    ) = PlayData(dashVideos, dashAudios, dolby, flac, needPay)
 
     // endregion
 
@@ -489,75 +488,19 @@ class PlayDataTest {
 
     // endregion
 
-    // region ---- fromPlayUrlData: codec 映射 ----
-
     @Test
-    fun `fromPlayUrlData builds codec map from supportFormats`() {
-        val data =
-            playUrlData(
-                dash = dash(video = listOf(videoDashData(id = 80))),
-                supportFormats =
-                    listOf(
-                        supportFormat(80, listOf("avc1", "hev1")),
-                        supportFormat(120, listOf("avc1", "hev1", "av01")),
-                        supportFormat(126, listOf("avc1")),
-                    ),
+    fun `support formats do not create video tracks or replace their codecs`() {
+        val expected = PlayData.fromPlayUrlData(playUrlData(dash = dash(video = listOf(videoDashData(id = 80)))))
+        val withMetadata =
+            PlayData.fromPlayUrlData(
+                playUrlData(
+                    dash = dash(video = listOf(videoDashData(id = 80))),
+                    supportFormats = listOf(supportFormat(80, listOf("hev1")), supportFormat(120, listOf("av01"))),
+                ),
             )
 
-        val playData = PlayData.fromPlayUrlData(data)
-
-        assertThat(playData.codec).hasSize(3)
-        assertThat(playData.codec[80]).containsExactly("avc1", "hev1")
-        assertThat(playData.codec[120]).containsExactly("avc1", "hev1", "av01")
-        assertThat(playData.codec[126]).containsExactly("avc1")
+        assertThat(withMetadata).isEqualTo(expected)
     }
-
-    @Test
-    fun `fromPlayUrlData skips supportFormats with null codecs`() {
-        val data =
-            playUrlData(
-                supportFormats =
-                    listOf(
-                        supportFormat(80, listOf("avc1")),
-                        supportFormat(120, codecs = null),
-                    ),
-            )
-
-        val playData = PlayData.fromPlayUrlData(data)
-
-        // null codecs 的项被 mapNotNull 过滤
-        assertThat(playData.codec).hasSize(1)
-        assertThat(playData.codec).containsKey(80)
-        assertThat(playData.codec).doesNotContainKey(120)
-    }
-
-    @Test
-    fun `fromPlayUrlData includes supportFormat with empty codecs list`() {
-        // codecs 非空但为空列表时，仍被包含（仅 null 被过滤）
-        val data =
-            playUrlData(
-                supportFormats = listOf(supportFormat(80, codecs = emptyList())),
-            )
-
-        val playData = PlayData.fromPlayUrlData(data)
-
-        assertThat(playData.codec).hasSize(1)
-        assertThat(playData.codec[80]).isEmpty()
-    }
-
-    @Test
-    fun `fromPlayUrlData returns empty codec map when supportFormats is empty`() {
-        val data =
-            playUrlData(
-                dash = dash(video = listOf(videoDashData(id = 80))),
-            )
-
-        val playData = PlayData.fromPlayUrlData(data)
-
-        assertThat(playData.codec).isEmpty()
-    }
-
-    // endregion
 
     // region ---- fromPlayUrlData: 边界情况 ----
 
@@ -912,68 +855,6 @@ class PlayDataTest {
 
     // endregion
 
-    // region ---- plus: codec 映射合并 ----
-
-    @Test
-    fun `plus merges codec maps with distinct values for shared keys`() {
-        val left = playData(codec = mapOf(80 to listOf("avc1"), 120 to listOf("hev1")))
-        val other = playData(codec = mapOf(80 to listOf("hev1", "av01")))
-
-        val result = left + other
-
-        // key 80: ["avc1"] + ["hev1", "av01"] 去重 → ["avc1", "hev1", "av01"]
-        assertThat(result.codec[80]).containsExactly("avc1", "hev1", "av01")
-        // key 120 仅 this 有 → 保留
-        assertThat(result.codec[120]).containsExactly("hev1")
-    }
-
-    @Test
-    fun `plus deduplicates overlapping codec values`() {
-        val left = playData(codec = mapOf(80 to listOf("avc1", "hev1")))
-        val other = playData(codec = mapOf(80 to listOf("hev1", "av01")))
-
-        val result = left + other
-
-        // ["avc1", "hev1", "hev1", "av01"] 去重 → ["avc1", "hev1", "av01"]
-        assertThat(result.codec[80]).containsExactly("avc1", "hev1", "av01")
-    }
-
-    @Test
-    fun `plus filters out none string from merged codec values`() {
-        val left = playData(codec = mapOf(80 to listOf("none", "avc1")))
-        val other = playData(codec = mapOf(80 to listOf("none", "hev1")))
-
-        val result = left + other
-
-        // 合并后 ["none", "avc1", "none", "hev1"] → 去重 ["none", "avc1", "hev1"] → 过滤 none → ["avc1", "hev1"]
-        assertThat(result.codec[80]).containsExactly("avc1", "hev1")
-        assertThat(result.codec[80]).doesNotContain("none")
-    }
-
-    @Test
-    fun `plus drops codec keys that exist only in other`() {
-        // plus 仅遍历 this.codec 的 key，other 独有的 key 会被丢弃（当前实现行为）
-        val left = playData(codec = mapOf(80 to listOf("avc1")))
-        val other = playData(codec = mapOf(120 to listOf("hev1")))
-
-        val result = left + other
-
-        assertThat(result.codec).containsKey(80)
-        assertThat(result.codec).doesNotContainKey(120)
-    }
-
-    @Test
-    fun `plus preserves codec key when other has no entry for it`() {
-        val left = playData(codec = mapOf(80 to listOf("avc1")))
-        val other = playData(codec = emptyMap())
-
-        val result = left + other
-
-        assertThat(result.codec[80]).containsExactly("avc1")
-    }
-
-    // endregion
-
     // region ---- plus: needPay 聚合 ----
 
     @Test
@@ -1039,7 +920,6 @@ class PlayDataTest {
                     ),
                 dolby = DashAudio(baseUrl = "t-dolby", bandwidth = 500, codecId = 30250, backUrl = emptyList()),
                 flac = null,
-                codec = mapOf(80 to listOf("avc1"), 120 to listOf("hev1")),
                 needPay = false,
             )
         val other =
@@ -1076,7 +956,6 @@ class PlayDataTest {
                     ),
                 dolby = DashAudio(baseUrl = "o-dolby", bandwidth = 600, codecId = 30251, backUrl = emptyList()),
                 flac = DashAudio(baseUrl = "o-flac", bandwidth = 800, codecId = 30251, backUrl = emptyList()),
-                codec = mapOf(80 to listOf("av01"), 126 to listOf("avc1")),
                 needPay = true,
             )
 
@@ -1106,12 +985,6 @@ class PlayDataTest {
         assertThat(result.flac).isNotNull()
         assertThat(result.flac!!.baseUrl).isEqualTo("o-flac")
 
-        // codec: key 80 合并, key 120 仅 this, key 126 仅 other → 丢弃
-        assertThat(result.codec).hasSize(2)
-        assertThat(result.codec[80]).containsExactly("avc1", "av01")
-        assertThat(result.codec[120]).containsExactly("hev1")
-        assertThat(result.codec).doesNotContainKey(126)
-
         // needPay: OR
         assertThat(result.needPay).isTrue()
     }
@@ -1124,7 +997,6 @@ class PlayDataTest {
         assertThat(result.dashAudios).isEmpty()
         assertThat(result.dolby).isNull()
         assertThat(result.flac).isNull()
-        assertThat(result.codec).isEmpty()
         assertThat(result.needPay).isFalse()
     }
 
@@ -1194,8 +1066,6 @@ class PlayDataTest {
         assertThat(playData.flac).isNotNull()
         assertThat(playData.flac?.baseUrl).isEqualTo("http://cdn.test/flac.m4s")
         assertThat(playData.needPay).isFalse()
-        assertThat(playData.codec).hasSize(1)
-        assertThat(playData.codec[80]).isNotNull()
     }
 
     @Test
@@ -1328,7 +1198,6 @@ class PlayDataTest {
         assertThat(playData.dolby?.baseUrl).isEqualTo("http://cdn.test/pgc-dolby.m4s")
         assertThat(playData.flac).isNull()
         assertThat(playData.needPay).isFalse()
-        assertThat(playData.codec).hasSize(1)
     }
 
     @Test

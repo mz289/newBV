@@ -10,29 +10,21 @@ data class PlaybackCandidate(
     val codec: VideoCodec,
 )
 
-/**
- * 汇总指定画质下可用的视频编码。
- *
- * Web 旧端点的 `support_formats[].codecs` 常为 null，导致编码表为空（表现为
- * 编码菜单空白，issue #263）；此时从 dash 流按 codec 字符串 / codecId 反推兜底。
- *
- * @param data 播放数据。
- * @param qualityId 画质 ID（qn）。
- * @return 该画质下可用编码，按 ordinal 排序。
- */
+/** 菜单只显示有实际视频流的编码，按 ordinal 排序。 */
 fun collectCodecs(
     data: PlayData,
     qualityId: Int,
-): List<VideoCodec> {
-    val fromTable = data.codec[qualityId]?.mapNotNull { VideoCodec.fromCodecString(it) } ?: emptyList()
-    val fromTracks =
-        data.dashVideos
-            .filter { it.quality == qualityId }
-            .mapNotNull { track ->
-                track.codecs?.takeIf { it.isNotBlank() }?.let { VideoCodec.fromCodecString(it) }
-                    ?: VideoCodec.fromCodecId(track.codecId)
-            }
-    return (fromTable + fromTracks).distinct().sortedBy { it.ordinal }
+): List<VideoCodec> =
+    data.dashVideos
+        .filter { it.quality == qualityId }
+        .mapNotNull { it.videoCodec() }
+        .distinct()
+        .sortedBy { it.ordinal }
+
+/** 使用同一编码解析规则生成菜单、选择流和检查解码能力。 */
+private fun DashVideo.videoCodec(): VideoCodec? {
+    val codecString = codecs
+    return if (codecString.isNullOrBlank()) VideoCodec.fromCodecId(codecId) else VideoCodec.fromCodecString(codecString)
 }
 
 /**
@@ -55,14 +47,7 @@ fun orderQualities(
 fun trackMatchesCodec(
     track: DashVideo,
     codec: VideoCodec,
-): Boolean {
-    val codecStr = track.codecs
-    return if (!codecStr.isNullOrBlank()) {
-        codec.prefixes.any { codecStr.startsWith(it) }
-    } else {
-        VideoCodec.fromCodecId(track.codecId) == codec
-    }
-}
+): Boolean = track.videoCodec() == codec
 
 /** 查找指定画质 + 编码的 DASH 视频流。 */
 fun findTrack(
@@ -96,8 +81,7 @@ fun pickDecodableProfile(
             VideoCodec.DVH1,
         ).distinct()
     for (quality in qualities) {
-        val available = collectCodecs(data, quality).toSet()
-        for (codec in codecOrder.filter { it in available }) {
+        for (codec in codecOrder) {
             val track = findTrack(data, quality, codec) ?: continue
             val profile =
                 VideoDecodeProfile(

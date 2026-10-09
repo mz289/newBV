@@ -7,9 +7,9 @@ import dev.frost819.newbv.data.datastore.VideoCodec
 import org.junit.jupiter.api.Test
 
 /**
- * [PlaybackSelection] 纯函数单测。
+ * 播放编码菜单与选流的纯函数单测。
  *
- * 覆盖：编码表兜底（#263）、画质遍历顺序、能力感知选流（#288）。
+ * 覆盖：实际可选编码、画质遍历顺序、能力感知选流。
  */
 class PlaybackSelectionTest {
     private fun dashVideo(
@@ -33,8 +33,7 @@ class PlaybackSelectionTest {
 
     private fun playData(
         videos: List<DashVideo>,
-        codec: Map<Int, List<String>> = emptyMap(),
-    ) = PlayData(dashVideos = videos, dashAudios = emptyList(), codec = codec)
+    ) = PlayData(dashVideos = videos, dashAudios = emptyList())
 
     private fun capability(vararg decodable: VideoCodec): VideoCapabilityProvider =
         capabilityByProfile { it.codec in decodable }
@@ -45,8 +44,7 @@ class PlaybackSelectionTest {
         }
 
     @Test
-    fun `collectCodecs falls back to dash tracks when codec table empty`() {
-        // Given: Web codec 表为空（support_formats.codecs=null）
+    fun `collectCodecs derives available codecs from video tracks`() {
         val data = playData(listOf(dashVideo(80, 12, "hev1.1.6.L120.90")))
 
         // When
@@ -57,15 +55,19 @@ class PlaybackSelectionTest {
     }
 
     @Test
-    fun `collectCodecs merges table and tracks and sorts by ordinal`() {
+    fun `collectCodecs deduplicates tracks and sorts by ordinal`() {
         val data =
             playData(
-                videos = listOf(dashVideo(80, 7, "avc1.640028"), dashVideo(80, 13, "av01.0.08M.08")),
-                codec = mapOf(80 to listOf("hev1.1.6.L120.90")),
+                videos =
+                    listOf(
+                        dashVideo(80, 13, "av01.0.08M.08"),
+                        dashVideo(80, 7, "avc1.640028"),
+                        dashVideo(80, 7, "avc1.640028"),
+                    ),
             )
 
         assertThat(collectCodecs(data, 80))
-            .containsExactly(VideoCodec.AVC, VideoCodec.HEVC, VideoCodec.AV1)
+            .containsExactly(VideoCodec.AVC, VideoCodec.AV1)
             .inOrder()
     }
 
@@ -202,5 +204,19 @@ class PlaybackSelectionTest {
         assertThat(trackMatchesCodec(dashVideo(80, 7, "avc1.640028"), VideoCodec.HEVC)).isFalse()
         // codecs 为空时用 codecId 兜底
         assertThat(trackMatchesCodec(dashVideo(80, 12, ""), VideoCodec.HEVC)).isTrue()
+    }
+
+    @Test
+    fun `codec menu and track lookup agree for missing and unknown codec strings`() {
+        val known = dashVideo(80, 7, "hvc1.1.6.L120.90")
+        val missing = dashVideo(80, 13, "")
+        val unknown = dashVideo(80, 12, "unknown")
+        val data = playData(listOf(known, missing, unknown))
+
+        assertThat(collectCodecs(data, 80)).containsExactly(VideoCodec.HEVC, VideoCodec.AV1).inOrder()
+        assertThat(findTrack(data, 80, VideoCodec.HEVC)).isEqualTo(known)
+        assertThat(findTrack(data, 80, VideoCodec.AV1)).isEqualTo(missing)
+        assertThat(collectCodecs(playData(listOf(unknown)), 80)).isEmpty()
+        assertThat(findTrack(playData(listOf(unknown)), 80, VideoCodec.HEVC)).isNull()
     }
 }

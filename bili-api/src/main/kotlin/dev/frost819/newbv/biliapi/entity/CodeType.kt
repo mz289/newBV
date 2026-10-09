@@ -16,9 +16,7 @@ enum class CodeType(
 
     companion object {
         fun fromCodecId(code: Int?) =
-            runCatching {
-                entries.find { it.codecId == code }!!
-            }.getOrDefault(NoCode)
+            entries.firstOrNull { it.codecId == code } ?: NoCode
     }
 
     fun toPlayerSharedCodeType() =

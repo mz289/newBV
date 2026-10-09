@@ -20,39 +20,31 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 object BiliPassportHttpApi {
-    private lateinit var client: HttpClient
-
-    init {
-        createClient()
-    }
-
-    private fun createClient() {
-        client =
-            HttpClient(OkHttp) {
-                BiliUserAgent()
-                install(ContentNegotiation) {
-                    json(
-                        Json {
-                            coerceInputValues = true
-                            ignoreUnknownKeys = true
-                            prettyPrint = true
-                        },
-                    )
-                }
-                install(ContentEncoding) {
-                    deflate(1.0F)
-                    gzip(0.9F)
-                }
-                defaultRequest {
-                    url {
-                        host = "passport.bilibili.com"
-                        protocol = URLProtocol.HTTPS
-                    }
-                }
-            }.apply {
-                encApiSign()
+    private val client =
+        HttpClient(OkHttp) {
+            BiliUserAgent()
+            install(ContentNegotiation) {
+                json(
+                    Json {
+                        coerceInputValues = true
+                        ignoreUnknownKeys = true
+                        prettyPrint = true
+                    },
+                )
             }
-    }
+            install(ContentEncoding) {
+                deflate(1.0F)
+                gzip(0.9F)
+            }
+            defaultRequest {
+                url {
+                    host = "passport.bilibili.com"
+                    protocol = URLProtocol.HTTPS
+                }
+            }
+        }.apply {
+            encApiSign()
+        }
 
     /**
      * 申请二维码（App）

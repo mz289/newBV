@@ -191,12 +191,4 @@ class UserRepositoryTest {
             assertThat(unfollow).isNotEmpty()
         }
 
-    @Test
-    fun `get following up count with app api`() =
-        runBlocking {
-            // 查询类：断言返回非负的关注数
-            val count = userRepository.getFollowingUpCount(mid = UID, preferApiType = ApiType.App)
-            println("app following up count: $count")
-            assertThat(count).isAtLeast(0)
-        }
 }

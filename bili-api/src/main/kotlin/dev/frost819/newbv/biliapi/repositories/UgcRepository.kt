@@ -5,9 +5,7 @@ import dev.frost819.newbv.biliapi.entity.ugc.region.UgcFeedData
 import dev.frost819.newbv.biliapi.entity.ugc.region.UgcFeedPage
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 
-class UgcRepository(
-    private val authRepository: AuthRepository,
-) {
+class UgcRepository {
     suspend fun getRegionFeedRcmd(
         ugcType: UgcTypeV2,
         page: UgcFeedPage,

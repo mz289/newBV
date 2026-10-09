@@ -1,7 +1,9 @@
 package dev.frost819.newbv.app.cast.protocol
 
-import java.io.ByteArrayOutputStream
+import okio.ByteString.Companion.decodeBase64
+import java.io.ByteArrayInputStream
 import java.util.zip.Inflater
+import java.util.zip.InflaterInputStream
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -48,18 +50,9 @@ internal object NvaExtDecoder {
         runCatching {
             val inflater = Inflater(true)
             try {
-                inflater.setInput(data)
-                val output = ByteArrayOutputStream(data.size)
-                val buffer = ByteArray(1024)
-                while (!inflater.finished()) {
-                    val count = inflater.inflate(buffer)
-                    if (count > 0) {
-                        output.write(buffer, 0, count)
-                    } else if (inflater.needsInput() || inflater.needsDictionary()) {
-                        break
-                    }
+                InflaterInputStream(ByteArrayInputStream(data), inflater).use {
+                    it.readBytes().takeIf { plain -> plain.isNotEmpty() && inflater.finished() }
                 }
-                output.toByteArray().takeIf { it.isNotEmpty() && inflater.finished() }
             } finally {
                 inflater.end()
             }
@@ -74,30 +67,17 @@ internal object NvaExtDecoder {
     }
 
     private fun decodeBase64Url(input: String): ByteArray? {
-        val output = ByteArrayOutputStream(input.length * 3 / 4)
-        var buffer = 0
-        var bits = 0
-        for (char in input) {
-            if (char == '=') break
-            if (char.isWhitespace()) continue
-            val value = base64Value(char) ?: return null
-            buffer = (buffer shl 6) or value
-            bits += 6
-            if (bits >= 8) {
-                bits -= 8
-                output.write((buffer shr bits) and 0xff)
+        // 保留旧客户端兼容规则：忽略 padding 后的内容与 Unicode 空白。
+        val encoded = input.substringBefore('=').filterNot { it.isWhitespace() }
+        // 旧解码器丢弃不足一个字节的最后 6 bits；Okio 对这种尾部会返回 null。
+        val normalized =
+            if (encoded.length % 4 == 1 && encoded.last() in BASE64_CHARS) {
+                encoded.dropLast(1)
+            } else {
+                encoded
             }
-        }
-        return output.toByteArray()
+        return normalized.decodeBase64()?.toByteArray()
     }
 
-    private fun base64Value(char: Char): Int? =
-        when (char) {
-            in 'A'..'Z' -> char - 'A'
-            in 'a'..'z' -> char - 'a' + 26
-            in '0'..'9' -> char - '0' + 52
-            '+', '-' -> 62
-            '/', '_' -> 63
-            else -> null
-        }
+    private const val BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/-_"
 }

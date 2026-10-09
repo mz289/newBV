@@ -2,7 +2,6 @@ package dev.frost819.newbv.biliapi.http
 
 import bilibili.community.service.dm.v1.DmSegMobileReply
 import bilibili.community.service.dm.v1.DmWebViewReply
-import com.tfowl.ktor.client.plugins.JsoupPlugin
 import dev.frost819.newbv.biliapi.entity.SpiData
 import dev.frost819.newbv.biliapi.entity.SpiResult
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
@@ -87,7 +86,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
-import org.jsoup.nodes.Document
+import org.jsoup.Jsoup
 import java.io.InputStream
 
 @Suppress("SpellCheckingInspection")
@@ -229,7 +228,6 @@ object BiliHttpApi {
                 connectTimeoutMillis = CONNECT_TIMEOUT_MS
                 socketTimeoutMillis = SOCKET_TIMEOUT_MS
             }
-            install(JsoupPlugin)
             defaultRequest {
                 url {
                     host = endPoint
@@ -1591,7 +1589,11 @@ object BiliHttpApi {
     /** 获取番剧首页数据 */
     suspend fun getPgcWebInitialStateData(pgcType: PgcType): PgcWebInitialStateData {
         val path = pgcType.name.lowercase()
-        val htmlDocuments = client.get("https://www.bilibili.com/$path").body<Document>()
+        val response = client.get("https://www.bilibili.com/$path")
+        val htmlDocuments = Jsoup.parse(
+            response.body<ByteArray>().toString(Charsets.UTF_8),
+            response.call.request.url.toString(),
+        )
 
         val dataScriptTagContent =
             htmlDocuments

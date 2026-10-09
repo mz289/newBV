@@ -2,6 +2,13 @@ package dev.frost819.newbv.app.cast.server
 
 import dev.frost819.newbv.app.cast.CastPlaybackSnapshot
 import dev.frost819.newbv.app.cast.CastTransportState
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * 把 [CastPlaybackSnapshot] 格式化为 B 站官方客户端 Nirvana `GetPlayInfo`
@@ -9,76 +16,80 @@ import dev.frost819.newbv.app.cast.CastTransportState
  */
 internal object CastNirvanaPlayInfoFormatter {
     fun format(snapshot: CastPlaybackSnapshot): String {
-        val qnItems =
-            snapshot.availableQuality.entries.joinToString(separator = ",") { (qualityId, description) ->
-                """
-                {
-                  "quality":$qualityId,
-                  "description":"${description.escapeJson()}",
-                  "displayDesc":"${description.escapeJson()}",
-                  "superscript":"",
-                  "needLogin":false,
-                  "needVip":false,
-                  "need_login":false,
-                  "need_vip":false
-                }
-                """.trimIndent().lineSequence().joinToString("") { it.trim() }
-            }
-        val qn =
-            if (snapshot.qualityId > 0) {
-                """
-                "qn":{
-                  "supportQnList":[$qnItems],
-                  "currentQn":{"quality":${snapshot.qualityId}},
-                  "curQn":${snapshot.qualityId},
-                  "userDesireQn":${snapshot.qualityId}
-                },
-                """.trimIndent().lineSequence().joinToString("") { it.trim() }
-            } else {
-                """"qn":null,"""
-            }
         val playerStatus = snapshot.state.toNirvanaPlayerState()
         val durationMs = snapshot.durationMs.toPhoneDurationMillis(snapshot.state)
         val positionSeconds = snapshot.positionMs.toPhonePositionSeconds(durationMs)
-        return """
-            {
-              "aid":"${snapshot.aid.takeIf { it > 0L } ?: ""}",
-              "cid":"${snapshot.cid.takeIf { it > 0L } ?: ""}",
-              "epId":"${snapshot.epid ?: ""}",
-              "seasonId":"${snapshot.seasonId.takeIf { it > 0 } ?: ""}",
-              "roomId":"${snapshot.roomId.takeIf { it > 0L } ?: ""}",
-              $qn
-              "duration":$durationMs,
-              "position":$positionSeconds,
-              "playerStatus":$playerStatus,
-              "danmakuStatus":${if (snapshot.danmakuEnabled) 1 else 0},
-              "supportVideoDanmaku":true,
-              "supportLiveDanmaku":true,
-              "supportMultiSpeed":true,
-              "isLastEp":false,
-              "playState":$playerStatus,
-              "danmakuState":${snapshot.danmakuEnabled},
-              "playItem":{
-                "aid":${snapshot.aid.coerceAtLeast(0L)},
-                "cid":${snapshot.cid.coerceAtLeast(0L)},
-                "epId":${snapshot.epid ?: 0},
-                "seasonId":${snapshot.seasonId.coerceAtLeast(0)},
-                "roomId":${snapshot.roomId.coerceAtLeast(0L)},
-                "contentType":0
-              },
-              "listInfo":null,
-              "title":"${snapshot.title.escapeJson()}",
-              "volume":100,
-              "speedInfo":{
-                "supportSpeedList":[0.5,0.75,1.0,1.25,1.5,2.0],
-                "currSpeed":${snapshot.speed.cleanSpeed()}
-              },
-              "speed":{
-                "supportSpeedList":[0.5,0.75,1.0,1.25,1.5,2.0],
-                "currSpeed":${snapshot.speed.cleanSpeed()}
-              }
+        val speedInfo =
+            buildJsonObject {
+                putJsonArray("supportSpeedList") {
+                    listOf(0.5, 0.75, 1.0, 1.25, 1.5, 2.0).forEach { add(it) }
+                }
+                put(
+                    "currSpeed",
+                    if (snapshot.speed % 1f ==
+                        0f
+                    ) {
+                        JsonPrimitive(snapshot.speed.toInt())
+                    } else {
+                        JsonPrimitive(snapshot.speed)
+                    },
+                )
             }
-        """.trimIndent().lineSequence().joinToString("") { it.trim() }
+        return buildJsonObject {
+            put("aid", snapshot.aid.takeIf { it > 0L }?.toString() ?: "")
+            put("cid", snapshot.cid.takeIf { it > 0L }?.toString() ?: "")
+            put("epId", snapshot.epid?.toString() ?: "")
+            put("seasonId", snapshot.seasonId.takeIf { it > 0 }?.toString() ?: "")
+            put("roomId", snapshot.roomId.takeIf { it > 0L }?.toString() ?: "")
+            if (snapshot.qualityId > 0) {
+                putJsonObject("qn") {
+                    putJsonArray("supportQnList") {
+                        snapshot.availableQuality.forEach { (qualityId, description) ->
+                            add(
+                                buildJsonObject {
+                                    put("quality", qualityId)
+                                    put("description", description)
+                                    put("displayDesc", description)
+                                    put("superscript", "")
+                                    put("needLogin", false)
+                                    put("needVip", false)
+                                    put("need_login", false)
+                                    put("need_vip", false)
+                                },
+                            )
+                        }
+                    }
+                    putJsonObject("currentQn") { put("quality", snapshot.qualityId) }
+                    put("curQn", snapshot.qualityId)
+                    put("userDesireQn", snapshot.qualityId)
+                }
+            } else {
+                put("qn", JsonNull)
+            }
+            put("duration", durationMs)
+            put("position", positionSeconds)
+            put("playerStatus", playerStatus)
+            put("danmakuStatus", if (snapshot.danmakuEnabled) 1 else 0)
+            put("supportVideoDanmaku", true)
+            put("supportLiveDanmaku", true)
+            put("supportMultiSpeed", true)
+            put("isLastEp", false)
+            put("playState", playerStatus)
+            put("danmakuState", snapshot.danmakuEnabled)
+            putJsonObject("playItem") {
+                put("aid", snapshot.aid.coerceAtLeast(0L))
+                put("cid", snapshot.cid.coerceAtLeast(0L))
+                put("epId", snapshot.epid ?: 0)
+                put("seasonId", snapshot.seasonId.coerceAtLeast(0))
+                put("roomId", snapshot.roomId.coerceAtLeast(0L))
+                put("contentType", 0)
+            }
+            put("listInfo", JsonNull)
+            put("title", snapshot.title)
+            put("volume", 100)
+            put("speedInfo", speedInfo)
+            put("speed", speedInfo)
+        }.toString()
     }
 
     private fun Long.toNirvanaMillis(): Long = coerceIn(0L, Int.MAX_VALUE.toLong())
@@ -92,11 +103,13 @@ internal object CastNirvanaPlayInfoFormatter {
         }
 
     private fun Long.toPhonePositionSeconds(durationMs: Long): Long =
-        (if (durationMs > 0L) {
-            coerceIn(0L, durationMs) / 1000L
-        } else {
-            0L
-        }).coerceIn(0L, Int.MAX_VALUE.toLong())
+        (
+            if (durationMs > 0L) {
+                coerceIn(0L, durationMs) / 1000L
+            } else {
+                0L
+            }
+        ).coerceIn(0L, Int.MAX_VALUE.toLong())
 
     private fun CastTransportState.toNirvanaPlayerState(): Int =
         when (this) {
@@ -104,24 +117,6 @@ internal object CastNirvanaPlayInfoFormatter {
             CastTransportState.PAUSED_PLAYBACK -> 5
             CastTransportState.TRANSITIONING -> 2
             CastTransportState.STOPPED -> 7
-        }
-
-    private fun Float.cleanSpeed(): String = if (this % 1f == 0f) toInt().toString() else toString()
-
-    private fun String.escapeJson(): String =
-        buildString(length) {
-            this@escapeJson.forEach { char ->
-                when (char) {
-                    '\\' -> append("\\\\")
-                    '"' -> append("\\\"")
-                    '\b' -> append("\\b")
-                    '\u000C' -> append("\\f")
-                    '\n' -> append("\\n")
-                    '\r' -> append("\\r")
-                    '\t' -> append("\\t")
-                    else -> append(char)
-                }
-            }
         }
 
     private const val LOADING_DURATION_MS = 1_000L

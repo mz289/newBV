@@ -10,7 +10,10 @@ import dev.frost819.newbv.biliapi.repositories.SearchRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.repository.SearchHistoryRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -38,6 +41,7 @@ class SearchInputViewModel
 
         private val _uiState = MutableStateFlow(SearchInputUiState())
         val uiState = _uiState.asStateFlow()
+        private var suggestsJob: Job? = null
 
         init {
             loadHotwords()
@@ -50,8 +54,10 @@ class SearchInputViewModel
          * keyword 非空时自动触发搜索建议加载。
          */
         fun updateKeyword(keyword: String) {
-            _uiState.update { it.copy(keyword = keyword) }
-            if (keyword.isNotEmpty()) {
+            if (keyword == _uiState.value.keyword) return
+            suggestsJob?.cancel()
+            _uiState.update { it.copy(keyword = keyword, suggests = emptyList()) }
+            if (keyword.isNotBlank()) {
                 loadSuggests(keyword)
             } else {
                 _uiState.update { it.copy(suggests = emptyList()) }
@@ -71,7 +77,8 @@ class SearchInputViewModel
             viewModelScope.launch {
                 // 页面会在提交后跳转，确保数据库写入不会因源页面销毁而被取消。
                 withContext(NonCancellable) {
-                    searchHistoryRepository.addHistory(keyword)
+                    runCatching { searchHistoryRepository.addHistory(keyword.trim()) }
+                        .onFailure { logger.warn { "Failed to save search history: $it" } }
                 }
                 loadHistories()
                 onCompleted()
@@ -114,7 +121,7 @@ class SearchInputViewModel
         }
 
         private fun loadSuggests(keyword: String) {
-            viewModelScope.launch {
+            suggestsJob = viewModelScope.launch {
                 runCatching {
                     withTimeout(LOAD_TIMEOUT_MS) {
                         searchRepository.getSearchSuggest(
@@ -123,11 +130,13 @@ class SearchInputViewModel
                         )
                     }
                 }.onSuccess { suggests ->
-                    _uiState.update { it.copy(suggests = suggests) }
+                    currentCoroutineContext().ensureActive()
+                    _uiState.update { if (it.keyword == keyword) it.copy(suggests = suggests) else it }
                 }.onFailure { e ->
                     e.rethrowUnlessTimeout()
                     logger.warn { "Failed to load suggests: $e" }
-                    _uiState.update { it.copy(suggests = emptyList()) }
+                    currentCoroutineContext().ensureActive()
+                    _uiState.update { if (it.keyword == keyword) it.copy(suggests = emptyList()) else it }
                 }
             }
         }

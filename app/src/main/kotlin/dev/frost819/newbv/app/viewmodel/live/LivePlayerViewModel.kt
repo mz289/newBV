@@ -10,6 +10,9 @@ import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.component.livecard.formatOnlineCount
+import dev.frost819.newbv.app.util.PlayerConstants
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.http.entity.live.DanmakuEvent
 import dev.frost819.newbv.biliapi.http.entity.live.LiveEvent
 import dev.frost819.newbv.biliapi.http.entity.live.OnlineRankCountEvent
@@ -17,7 +20,6 @@ import dev.frost819.newbv.biliapi.repositories.LivePlayInfo
 import dev.frost819.newbv.biliapi.repositories.LivePlayLine
 import dev.frost819.newbv.biliapi.repositories.LiveRepository
 import dev.frost819.newbv.biliapi.websocket.LiveDataWebSocket
-import dev.frost819.newbv.app.util.PlayerConstants
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.player.AbstractVideoPlayer
@@ -28,7 +30,9 @@ import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +40,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 /**
@@ -100,6 +105,7 @@ class LivePlayerViewModel
         val uiState: StateFlow<LivePlayerUiState> = _uiState.asStateFlow()
 
         private var wsJob: Job? = null
+        private var streamJob: Job? = null
         private var debugInfoJob: Job? = null
         private var danmakuIdCounter = 0L
 
@@ -208,15 +214,19 @@ class LivePlayerViewModel
         }
 
         private fun loadLiveInternal(roomId: Long) {
-            viewModelScope.launch {
-                _uiState.update { it.copy(playerState = LivePlayerState.Loading) }
+            streamJob?.cancel()
+            wsJob?.cancel()
+            streamJob = viewModelScope.launch {
+                _uiState.update { it.copy(playerState = LivePlayerState.Loading, errorMessage = null) }
 
                 runCatching {
-                    val roomInit = liveRepository.getRoomInit(roomId.toInt())
+                    val roomInit = withTimeout(LOAD_TIMEOUT_MS) { liveRepository.getRoomInit(roomId.toInt()) }
+                    currentCoroutineContext().ensureActive()
                     val realRoomId = roomInit.roomId
                     _uiState.update { it.copy(realRoomId = realRoomId, liveStatus = roomInit.liveStatus) }
 
-                    val roomInfo = liveRepository.getRoomInfo(realRoomId)
+                    val roomInfo = withTimeout(LOAD_TIMEOUT_MS) { liveRepository.getRoomInfo(realRoomId) }
+                    currentCoroutineContext().ensureActive()
                     _uiState.update {
                         val newState =
                             it.copy(
@@ -229,7 +239,8 @@ class LivePlayerViewModel
                     }
 
                     val requestedQn = _uiState.value.currentQuality.takeIf { it > 0 } ?: 0
-                    val playInfo = liveRepository.getLivePlayInfo(realRoomId, requestedQn)
+                    val playInfo = withTimeout(LOAD_TIMEOUT_MS) { liveRepository.getLivePlayInfo(realRoomId, requestedQn) }
+                    currentCoroutineContext().ensureActive()
                     val line = resolveLine(playInfo, _uiState.value.currentLine)
                     if (line == null) {
                         _uiState.update {
@@ -258,7 +269,8 @@ class LivePlayerViewModel
 
                     connectDanmaku(realRoomId)
                 }.onFailure { error ->
-                    if (error is CancellationException) throw error
+                    error.rethrowUnlessTimeout()
+                    currentCoroutineContext().ensureActive()
                     logger.error(error) { "Failed to load live" }
                     _uiState.update {
                         it.copy(
@@ -427,11 +439,14 @@ class LivePlayerViewModel
             val realRoomId = _uiState.value.realRoomId
             if (realRoomId == 0) return
 
-            viewModelScope.launch {
+            val preferredOrder = _uiState.value.currentLine
+            streamJob?.cancel()
+            streamJob = viewModelScope.launch {
                 runCatching {
-                    val playInfo = liveRepository.getLivePlayInfo(realRoomId, qn)
+                    val playInfo = withTimeout(LOAD_TIMEOUT_MS) { liveRepository.getLivePlayInfo(realRoomId, qn) }
+                    currentCoroutineContext().ensureActive()
                     val line =
-                        resolveLine(playInfo, _uiState.value.currentLine)
+                        resolveLine(playInfo, preferredOrder)
                             ?: error("获取直播流地址失败")
                     _uiState.update {
                         it.copy(
@@ -439,13 +454,15 @@ class LivePlayerViewModel
                             currentQuality = playInfo.currentQn.takeIf { current -> current > 0 } ?: qn,
                             availableLines = playInfo.lines,
                             currentLine = line.order,
+                            errorMessage = null,
                         )
                     }
                     videoPlayer?.playUrl(line.url)
                     videoPlayer?.prepare()
                     videoPlayer?.start()
                 }.onFailure { error ->
-                    if (error is CancellationException) throw error
+                    error.rethrowUnlessTimeout()
+                    currentCoroutineContext().ensureActive()
                     logger.error(error) { "Failed to reload live stream" }
                     _uiState.update {
                         it.copy(
@@ -480,6 +497,7 @@ class LivePlayerViewModel
          * 弹幕播放器由 [DanmakuViewModel] 管理释放，此处不释放。
          */
         fun detachPlayer() {
+            streamJob?.cancel()
             wsJob?.cancel()
             stopDebugInfoUpdater()
             videoPlayer?.release()

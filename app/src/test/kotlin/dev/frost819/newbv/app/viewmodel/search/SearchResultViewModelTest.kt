@@ -14,13 +14,17 @@ import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
@@ -71,6 +75,50 @@ class SearchResultViewModelTest {
             play = 10000,
             danmaku = 500,
         )
+
+    @Test
+    fun `old search cannot overwrite new search even if request ignores cancellation`() = runTest(testDispatcher) {
+        val old = CompletableDeferred<SearchTypeResult>()
+        coEvery { searchRepo.searchType("old", SearchType.Video, any(), any(), any(), any(), any()) } coAnswers {
+            withContext(NonCancellable) { old.await() }
+        }
+        viewModel.search("old")
+        runCurrent()
+        viewModel.search("new")
+        runCurrent()
+        old.complete(fakeVideoSearchResult(listOf(fakeVideoResult(999))))
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.keyword).isEqualTo("new")
+        val ids = viewModel.uiState.value.results[SearchType.Video]!!.items.map {
+            (it as dev.frost819.newbv.app.ui.state.search.SearchResultItem.VideoItem).video.aid
+        }
+        assertThat(ids).doesNotContain(999L)
+        assertThat(ids).contains(1L)
+    }
+
+    @Test
+    fun `duplicates within first page are removed`() = runTest(testDispatcher) {
+        coEvery { searchRepo.searchType(any(), SearchType.Video, any(), any(), any(), any(), any()) } returns
+            fakeVideoSearchResult(listOf(fakeVideoResult(1), fakeVideoResult(1), fakeVideoResult(2)))
+        viewModel.search("test")
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.results[SearchType.Video]!!.items).hasSize(2)
+    }
+
+    @Test
+    fun `new filter cancels pending results from previous filter`() = runTest(testDispatcher) {
+        val old = CompletableDeferred<SearchTypeResult>()
+        coEvery { searchRepo.searchType(any(), SearchType.Video, any(), SearchFilterOrderType.ComprehensiveSort, any(), any(), any()) } coAnswers {
+            withContext(NonCancellable) { old.await() }
+        }
+        viewModel.search("test")
+        runCurrent()
+        viewModel.updateFilter(SearchFilterOrderType.LatestPublish, SearchFilterDuration.All)
+        runCurrent()
+        old.complete(fakeVideoSearchResult(listOf(fakeVideoResult(999))))
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.results[SearchType.Video]!!.items).hasSize(20)
+    }
 
     private fun fakePgcResult(seasonId: Int) =
         SearchTypeResult.Pgc(

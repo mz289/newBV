@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
@@ -145,7 +147,7 @@ private fun SearchInputColumn(
                 modifier = Modifier.width(258.dp).confirmOpenIme(confirmIme),
                 value = keyword,
                 onValueChange = onKeywordChange,
-                maxLines = 1,
+                singleLine = true,
                 shape = MaterialTheme.shapes.large,
                 colors =
                     OutlinedTextFieldDefaults.colors(
@@ -156,7 +158,8 @@ private fun SearchInputColumn(
                         cursorColor = MaterialTheme.colorScheme.primary,
                     ),
                 placeholder = { Text("搜索") },
-                keyboardOptions = confirmImeKeyboardOptions(confirmIme),
+                keyboardOptions = confirmImeKeyboardOptions(confirmIme, imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
             )
             SoftKeyboard(
                 firstButtonFocusRequester = focusRequester,

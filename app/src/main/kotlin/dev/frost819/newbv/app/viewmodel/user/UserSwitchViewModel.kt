@@ -83,11 +83,12 @@ class UserSwitchViewModel
          */
         fun deleteUser(user: UserEntity) {
             viewModelScope.launch {
+                val wasCurrentUser = accountRepository.currentUid() == user.uid
                 accountRepository.deleteUser(user)
                 val remaining = accountRepository.getAllUsers()
-                if (remaining.isNotEmpty()) {
+                if (wasCurrentUser && remaining.isNotEmpty()) {
                     accountRepository.setCurrentUser(remaining.first())
-                } else {
+                } else if (wasCurrentUser) {
                     accountRepository.logout()
                 }
                 updateData()

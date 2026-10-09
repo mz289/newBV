@@ -162,14 +162,4 @@ class DanmakuMobMaskFrameTest {
         assertThat(segment!!.frames).isEmpty()
     }
 
-    @Test
-    fun `DanmakuMask segments property returns all segments`() {
-        val segmentData = gzipCompress(ByteArray(0))
-        val binary = buildMaskBinary(listOf(60000L), segmentData)
-
-        val mask = DanmakuMask.fromBinary(binary, DanmakuMaskType.WebMask)
-
-        assertThat(mask.segments).hasSize(1)
-    }
-
 }

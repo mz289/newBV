@@ -18,7 +18,10 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
@@ -91,6 +94,45 @@ class AccountRepositoryImplTest {
     fun tearDown() {
         io.mockk.unmockkAll()
     }
+
+    @Test
+    fun `old profile response cannot overwrite another account`() =
+        runTest {
+            Prefs.isLogin = true
+            Prefs.uid = 100L
+            val pending = CompletableDeferred<BiliResponse<MyInfoData>>()
+            coEvery { BiliHttpApi.getUserSelfInfo() } coAnswers { pending.await() }
+            val oldUser = UserEntity(uid = 100L, username = "old", avatar = "old", auth = "{}")
+            val newUser = UserEntity(uid = 200L, username = "new", avatar = "new", auth = "{}")
+            coEvery { userDao.findUserByUid(100L) } returns oldUser
+            coEvery { userDao.findUserByUid(200L) } returns newUser
+            val job = launch { repository.refreshUserInfo() }
+            runCurrent()
+            Prefs.uid = 200L
+            val response = mockk<MyInfoData>(relaxed = true)
+            pending.complete(BiliResponse(code = 0, message = "ok", data = response))
+            job.join()
+            coVerify(exactly = 0) { userDao.update(any()) }
+            assertThat(newUser.username).isEqualTo("new")
+        }
+
+    @Test
+    fun `profile response after logout leaves account state logged out`() =
+        runTest {
+            Prefs.isLogin = true
+            Prefs.uid = 100L
+            val pending = CompletableDeferred<BiliResponse<MyInfoData>>()
+            coEvery { BiliHttpApi.getUserSelfInfo() } coAnswers { pending.await() }
+            coEvery { userDao.findUserByUid(any()) } returns null
+            val job = launch { repository.refreshUserInfo() }
+            runCurrent()
+            repository.logout()
+            pending.complete(BiliResponse(code = 0, message = "ok", data = mockk<MyInfoData>(relaxed = true)))
+            job.join()
+            assertThat(repository.uiState.value.isLogin).isFalse()
+            assertThat(repository.uiState.value.username).isEmpty()
+            coVerify(exactly = 0) { userDao.update(any()) }
+        }
 
     @Test
     fun `getAllUsers delegates to userDao`() =
@@ -238,7 +280,7 @@ class AccountRepositoryImplTest {
         }
 
     @Test
-    fun `logout clears Prefs and AuthRepository`() =
+    fun `logout clears Prefs AuthRepository and HTTP credentials`() =
         runTest {
             Prefs.isLogin = true
             Prefs.uid = 100L
@@ -246,6 +288,10 @@ class AccountRepositoryImplTest {
             Prefs.biliJct = "jct"
             authRepository.mid = 100L
             authRepository.sessionData = "sess"
+            BiliHttpApi.mid = 100L
+            BiliHttpApi.sessData = "sess"
+            BiliHttpApi.biliJct = "jct"
+            BiliHttpApi.accessToken = "token"
 
             coEvery { userDao.findUserByUid(100L) } returns null
 
@@ -256,6 +302,10 @@ class AccountRepositoryImplTest {
             assertThat(Prefs.sessData).isEmpty()
             assertThat(authRepository.mid).isNull()
             assertThat(authRepository.sessionData).isNull()
+            assertThat(BiliHttpApi.mid).isNull()
+            assertThat(BiliHttpApi.sessData).isEmpty()
+            assertThat(BiliHttpApi.biliJct).isEmpty()
+            assertThat(BiliHttpApi.accessToken).isEmpty()
         }
 
     @Test

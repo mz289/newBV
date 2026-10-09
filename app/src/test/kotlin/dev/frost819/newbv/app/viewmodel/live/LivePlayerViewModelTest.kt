@@ -12,14 +12,18 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -147,6 +151,37 @@ class LivePlayerViewModelTest {
         }
 
     // ── Helpers ──────────────────────────────────────────────
+
+    @Test
+    fun `latest quality selection wins when old response is late`() = runTest(testDispatcher) {
+        updateUiState { it.copy(realRoomId = 123) }
+        val old = CompletableDeferred<LivePlayInfo>()
+        coEvery { liveRepository.getLivePlayInfo(123, 400) } coAnswers { withContext(NonCancellable) { old.await() } }
+        coEvery { liveRepository.getLivePlayInfo(123, 10000) } returns LivePlayInfo(currentQn = 10000, qualities = emptyList(), lines = listOf(LivePlayLine(1, "new")))
+        viewModel.changeQuality(400)
+        runCurrent()
+        viewModel.changeQuality(10000)
+        runCurrent()
+        old.complete(LivePlayInfo(currentQn = 400, qualities = emptyList(), lines = listOf(LivePlayLine(1, "old"))))
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.currentQuality).isEqualTo(10000)
+        verify(exactly = 1) { mockPlayer.playUrl("new") }
+        verify(exactly = 0) { mockPlayer.playUrl("old") }
+    }
+
+    @Test
+    fun `detaching player cancels pending stream reload`() = runTest(testDispatcher) {
+        updateUiState { it.copy(realRoomId = 123) }
+        val pending = CompletableDeferred<LivePlayInfo>()
+        coEvery { liveRepository.getLivePlayInfo(any(), any()) } coAnswers { pending.await() }
+        viewModel.changeQuality(400)
+        runCurrent()
+        viewModel.detachPlayer()
+        pending.complete(LivePlayInfo(currentQn = 400, qualities = emptyList(), lines = listOf(LivePlayLine(1, "late"))))
+        advanceUntilIdle()
+        verify(exactly = 0) { mockPlayer.playUrl(any()) }
+        assertThat(viewModel.uiState.value.availableLines).isEmpty()
+    }
 
     private fun setVideoPlayer(player: AbstractVideoPlayer?) {
         val field = LivePlayerViewModel::class.java.getDeclaredField("videoPlayer${'$'}delegate")

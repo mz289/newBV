@@ -20,14 +20,18 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
@@ -126,6 +130,52 @@ class HomeViewModelTest {
     }
 
     private fun createViewModel() = HomeViewModel(recommendRepo, userRepo, accountRepo)
+
+    @Test
+    fun `refresh while popular load is pending replaces old page`() = runTest(testDispatcher) {
+        val old = CompletableDeferred<PopularVideoData>()
+        var calls = 0
+        coEvery { recommendRepo.getPopularVideos(any(), any()) } coAnswers {
+            if (++calls == 1) withContext(NonCancellable) { old.await() }
+            else PopularVideoData(list = listOf(fakeUgcItem(100)), nextPage = PopularVideoPage(), noMore = true)
+        }
+        val vm = createViewModel()
+        runCurrent()
+        vm.refreshPopular()
+        runCurrent()
+        old.complete(PopularVideoData(list = listOf(fakeUgcItem(999)), nextPage = PopularVideoPage(), noMore = false))
+        advanceUntilIdle()
+        assertThat(vm.uiState.value.popularItems.map { it.aid }).containsExactly(100L)
+        assertThat(vm.uiState.value.popularLoading).isFalse()
+    }
+
+    @Test
+    fun `logout cancels pending dynamics and keeps list empty`() = runTest(testDispatcher) {
+        val old = CompletableDeferred<DynamicVideoData>()
+        coEvery { userRepo.getDynamicVideos(any(), any(), any(), any()) } coAnswers {
+            withContext(NonCancellable) { old.await() }
+        }
+        val vm = createViewModel()
+        runCurrent()
+        vm.updateLoginState(true)
+        runCurrent()
+        vm.updateLoginState(false)
+        old.complete(DynamicVideoData(videos = listOf(fakeDynamicVideo(999)), hasMore = true, historyOffset = "old", updateBaseline = "old"))
+        advanceUntilIdle()
+        assertThat(vm.uiState.value.dynamicItems).isEmpty()
+        assertThat(vm.uiState.value.dynamicLoading).isFalse()
+    }
+
+    @Test
+    fun `popular has no more prevents further requests`() = runTest(testDispatcher) {
+        coEvery { recommendRepo.getPopularVideos(any(), any()) } returns
+            PopularVideoData(list = listOf(fakeUgcItem(100)), nextPage = PopularVideoPage(), noMore = true)
+        val vm = createViewModel()
+        advanceUntilIdle()
+        vm.loadPopular()
+        advanceUntilIdle()
+        coVerify(exactly = 1) { recommendRepo.getPopularVideos(any(), any()) }
+    }
 
     @AfterEach
     fun tearDown() {

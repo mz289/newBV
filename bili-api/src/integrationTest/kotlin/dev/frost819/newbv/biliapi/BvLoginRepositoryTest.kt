@@ -18,31 +18,6 @@ class BvLoginRepositoryTest {
     private val loginRepository = LoginRepository()
 
     @Test
-    fun `request web qr login url`() {
-        runBlocking {
-            val qrData = loginRepository.requestWebQrLogin()
-            println("web qr url: ${qrData.url}")
-            println("web qr key: ${qrData.key}")
-            assertThat(qrData.url).isNotEmpty()
-            assertThat(qrData.key).isNotEmpty()
-        }
-    }
-
-    @Test
-    fun `check web qr login state returns waiting or expired`() {
-        runBlocking {
-            val qrData = loginRepository.requestWebQrLogin()
-            val result = loginRepository.checkWebQrLoginState(qrData.key)
-            println("web qr login state: ${result.state}")
-            assertThat(result.state).isAnyOf(
-                QrLoginState.WaitingForScan,
-                QrLoginState.Expired,
-                QrLoginState.Unknown,
-            )
-        }
-    }
-
-    @Test
     fun `request app qr login url`() {
         runBlocking {
             val qrData = loginRepository.requestAppQrLogin()
@@ -64,29 +39,6 @@ class BvLoginRepositoryTest {
                 QrLoginState.Expired,
                 QrLoginState.Unknown,
             )
-        }
-    }
-
-    @Disabled("交互式 QR 登录测试，需手动扫码，不在 CI 中运行")
-    @Test
-    fun `web qr login full flow`() {
-        runBlocking {
-            val qrData = loginRepository.requestWebQrLogin()
-            println("请扫描此二维码登录: ${qrData.url}")
-
-            var state = QrLoginState.WaitingForScan
-            while (state == QrLoginState.WaitingForScan || state == QrLoginState.WaitingForConfirm) {
-                val result = loginRepository.checkWebQrLoginState(qrData.key)
-                state = result.state
-                println("login state: $state")
-                if (state == QrLoginState.Success) {
-                    println("登录成功！")
-                    println("cookies: ${result.cookies}")
-                    assertThat(result.cookies).isNotNull()
-                    assertThat(result.cookies!!.sessData).isNotEmpty()
-                }
-                delay(1000)
-            }
         }
     }
 

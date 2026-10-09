@@ -30,19 +30,5 @@ fun ByteArray.zlibDecompress(): ByteArray {
  * B 站 WebSocket 直播弹幕协议 version=3 使用 brotli 压缩，
  * 解压后与 zlib 解压结果相同：一个或多个带头部的弹幕帧。
  */
-fun ByteArray.brotliDecompress(): ByteArray {
-    val outputStream = ByteArrayOutputStream()
-    outputStream.use { out ->
-        ByteArrayInputStream(this).use { input ->
-            BrotliInputStream(input).use { brotliInput ->
-                val buffer = ByteArray(8192)
-                while (true) {
-                    val read = brotliInput.read(buffer)
-                    if (read == -1) break
-                    out.write(buffer, 0, read)
-                }
-            }
-        }
-    }
-    return outputStream.toByteArray()
-}
+fun ByteArray.brotliDecompress(): ByteArray =
+    BrotliInputStream(ByteArrayInputStream(this)).use { it.readBytes() }

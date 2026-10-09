@@ -14,10 +14,13 @@ import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
@@ -62,6 +65,53 @@ class LoginViewModelTest {
     @AfterEach
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `refresh cancels pending QR request`() = runTest(testDispatcher) {
+        val old = CompletableDeferred<QrLoginData>()
+        var requests = 0
+        coEvery { loginRepository.requestAppQrLogin() } coAnswers {
+            if (++requests == 1) old.await() else QrLoginData(url = "new-url", key = "new-key")
+        }
+        viewModel.requestAppQrCode()
+        viewModel.requestAppQrCode()
+        old.complete(fakeQrData)
+        runCurrent()
+        assertThat(viewModel.uiState.value.qrUrl).isEqualTo("new-url")
+        viewModel.cancelPolling()
+    }
+
+    @Test
+    fun `leaving page cancels QR request without error or starting polling`() = runTest(testDispatcher) {
+        val response = CompletableDeferred<QrLoginData>()
+        coEvery { loginRepository.requestAppQrLogin() } coAnswers { response.await() }
+        viewModel.requestAppQrCode()
+        viewModel.cancelPolling()
+        response.complete(fakeQrData)
+        advanceTimeBy(2000)
+        assertThat(viewModel.uiState.value.state).isEqualTo(QrLoginState.RequestingQRCode)
+        coVerify(exactly = 0) { loginRepository.checkAppQrLoginState(any()) }
+    }
+
+    @Test
+    fun `QR request timeout shows retryable error`() = runTest(testDispatcher) {
+        coEvery { loginRepository.requestAppQrLogin() } coAnswers { CompletableDeferred<QrLoginData>().await() }
+        viewModel.requestAppQrCode()
+        advanceTimeBy(10_001)
+        assertThat(viewModel.uiState.value.state).isEqualTo(QrLoginState.Error)
+    }
+
+    @Test
+    fun `account persistence failure becomes error instead of uncaught coroutine exception`() = runTest(testDispatcher) {
+        coEvery { loginRepository.requestAppQrLogin() } returns fakeQrData
+        coEvery { loginRepository.checkAppQrLoginState(any()) } returns QrLoginResult(state = QrLoginState.Success, cookies = fakeCookies)
+        coEvery { accountRepository.addUser(any()) } throws java.io.IOException("disk full")
+        viewModel.requestAppQrCode()
+        advanceTimeBy(2000)
+        assertThat(viewModel.uiState.value.state).isEqualTo(QrLoginState.Error)
+        assertThat(viewModel.uiState.value.errorMessage).contains("disk full")
+        coVerify(exactly = 1) { loginRepository.checkAppQrLoginState(any()) }
     }
 
     @Test

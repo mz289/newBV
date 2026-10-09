@@ -202,7 +202,7 @@ class PgcPlayUrlDataTest {
         assertThat(playData.dashVideos).hasSize(1)
         assertThat(playData.dashVideos.first().quality).isEqualTo(120)
         assertThat(playData.dashAudios).hasSize(1)
-        assertThat(playData.codec[120]).containsExactly("avc1.640033")
+        assertThat(playData.dashVideos.first().codecs).isEqualTo("avc1.640033")
     }
 
     @Test

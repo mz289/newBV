@@ -43,6 +43,7 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import dev.frost819.newbv.app.ui.component.EmptyTip
 import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
 import dev.frost819.newbv.app.ui.component.TopNav
@@ -138,7 +139,10 @@ fun SearchResultContent(
         itemCount = {
             viewModel.uiState.value.let { it.results[it.activeType]?.count ?: 0 }
         },
-        onLoadMore = { viewModel.loadMore(viewModel.uiState.value.activeType) },
+        onLoadMore = {
+            val state = viewModel.uiState.value
+            if (state.results[state.activeType]?.error == false) viewModel.loadMore(state.activeType)
+        },
     )
 
     Box(
@@ -323,13 +327,21 @@ fun SearchResultContent(
                     androidx.compose.foundation.lazy.grid
                         .GridItemSpan(maxLineSpan)
                 }) {
-                    ListFooterTip(
-                        isLoading = activeResult.isLoading,
-                        isError = activeResult.error,
-                        hasMore = activeResult.hasMore,
-                        itemsIsEmpty = activeResult.items.isEmpty(),
-                        onRetry = { viewModel.loadMore(uiState.activeType) },
-                    )
+                    if (activeResult.items.isEmpty() &&
+                        !activeResult.isLoading &&
+                        !activeResult.error &&
+                        !activeResult.hasMore
+                    ) {
+                        EmptyTip("没有找到相关结果")
+                    } else {
+                        ListFooterTip(
+                            isLoading = activeResult.isLoading,
+                            isError = activeResult.error,
+                            hasMore = activeResult.hasMore,
+                            itemsIsEmpty = activeResult.items.isEmpty(),
+                            onRetry = { viewModel.loadMore(uiState.activeType) },
+                        )
+                    }
                 }
             }
         }

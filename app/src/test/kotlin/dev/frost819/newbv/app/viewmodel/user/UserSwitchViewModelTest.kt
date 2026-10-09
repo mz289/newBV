@@ -103,4 +103,16 @@ class UserSwitchViewModelTest {
             coVerify { accountRepository.deleteUser(user1) }
             coVerify { accountRepository.logout() }
         }
+
+    @Test
+    fun `deleting another account preserves current user`() = runTest(testDispatcher) {
+        coEvery { accountRepository.getAllUsers() } returnsMany listOf(listOf(user1, user2), listOf(user1))
+        coEvery { accountRepository.currentUid() } returns user1.uid
+        viewModel = UserSwitchViewModel(accountRepository)
+        viewModel.deleteUser(user2)
+        coVerify { accountRepository.deleteUser(user2) }
+        coVerify(exactly = 0) { accountRepository.setCurrentUser(any()) }
+        coVerify(exactly = 0) { accountRepository.logout() }
+        assertThat(viewModel.uiState.value.currentUid).isEqualTo(user1.uid)
+    }
 }

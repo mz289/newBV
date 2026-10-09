@@ -29,44 +29,35 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 object BiliLiveHttpApi {
-    private var endPoint: String = ""
-    private lateinit var client: HttpClient
     private val logger = BiliLogger
-
-    init {
-        createClient()
-    }
-
-    private fun createClient() {
-        client =
-            HttpClient(OkHttp) {
-                BiliUserAgent()
-                install(ContentNegotiation) {
-                    json(
-                        Json {
-                            coerceInputValues = true
-                            ignoreUnknownKeys = true
-                            prettyPrint = true
-                        },
-                    )
-                }
-                install(ContentEncoding) {
-                    deflate(1.0F)
-                    gzip(0.9F)
-                }
-                defaultRequest {
-                    url {
-                        host = "api.live.bilibili.com"
-                        protocol = URLProtocol.HTTPS
-                    }
-                    header("Referer", "https://live.bilibili.com")
-                    header("Origin", "https://live.bilibili.com")
-                }
-            }.apply {
-                encApiSign()
-                injectCookies()
+    private val client =
+        HttpClient(OkHttp) {
+            BiliUserAgent()
+            install(ContentNegotiation) {
+                json(
+                    Json {
+                        coerceInputValues = true
+                        ignoreUnknownKeys = true
+                        prettyPrint = true
+                    },
+                )
             }
-    }
+            install(ContentEncoding) {
+                deflate(1.0F)
+                gzip(0.9F)
+            }
+            defaultRequest {
+                url {
+                    host = "api.live.bilibili.com"
+                    protocol = URLProtocol.HTTPS
+                }
+                header("Referer", "https://live.bilibili.com")
+                header("Origin", "https://live.bilibili.com")
+            }
+        }.apply {
+            encApiSign()
+            injectCookies()
+        }
 
     /**
      * 获取直播间[roomId]的弹幕连接地址等信息，例如 token。

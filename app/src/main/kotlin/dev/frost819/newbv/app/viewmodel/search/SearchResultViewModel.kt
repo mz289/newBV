@@ -14,6 +14,7 @@ import dev.frost819.newbv.biliapi.repositories.SearchRepository
 import dev.frost819.newbv.biliapi.repositories.SearchType
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -38,6 +39,8 @@ class SearchResultViewModel
 
         private val _uiState = MutableStateFlow(SearchResultUiState())
         val uiState = _uiState.asStateFlow()
+        private val loadJobs = mutableMapOf<SearchType, Job>()
+        private var searchGeneration = 0L
 
         /**
          * 设置搜索关键词并启动搜索。
@@ -45,9 +48,12 @@ class SearchResultViewModel
          * 重置所有分页和结果，对 4 种类型并行加载第一页。
          */
         fun search(keyword: String) {
+            searchGeneration++
+            loadJobs.values.forEach { it.cancel() }
+            loadJobs.clear()
             _uiState.update {
                 it.copy(
-                    keyword = keyword,
+                    keyword = keyword.trim(),
                     results =
                         SearchType.entries.associateWith { type ->
                             TypedSearchResult(type = type)
@@ -83,7 +89,8 @@ class SearchResultViewModel
 
             updateResult(type) { it.copy(isLoading = true, error = false) }
 
-            viewModelScope.launch {
+            val generation = searchGeneration
+            loadJobs[type] = viewModelScope.launch {
                 runCatching {
                     withTimeout(LOAD_TIMEOUT_MS) {
                         searchRepository.searchType(
@@ -97,6 +104,7 @@ class SearchResultViewModel
                         )
                     }
                 }.onSuccess { searchResult ->
+                    if (generation != searchGeneration) return@onSuccess
                     val newItems =
                         when (type) {
                             SearchType.Video -> searchResult.videos.map { SearchResultItem.VideoItem(it) }
@@ -131,6 +139,14 @@ class SearchResultViewModel
                                     }
                                 key !in existingIds
                             }
+                            .distinctBy { item ->
+                                when (item) {
+                                    is SearchResultItem.VideoItem -> "v_${item.video.aid}"
+                                    is SearchResultItem.PgcItem -> "p_${item.pgc.seasonId}"
+                                    is SearchResultItem.UserItem -> "u_${item.user.mid}"
+                                    is SearchResultItem.LiveRoomItem -> "l_${item.room.roomId}"
+                                }
+                            }
                         // hasMore 由 Repository 根据 API 返回的 numPages 判断
                         val hasMore = searchResult.hasMore && dedupedNewItems.isNotEmpty()
                         it.copy(
@@ -146,6 +162,7 @@ class SearchResultViewModel
                     }
                 }.onFailure { e ->
                     e.rethrowUnlessTimeout()
+                    if (generation != searchGeneration) return@onFailure
                     logger.warn { "Failed to load search result: type=$type, $e" }
                     updateResult(type) { it.copy(isLoading = false, error = true) }
                 }

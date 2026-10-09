@@ -49,34 +49,27 @@ class PgcRepositoryTest {
     }
 
     @Test
-    fun `get pgc carousel data`() {
+    fun `get pgc web page`() =
         runBlocking {
-            // 查询类：断言每个分类返回轮播数据
             PgcType.entries.forEach { pgcType ->
-                println("pgcType: $pgcType")
-                val data = pgcRepository.getCarousel(pgcType)
-                println("carousel items: ${data.items.size}")
-                assertThat(data.items).isNotEmpty()
+                val page = pgcRepository.getPgcWebPage(pgcType)
+                assertThat(page.modules).isNotEmpty()
+                page.modules.forEach { module ->
+                    assertThat(module.title).isNotEmpty()
+                }
             }
         }
-    }
 
     @Test
-    fun `get pgc feed data`() {
+    fun `get pgc rank list`() =
         runBlocking {
-            // 查询类：断言每个分类返回 feed 数据（部分分类 feed 可能为空，断言结构正常）
-            PgcType.entries.forEach { pgcType ->
-                println("pgcType: $pgcType")
-                val data =
-                    pgcRepository.getFeed(
-                        pgcType = pgcType,
-                        cursor = 0,
-                    )
-                println("feed items: ${data.items.size}")
-                assertThat(data.items).isNotNull()
+            val data = pgcRepository.getPgcRankList(PgcType.Anime)
+            assertThat(data.items).isNotEmpty()
+            data.items.forEach { item ->
+                assertThat(item.rank).isGreaterThan(0)
+                assertThat(item.seasonId).isGreaterThan(0)
             }
         }
-    }
 
     @Test
     fun `get pgc index`() {

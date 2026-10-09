@@ -14,7 +14,6 @@ data class PlayData(
     val dashAudios: List<DashAudio>,
     val dolby: DashAudio? = null,
     val flac: DashAudio? = null,
-    val codec: Map<Int, List<String>> = emptyMap(),
     val needPay: Boolean = false,
 ) {
     companion object {
@@ -107,24 +106,11 @@ data class PlayData(
                     )
                 }
 
-            // 生成 codec 映射（优先使用 dashVideo，如果没有则使用 segmentVideo）
-            val codecs =
-                if (dashVideoStreams.isNotEmpty()) {
-                    dashVideoStreams.associate {
-                        it.streamInfo.quality to listOf(CodeType.fromCodecId(it.dashVideo.codecid).str)
-                    }
-                } else {
-                    segmentVideoStreams.associate {
-                        it.streamInfo.quality to listOf(CodeType.fromCodecId(it.streamInfo.quality).str)
-                    }
-                }
-
             return PlayData(
                 dashVideos = dashVideos,
                 dashAudios = dashAudios,
                 dolby = dolby,
                 flac = flac,
-                codec = codecs,
                 needPay = isPreview,
             )
         }
@@ -206,24 +192,11 @@ data class PlayData(
                     )
                 }
 
-            // 生成 codec 映射（优先使用 dashVideo，如果没有则使用 segmentVideo）
-            val codecs =
-                if (dashVideoStreams.isNotEmpty()) {
-                    dashVideoStreams.associate {
-                        it.info.quality to listOf(CodeType.fromCodecId(it.dashVideo.codecid).str)
-                    }
-                } else {
-                    segmentVideoStreams.associate {
-                        it.info.quality to listOf(CodeType.fromCodecId(it.info.quality).str)
-                    }
-                }
-
             return PlayData(
                 dashVideos = dashVideos,
                 dashAudios = dashAudios,
                 dolby = dolby,
                 flac = null,
-                codec = codecs,
                 needPay = isPreview || (dashVideoStreams.isEmpty() && segmentVideoStreams.isNotEmpty()),
             )
         }
@@ -246,11 +219,6 @@ data class PlayData(
             val hasDash = dash?.video?.isNotEmpty() == true
             val durl = videoInfo.durl
             val isPreview = videoInfo.isPreview == 1 || (!hasDash && durl.isNotEmpty())
-
-            val codec =
-                videoInfo.supportFormats
-                    .mapNotNull { it.codecs?.let { c -> it.quality to c } }
-                    .toMap()
 
             val dashVideos =
                 if (hasDash) {
@@ -315,7 +283,6 @@ data class PlayData(
                 dashAudios = dashAudios,
                 dolby = dolby,
                 flac = flac,
-                codec = codec,
                 needPay = isPreview,
             )
         }
@@ -331,11 +298,6 @@ data class PlayData(
                     ?.audio
                     ?.firstOrNull()
             val flacItem = playUrlData.dash?.flac?.audio
-            val codec =
-                playUrlData.supportFormats
-                    .mapNotNull { it.codecs?.let { c -> it.quality to c } }
-                    .toMap()
-
             val dashVideos =
                 if (hasDash) {
                     playUrlData.dash.video.map {
@@ -401,7 +363,6 @@ data class PlayData(
                 dashAudios = dashAudios,
                 dolby = dolby,
                 flac = flac,
-                codec = codec,
                 needPay = isPreview,
             )
         }
@@ -411,7 +372,7 @@ data class PlayData(
         PlayData(
             dashVideos =
                 (dashVideos + other.dashVideos)
-                    .distinctBy { "${it.codecId}_${it.quality}" }
+                    .distinctBy { it.codecId to it.quality }
                     .sortedByDescending { it.quality },
             dashAudios =
                 (dashAudios + other.dashAudios)
@@ -419,14 +380,6 @@ data class PlayData(
                     .sortedByDescending { it.codecId },
             dolby = dolby ?: other.dolby,
             flac = flac ?: other.flac,
-            codec =
-                codec
-                    .map {
-                        it.key to
-                            (it.value + other.codec[it.key].orEmpty())
-                                .distinct()
-                                .filter { it != "none" }
-                    }.toMap(),
             needPay = needPay || other.needPay,
         )
 }

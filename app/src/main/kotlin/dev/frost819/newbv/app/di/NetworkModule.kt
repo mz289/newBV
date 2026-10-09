@@ -158,7 +158,7 @@ object NetworkModule {
      */
     @Provides
     @Singleton
-    fun provideUgcRepository(authRepository: AuthRepository): UgcRepository = UgcRepository(authRepository)
+    fun provideUgcRepository(): UgcRepository = UgcRepository()
 
     /**
      * 提供 [PgcRepository] 单例。

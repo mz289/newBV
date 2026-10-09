@@ -26,13 +26,17 @@ fun InfiniteScrollEffect(
     onLoadMore: () -> Unit,
 ) {
     val currentItemCount by rememberUpdatedState(itemCount)
+    val currentOnLoadMore by rememberUpdatedState(onLoadMore)
     LaunchedEffect(state) {
         snapshotFlow {
-            state.layoutInfo.visibleItemsInfo
-                .lastOrNull()
-                ?.index
+            val count = currentItemCount()
+            val index =
+                state.layoutInfo.visibleItemsInfo
+                    .lastOrNull()
+                    ?.index
+            index to count
         }.distinctUntilChanged()
-            .filter { index -> index != null && index >= currentItemCount() - threshold }
-            .collect { onLoadMore() }
+            .filter { (index, count) -> count > 0 && index != null && index >= count - threshold }
+            .collect { currentOnLoadMore() }
     }
 }

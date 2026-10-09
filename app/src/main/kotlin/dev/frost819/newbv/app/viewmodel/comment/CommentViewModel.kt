@@ -267,7 +267,7 @@ class CommentViewModel
                         if (!isCommentListCurrent(sort, aid, generation)) return@launch
                         val current = _uiState.value.commentLists[sort] ?: return@launch
                         val existing = current.comments.mapTo(HashSet()) { it.rpid }
-                        val appended = page.comments.filter { it.rpid !in existing }
+                        val appended = page.comments.filter { existing.add(it.rpid) }
                         updateCommentList(sort) {
                             it.copy(
                                 comments = it.comments + appended,
@@ -461,8 +461,8 @@ class CommentViewModel
                         val current =
                             _uiState.value.commentLists[sort]?.replyList(rootRpid)
                                 ?: ReplyListState(rootRpid = rootRpid)
-                        val existing = current.replies.mapTo(HashSet()) { it.rpid }
-                        val appended = result.comments.filter { it.rpid != rootRpid && it.rpid !in existing }
+                        val existing = if (isFirst) HashSet<Long>() else current.replies.mapTo(HashSet()) { it.rpid }
+                        val appended = result.comments.filter { it.rpid != rootRpid && existing.add(it.rpid) }
                         updateReplyList(rootRpid, sort) {
                             it.copy(
                                 replies = if (isFirst) appended else it.replies + appended,
@@ -471,7 +471,7 @@ class CommentViewModel
                                 // 若后续页全部为重复项则停止分页
                                 hasMore = result.hasMore && (isFirst || appended.isNotEmpty()),
                                 loaded = true,
-                                expanded = true,
+                                expanded = it.expanded,
                                 initialLoading = false,
                                 initialError = false,
                                 loadingMore = false,

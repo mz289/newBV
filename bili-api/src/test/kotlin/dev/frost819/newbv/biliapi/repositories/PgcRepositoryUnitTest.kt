@@ -5,7 +5,6 @@ import dev.frost819.newbv.biliapi.entity.pgc.PgcType
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.SeasonIndexType
 import dev.frost819.newbv.biliapi.http.entity.BiliResponse
-import dev.frost819.newbv.biliapi.http.entity.pgc.PgcFeedData
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockkObject

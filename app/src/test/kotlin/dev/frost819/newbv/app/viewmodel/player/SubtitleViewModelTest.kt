@@ -11,12 +11,16 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -52,6 +56,46 @@ class SubtitleViewModelTest {
     fun tearDown() {
         unmockkAll()
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `clear subtitle cancels pending list request`() = runBlocking {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        io.mockk.every { Prefs.apiType } returns dev.frost819.newbv.biliapi.entity.ApiType.Web
+        val started = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        val response = CompletableDeferred<List<dev.frost819.newbv.biliapi.entity.video.Subtitle>>()
+        io.mockk.coEvery { videoPlayRepository.getSubtitle(any(), any(), any()) } coAnswers {
+            started.complete(Unit)
+            try { response.await() } finally { cancelled.complete(Unit) }
+        }
+        viewModel.loadSubtitleList(1, 1)
+        withTimeout(5000) { started.await() }
+        viewModel.clearSubtitle()
+        withTimeout(5000) { cancelled.await() }
+        assertThat(viewModel.subtitleList.value).isEmpty()
+        assertThat(viewModel.subtitleId.value).isEqualTo(-1L)
+    }
+
+    @Test
+    fun `new video cancels old subtitle list request`() = runBlocking {
+        Dispatchers.setMain(UnconfinedTestDispatcher())
+        io.mockk.every { Prefs.apiType } returns dev.frost819.newbv.biliapi.entity.ApiType.Web
+        val started = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        val response = CompletableDeferred<List<dev.frost819.newbv.biliapi.entity.video.Subtitle>>()
+        io.mockk.coEvery { videoPlayRepository.getSubtitle(any(), any(), any()) } coAnswers {
+            if (firstArg<Long>() == 1L) {
+                started.complete(Unit)
+                try { response.await() } finally { cancelled.complete(Unit) }
+            } else emptyList()
+        }
+        viewModel.loadSubtitleList(1, 1)
+        withTimeout(5000) { started.await() }
+        viewModel.loadSubtitleList(2, 2)
+        withTimeout(5000) { cancelled.await() }
+        assertThat(viewModel.subtitleList.value).isEmpty()
+        viewModel.clearSubtitle()
     }
 
     @Test

@@ -4,17 +4,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.AccountRepositoryImpl
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.login.QrLoginState
 import dev.frost819.newbv.biliapi.entity.login.WebCookies
 import dev.frost819.newbv.biliapi.repositories.LoginRepository
 import dev.frost819.newbv.core.log.Loggers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 /**
@@ -66,23 +71,26 @@ class LoginViewModel
          */
         fun requestAppQrCode() {
             cancelPolling()
-            _uiState.update { it.copy(state = QrLoginState.RequestingQRCode, errorMessage = "") }
-            viewModelScope.launch {
+            _uiState.value = QrLoginUiState(state = QrLoginState.RequestingQRCode)
+            pollingJob = viewModelScope.launch {
                 runCatching {
-                    val qrData = loginRepository.requestAppQrLogin()
+                    val qrData = withTimeout(LOAD_TIMEOUT_MS) { loginRepository.requestAppQrLogin() }
+                    currentCoroutineContext().ensureActive()
                     _uiState.update {
                         it.copy(
                             state = QrLoginState.WaitingForScan,
                             qrUrl = qrData.url,
                         )
                     }
-                    startPolling(qrData.key)
+                    poll(qrData.key)
                 }.onFailure { error ->
-                    logger.error(error) { "Failed to request app QR code" }
+                    error.rethrowUnlessTimeout()
+                    currentCoroutineContext().ensureActive()
+                    logger.error(error) { "QR login failed" }
                     _uiState.update {
                         it.copy(
                             state = QrLoginState.Error,
-                            errorMessage = error.message ?: "请求二维码失败",
+                            errorMessage = error.message ?: "登录失败，请重试",
                         )
                     }
                 }
@@ -97,47 +105,32 @@ class LoginViewModel
          *
          * @param key TV 扫码登录的 authCode。
          */
-        private fun startPolling(key: String) {
-            pollingJob =
-                viewModelScope.launch {
-                    while (true) {
-                        delay(1000)
-                        runCatching {
-                            loginRepository.checkAppQrLoginState(key)
-                        }.onSuccess { result ->
-                            when (result.state) {
-                                QrLoginState.WaitingForScan,
-                                QrLoginState.WaitingForConfirm,
-                                -> {
-                                    _uiState.update { it.copy(state = result.state) }
-                                }
-
-                                QrLoginState.Expired -> {
-                                    _uiState.update { it.copy(state = QrLoginState.Expired) }
-                                    cancelPolling()
-                                }
-
-                                QrLoginState.Success -> {
-                                    handleLoginSuccess(result.cookies, result.accessToken, result.refreshToken)
-                                    cancelPolling()
-                                }
-
-                                else -> {
-                                    logger.warn { "Unknown QR login state: ${result.state}" }
-                                }
-                            }
-                        }.onFailure { error ->
-                            logger.error(error) { "Failed to check QR login state" }
-                            _uiState.update {
-                                it.copy(
-                                    state = QrLoginState.Error,
-                                    errorMessage = error.message ?: "检查登录状态失败",
-                                )
-                            }
-                            cancelPolling()
-                        }
+        private suspend fun poll(key: String) {
+            while (true) {
+                delay(1000)
+                val result =
+                    withTimeout(LOAD_TIMEOUT_MS) {
+                        loginRepository.checkAppQrLoginState(key)
                     }
+                currentCoroutineContext().ensureActive()
+                when (result.state) {
+                    QrLoginState.WaitingForScan,
+                    QrLoginState.WaitingForConfirm,
+                    -> _uiState.update { it.copy(state = result.state) }
+
+                    QrLoginState.Expired -> {
+                        _uiState.update { it.copy(state = QrLoginState.Expired) }
+                        return
+                    }
+
+                    QrLoginState.Success -> {
+                        handleLoginSuccess(result.cookies, result.accessToken, result.refreshToken)
+                        return
+                    }
+
+                    else -> logger.warn { "Unknown QR login state: ${result.state}" }
                 }
+            }
         }
 
         /**
@@ -176,6 +169,7 @@ class LoginViewModel
                     refreshToken = refreshToken ?: "",
                 )
             accountRepository.addUser(authData)
+            currentCoroutineContext().ensureActive()
             _uiState.update { it.copy(state = QrLoginState.Success) }
         }
 

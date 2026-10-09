@@ -121,7 +121,7 @@ class VideoPlayRepositoryUnitTest {
         }
 
     @Test
-    fun `getPlayData Web maps codec map from supportFormats`() =
+    fun `getPlayData Web preserves video stream codec`() =
         runTest {
             val playUrlData = fakePlayUrlDataWithDash()
             coEvery {
@@ -131,8 +131,8 @@ class VideoPlayRepositoryUnitTest {
 
             val result = repository.getPlayData(aid = AID, cid = CID, preferApiType = ApiType.Web)
 
-            assertThat(result.codec).containsKey(80)
-            assertThat(result.codec[80]).containsExactly("avc1.640032,mp4a.40.2")
+            assertThat(result.dashVideos.first().codecId).isEqualTo(7)
+            assertThat(result.dashVideos.first().codecs).startsWith("avc1")
         }
 
     @Test

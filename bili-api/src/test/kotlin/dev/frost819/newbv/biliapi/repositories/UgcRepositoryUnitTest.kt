@@ -23,13 +23,11 @@ import org.junit.jupiter.api.Test
  */
 class UgcRepositoryUnitTest {
     private lateinit var repository: UgcRepository
-    private lateinit var authRepository: AuthRepository
 
     @BeforeEach
     fun setUp() {
         mockkObject(BiliHttpApi)
-        authRepository = AuthRepository()
-        repository = UgcRepository(authRepository)
+        repository = UgcRepository()
     }
 
     @AfterEach

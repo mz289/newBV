@@ -182,22 +182,6 @@ internal class BiliHttpApiTest {
     }
 
     @Test
-    fun `get user info from Mr_He`() {
-        assertDoesNotThrow {
-            runBlocking {
-                val response =
-                    BiliHttpApi.getUserInfo(
-                        uid = 163637592,
-                    )
-                println(response)
-                assertThat(response.code).isEqualTo(0)
-                assertThat(response.data).isNotNull()
-                assertThat(response.data!!.mid).isEqualTo(163637592)
-            }
-        }
-    }
-
-    @Test
     fun `get self user info`() {
         assertDoesNotThrow {
             runBlocking {

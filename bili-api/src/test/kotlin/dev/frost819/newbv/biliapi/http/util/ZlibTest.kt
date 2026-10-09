@@ -11,6 +11,13 @@ import java.util.zip.Deflater
  * 测试数据用 [Deflater] 现场构造，验证 zlib 解压缩行为。
  */
 class ZlibTest {
+    @Test
+    fun `brotliDecompress restores a known uncompressed brotli stream`() {
+        val original = "hello world".toByteArray()
+        val compressed = byteArrayOf(0x0b, 0x05, 0x80.toByte()) + original + byteArrayOf(0x03)
+        assertThat(compressed.brotliDecompress()).isEqualTo(original)
+    }
+
     private fun compress(data: ByteArray): ByteArray {
         val deflater = Deflater().apply {
             setInput(data)

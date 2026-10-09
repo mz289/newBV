@@ -46,7 +46,7 @@ data class DanmakuMobMaskFrame(
     }
 }
 
-// ── 内部目录条目：只记录时间范围 + 压缩数据在文件中的字节偏移，不持有数据 ──
+/** 一个时间段的压缩蒙版数据。 */
 private data class SegmentEntry(
     // segment 对应的播放时间范围
     val segRange: LongRange,
@@ -54,16 +54,7 @@ private data class SegmentEntry(
     val compressedBytes: ByteArray,
 )
 
-// ── 主数据类 ─────────────────────────────────────────────────────────────────
-
-/**
- * DanmakuMask 加载后只保存每个 segment 的压缩字节块（SegmentEntry），
- * 不预先解压全部帧。调用 [getSegments] 时按需解压、用完即可被 GC。
- *
- * 内存模型：
- *   旧方案：所有帧像素全部展开常驻堆  →  几百 MB
- *   新方案：只持有压缩字节（通常是展开后的 1/5~1/10）  →  可控
- */
+/** 保存压缩数据，仅在 [getSegmentAt] 时解压当前段；解压结果由调用方管理。 */
 class DanmakuMask private constructor(
     val type: DanmakuMaskType,
     private val entries: List<SegmentEntry>,
@@ -74,24 +65,13 @@ class DanmakuMask private constructor(
      */
     fun getSegmentAt(positionMs: Long): DanmakuMaskSegment? {
         val entry = entries.firstOrNull { positionMs in it.segRange } ?: return null
-        return decompressEntry(entry, type)
+        return decompressEntry(entry)
     }
 
     val segmentCount: Int get() = entries.size
 
-    /**
-     * 兼容旧接口：返回所有 segments（逐个按需解压）。
-     * ⚠️ 对超长视频慎用，会把所有 segment 同时留在内存。
-     * 建议改用 [getSegmentAt]。
-     */
-    val segments: List<DanmakuMaskSegment> by lazy {
-        entries.map { decompressEntry(it, type) }
-    }
-
-    // ── 解压单个 segment ────────────────────────────────────────────────────
     private fun decompressEntry(
         entry: SegmentEntry,
-        type: DanmakuMaskType,
     ): DanmakuMaskSegment {
         val compressedBuffer = Buffer().write(entry.compressedBytes)
         val frames = mutableListOf<DanmakuMaskFrame>()
@@ -134,13 +114,13 @@ class DanmakuMask private constructor(
     }
 
     companion object {
-        /** 推荐：流式读取，只把每个 segment 的压缩块存入内存，不解压 */
+        /** 流式读取压缩块，关闭输入流。 */
         fun fromStream(
             input: InputStream,
             type: DanmakuMaskType,
         ): DanmakuMask = input.source().buffer().use { parseFromSource(it, type) }
 
-        /** 兼容旧调用 */
+        /** 从已加载的字节解析压缩块。 */
         fun fromBinary(
             binary: ByteArray,
             type: DanmakuMaskType,
@@ -153,8 +133,7 @@ class DanmakuMask private constructor(
             val magic = source.readByteString(4)
             require(magic.utf8() == "MASK") { "Not a mask file" }
 
-            val version = source.readInt()
-            source.skip(4)
+            source.skip(8) // version + reserved
             val size = source.readInt()
 
             val times = LongArray(size)
@@ -168,18 +147,12 @@ class DanmakuMask private constructor(
             var segLastTime = 0L
 
             for (i in 0 until size) {
-                // 只读压缩字节，不解压
-                val compressedBuffer = Buffer()
-                if (i == size - 1) {
-                    source.readAll(compressedBuffer)
-                } else {
-                    val compressedSize = offsets[i + 1] - offsets[i]
-                    source.require(compressedSize)
-                    source.read(compressedBuffer, compressedSize)
-                }
-
-                // 压缩块通常只有解压后的 1/5~1/10，保存这个而非展开数据
-                val compressedBytes = compressedBuffer.readByteArray()
+                val compressedBytes =
+                    if (i == size - 1) {
+                        source.readByteArray()
+                    } else {
+                        source.readByteArray(offsets[i + 1] - offsets[i])
+                    }
 
                 val startTime = segLastTime
                 val endTime = if (i == size - 1) Long.MAX_VALUE else times[i + 1]

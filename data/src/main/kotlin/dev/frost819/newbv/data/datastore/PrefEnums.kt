@@ -68,10 +68,7 @@ enum class VideoCodec(
 
         /** 从 codec string（如 `avc1.640028`、`hvc1.1.6.L153.90`）匹配编码，无匹配返回 null。 */
         fun fromCodecString(codec: String): VideoCodec? =
-            runCatching {
-                entries.forEach { if (it.prefixes.any { p -> codec.startsWith(p) }) return it }
-                null
-            }.getOrNull()
+            entries.firstOrNull { it.prefixes.any { prefix -> codec.startsWith(prefix) } }
 
         /** 从 B 站 codecId 匹配，无匹配返回 [AVC]。 */
         fun fromCodecId(codecId: Int): VideoCodec = entries.find { it.codecId == codecId } ?: AVC

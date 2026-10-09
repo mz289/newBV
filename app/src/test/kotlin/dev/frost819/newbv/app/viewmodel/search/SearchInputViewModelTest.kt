@@ -13,11 +13,13 @@ import dev.frost819.newbv.data.repository.SearchHistoryRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterAll
@@ -97,6 +99,35 @@ class SearchInputViewModelTest {
     @AfterEach
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `changing keyword cancels old suggestions and clearing keeps them empty`() = runTest(testDispatcher) {
+        val old = CompletableDeferred<List<String>>()
+        coEvery { searchRepo.getSearchSuggest("old", any()) } coAnswers { old.await() }
+        viewModel.updateKeyword("old")
+        runCurrent()
+        viewModel.updateKeyword("new")
+        runCurrent()
+        assertThat(viewModel.uiState.value.suggests).containsExactly("建议1", "建议2")
+        old.complete(listOf("old suggestion"))
+        runCurrent()
+        assertThat(viewModel.uiState.value.suggests).doesNotContain("old suggestion")
+
+        viewModel.updateKeyword("   ")
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.suggests).isEmpty()
+        coVerify(exactly = 0) { searchRepo.getSearchSuggest("   ", any()) }
+    }
+
+    @Test
+    fun `history write failure still completes search`() = runTest(testDispatcher) {
+        coEvery { historyRepo.addHistory(any()) } throws java.io.IOException("disk full")
+        var completed = false
+        viewModel.commitSearch(" search ") { completed = true }
+        advanceUntilIdle()
+        assertThat(completed).isTrue()
+        coVerify { historyRepo.addHistory("search") }
     }
 
     @Test

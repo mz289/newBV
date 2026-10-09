@@ -352,6 +352,35 @@ class CommentViewModelTest {
         hasMore: Boolean,
     ) = CommentPage(comments = comments, page = page, total = total, hasMore = hasMore)
 
+    @Test
+    fun `collapsing pending replies stays collapsed after completion`() = runTest(dispatcher) {
+        val response = CompletableDeferred<CommentPage>()
+        coEvery { repository.getComments(any(), any(), any(), any(), any()) } returns page(listOf(comment(1, replyCount = 2)), 1, hasMore = false)
+        coEvery { repository.getReplies(any(), any(), any(), any(), any()) } coAnswers { response.await() }
+        viewModel.load(100)
+        runCurrent()
+        viewModel.toggleReplies(1)
+        runCurrent()
+        viewModel.toggleReplies(1)
+        response.complete(page(listOf(comment(2, rootRpid = 1)), 1, hasMore = false))
+        advanceUntilIdle()
+        val replies = viewModel.uiState.value.commentList.replyList(1)!!
+        assertThat(replies.expanded).isFalse()
+        assertThat(replies.loaded).isTrue()
+        assertThat(replies.replies).hasSize(1)
+    }
+
+    @Test
+    fun `duplicate comments in appended page are removed`() = runTest(dispatcher) {
+        coEvery { repository.getComments(any(), any(), 1, any(), any()) } returns page(listOf(comment(1)), 1, hasMore = true)
+        coEvery { repository.getComments(any(), any(), 2, any(), any()) } returns page(listOf(comment(1), comment(2), comment(2)), 2, hasMore = false)
+        viewModel.load(100)
+        advanceUntilIdle()
+        viewModel.loadMoreComments()
+        advanceUntilIdle()
+        assertThat(viewModel.uiState.value.comments.map { it.rpid }).containsExactly(1L, 2L).inOrder()
+    }
+
     private fun comment(
         rpid: Long,
         rootRpid: Long = 0L,

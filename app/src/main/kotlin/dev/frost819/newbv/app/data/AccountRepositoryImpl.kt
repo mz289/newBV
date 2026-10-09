@@ -1,5 +1,7 @@
 package dev.frost819.newbv.app.data
 
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -38,6 +41,7 @@ class AccountRepositoryImpl
         /** UI 状态：当前登录用户信息。 */
         private val _uiState = MutableStateFlow(AccountUiState())
         val uiState: StateFlow<AccountUiState> = _uiState.asStateFlow()
+        private var accountGeneration = 0L
 
         init {
             initFromPrefs()
@@ -138,6 +142,7 @@ class AccountRepositoryImpl
          */
         suspend fun setCurrentUser(user: UserEntity) {
             val authData = AuthData.fromJson(user.auth)
+            accountGeneration++
             authData.saveToPrefs()
             syncToAuthRepository(
                 uid = authData.uid,
@@ -176,6 +181,7 @@ class AccountRepositoryImpl
                     auth = authData.toJson(),
                 )
             upsertUser(user)
+            accountGeneration++
             authData.saveToPrefs()
             syncToAuthRepository(
                 uid = authData.uid,
@@ -187,6 +193,12 @@ class AccountRepositoryImpl
                 it.copy(
                     isLogin = true,
                     uid = authData.uid,
+                    username = "",
+                    avatar = "",
+                    level = 0,
+                    currentMin = 0,
+                    exp = 0,
+                    nextExp = 0,
                 )
             }
             refreshUserInfo()
@@ -199,23 +211,32 @@ class AccountRepositoryImpl
          */
         suspend fun refreshUserInfo() {
             if (!Prefs.isLogin) return
+            val uid = Prefs.uid
+            val generation = accountGeneration
             runCatching {
-                val response: MyInfoData = BiliHttpApi.getUserSelfInfo().getResponseData()
-                val user = userDao.findUserByUid(Prefs.uid) ?: return
+                val response: MyInfoData =
+                    withTimeout(LOAD_TIMEOUT_MS) { BiliHttpApi.getUserSelfInfo().getResponseData() }
+                if (generation != accountGeneration || !Prefs.isLogin || Prefs.uid != uid) return
+                val user = userDao.findUserByUid(uid) ?: return
+                if (generation != accountGeneration) return
                 user.username = response.name
                 user.avatar = response.face
                 userDao.update(user)
                 _uiState.update {
-                    it.copy(
-                        username = response.name,
-                        avatar = response.face,
-                        level = response.levelExp.currentLevel,
-                        currentMin = response.levelExp.currentMin,
-                        exp = response.levelExp.currentExp,
-                        nextExp = response.levelExp.nextExp,
-                    )
+                    if (generation != accountGeneration || !Prefs.isLogin || Prefs.uid != uid) {
+                        it
+                    } else {
+                        it.copy(
+                            username = response.name,
+                            avatar = response.face,
+                            level = response.levelExp.currentLevel,
+                            currentMin = response.levelExp.currentMin,
+                            exp = response.levelExp.currentExp,
+                            nextExp = response.levelExp.nextExp,
+                        )
+                    }
                 }
-            }
+            }.onFailure { it.rethrowUnlessTimeout() }
         }
 
         /**
@@ -223,16 +244,23 @@ class AccountRepositoryImpl
          */
         suspend fun reloadAvatar() {
             if (!Prefs.isLogin) return
-            val user = userDao.findUserByUid(Prefs.uid) ?: return
+            val uid = Prefs.uid
+            val generation = accountGeneration
+            val user = userDao.findUserByUid(uid) ?: return
             _uiState.update {
-                it.copy(
-                    username = user.username,
-                    avatar = user.avatar,
-                )
+                if (generation != accountGeneration || !Prefs.isLogin || Prefs.uid != uid) {
+                    it
+                } else {
+                    it.copy(
+                        username = user.username,
+                        avatar = user.avatar,
+                    )
+                }
             }
         }
 
         suspend fun logout() {
+            accountGeneration++
             val user = userDao.findUserByUid(Prefs.uid)
             if (user != null) {
                 userDao.delete(user)
@@ -253,6 +281,12 @@ class AccountRepositoryImpl
                 sessionData = null
                 biliJct = null
                 accessToken = null
+            }
+            BiliHttpApi.apply {
+                mid = null
+                sessData = ""
+                biliJct = ""
+                accessToken = ""
             }
             channelRepository.close()
             _uiState.value = AccountUiState()

@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.ui.action.player.SubtitleSettingAction
 import dev.frost819.newbv.app.ui.state.player.SubtitleState
+import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
+import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.video.Subtitle
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.bilisubtitle.SubtitleParser
@@ -14,10 +16,15 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 /**
@@ -56,6 +63,8 @@ class SubtitleViewModel
         private val _subtitleData =
             MutableStateFlow<List<dev.frost819.newbv.bilisubtitle.entity.SubtitleItem>>(emptyList())
         val subtitleData = _subtitleData.asStateFlow()
+        private var listJob: Job? = null
+        private var trackJob: Job? = null
 
         /**
          * 加载字幕列表。
@@ -67,14 +76,21 @@ class SubtitleViewModel
             aid: Long,
             cid: Long,
         ) {
-            viewModelScope.launch(Dispatchers.IO) {
+            clearSubtitle()
+            listJob = viewModelScope.launch {
                 runCatching {
                     val apiType = Prefs.apiType
-                    videoPlayRepository.getSubtitle(aid = aid, cid = cid, preferApiType = apiType)
+                    withTimeout(LOAD_TIMEOUT_MS) {
+                        withContext(Dispatchers.IO) {
+                            videoPlayRepository.getSubtitle(aid = aid, cid = cid, preferApiType = apiType)
+                        }
+                    }
                 }.onSuccess { list ->
+                    currentCoroutineContext().ensureActive()
                     _subtitleList.update { list }
                     logger.info { "Update subtitle size: ${list.size}" }
                 }.onFailure { e ->
+                    e.rethrowUnlessTimeout()
                     logger.warn { "Update subtitle failed: $e" }
                 }
             }
@@ -86,6 +102,8 @@ class SubtitleViewModel
          * 调用后应接着 [loadSubtitleList] 加载新视频的字幕。
          */
         fun clearSubtitle() {
+            listJob?.cancel()
+            trackJob?.cancel()
             _subtitleList.update { emptyList() }
             _subtitleId.update { -1L }
             _subtitleData.update { emptyList() }
@@ -97,21 +115,28 @@ class SubtitleViewModel
          * @param id 字幕 ID，-1 表示关闭字幕
          */
         fun selectSubtitle(id: Long) {
+            trackJob?.cancel()
             if (id == -1L) {
                 _subtitleId.update { -1L }
                 _subtitleData.update { emptyList() }
                 return
             }
 
-            viewModelScope.launch(Dispatchers.IO) {
+            val subtitle = _subtitleList.value.find { it.id == id } ?: return
+            trackJob = viewModelScope.launch {
                 runCatching {
-                    val subtitle = _subtitleList.value.find { it.id == id } ?: return@runCatching
                     logger.info { "Subtitle url: ${subtitle.url}" }
-                    val responseText = httpClient.get(subtitle.url).bodyAsText()
-                    val data = SubtitleParser.fromBccString(responseText)
+                    val data = withTimeout(LOAD_TIMEOUT_MS) {
+                        withContext(Dispatchers.IO) {
+                            val responseText = httpClient.get(subtitle.url).bodyAsText()
+                            SubtitleParser.fromBccString(responseText)
+                        }
+                    }
+                    currentCoroutineContext().ensureActive()
                     _subtitleId.update { id }
                     _subtitleData.update { data }
                 }.onFailure { e ->
+                    e.rethrowUnlessTimeout()
                     logger.warn { "Load subtitle failed: $e" }
                 }
             }
