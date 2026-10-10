@@ -81,9 +81,6 @@ internal class AkTopRetainer(
                     // empty and allow overlap means clean all holder and rearrange it from beginning
                     ranges.clear()
                     holder = ranges.find(drawState.height.toInt()) { it == null }
-                } else if (drawItem.data.isImportant) {
-                    holder =
-                        ranges.min(drawState.height.toInt()) { (it?.drawState?.rect?.left ?: displayer.width).toInt() }
                 }
             }
             visibility =

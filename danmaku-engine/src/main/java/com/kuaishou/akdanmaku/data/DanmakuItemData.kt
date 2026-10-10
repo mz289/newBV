@@ -80,9 +80,6 @@ class DanmakuItemData(
     var mergedType: Int = MERGED_TYPE_NORMAL,
     val mergedCount: Int = 1,
 ) : Comparable<DanmakuItemData> {
-    val isImportant: Boolean
-        get() = score > 0
-
     companion object {
         const val DANMAKU_MODE_ROLLING = 0x1 // 00000001(1)
         const val DANMAKU_MODE_CENTER_BOTTOM = 0x4 // 00000100(4)
