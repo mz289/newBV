@@ -163,7 +163,7 @@ fun QrLoginContent(
  * @param modifier 修饰符。
  */
 @Composable
-private fun QrCodeImage(
+internal fun QrCodeImage(
     url: String,
     modifier: Modifier = Modifier,
 ) {

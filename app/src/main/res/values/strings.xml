@@ -17,6 +17,10 @@
     <string name="login_cookie_import_file">从文件导入</string>
     <string name="login_cookie_clear">清空</string>
     <string name="login_cookie_submitting">正在登录…</string>
+    <string name="login_cookie_remote_title">手机远程输入</string>
+    <string name="login_cookie_remote_hint">手机与电视连接同一网络，扫码粘贴 Cookie 或导入凭证文件</string>
+    <string name="login_cookie_remote_starting">正在启动远程输入…</string>
+    <string name="login_cookie_remote_error">远程输入启动失败，请检查网络后重试</string>
 
     <!-- User Switch -->
     <string name="user_switch_title">账号管理</string>

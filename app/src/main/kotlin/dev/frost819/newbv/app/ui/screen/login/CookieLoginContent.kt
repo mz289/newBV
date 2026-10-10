@@ -1,5 +1,6 @@
 package dev.frost819.newbv.app.ui.screen.login
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -31,14 +32,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.activity.compose.BackHandler
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.R
 import dev.frost819.newbv.app.viewmodel.login.LoginViewModel
-import dev.frost819.newbv.core.focus.ConfirmImeBehavior
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.confirmImeKeyboardOptions
 import dev.frost819.newbv.core.focus.confirmOpenIme
@@ -109,79 +108,95 @@ fun CookieLoginContent(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            modifier = Modifier.width(720.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
+            horizontalArrangement = Arrangement.spacedBy(32.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = stringResource(R.string.login_cookie_hint),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            OutlinedTextField(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { if (it.isFocused) imeCollapsed = false }
-                        .confirmOpenIme(confirmIme)
-                        .focusRequester(inputFocusRequester),
-                value = input,
-                onValueChange = { input = it },
-                minLines = 3,
-                maxLines = 6,
-                singleLine = false,
-                shape = MaterialTheme.shapes.large,
-                keyboardOptions = confirmImeKeyboardOptions(confirmIme, ImeAction.Done),
-                colors =
-                    OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.border,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                    ),
-            )
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                CookieSecondaryButton(
-                    text = stringResource(R.string.login_cookie_import_file),
-                    onClick = {
-                        fileImporter.launch(arrayOf("application/json", "text/plain", "*/*"))
-                    },
-                )
-                CookieSecondaryButton(
-                    text = stringResource(R.string.login_cookie_clear),
-                    onClick = {
-                        input = ""
-                        viewModel.resetCookieLogin()
-                    },
-                )
-                CookiePrimaryButton(
-                    text =
-                        if (uiState.submitting) {
-                            stringResource(R.string.login_cookie_submitting)
-                        } else {
-                            stringResource(R.string.login_cookie_submit)
-                        },
-                    enabled = !uiState.submitting && input.isNotBlank(),
-                    onClick = { viewModel.loginWithCookie(input) },
-                )
-            }
-
-            if (uiState.errorMessage.isNotEmpty()) {
                 Text(
-                    text = uiState.errorMessage,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    text = stringResource(R.string.login_cookie_hint),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+
+                OutlinedTextField(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { if (it.isFocused) imeCollapsed = false }
+                            .confirmOpenIme(confirmIme)
+                            .focusRequester(inputFocusRequester),
+                    value = input,
+                    onValueChange = { input = it },
+                    minLines = 3,
+                    maxLines = 6,
+                    singleLine = false,
+                    shape = MaterialTheme.shapes.large,
+                    keyboardOptions = confirmImeKeyboardOptions(confirmIme, ImeAction.Done),
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.border,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                        ),
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CookieSecondaryButton(
+                        text = stringResource(R.string.login_cookie_import_file),
+                        onClick = {
+                            fileImporter.launch(arrayOf("application/json", "text/plain", "*/*"))
+                        },
+                    )
+                    CookieSecondaryButton(
+                        text = stringResource(R.string.login_cookie_clear),
+                        onClick = {
+                            input = ""
+                            viewModel.resetCookieLogin()
+                        },
+                    )
+                    CookiePrimaryButton(
+                        text =
+                            if (uiState.submitting) {
+                                stringResource(R.string.login_cookie_submitting)
+                            } else {
+                                stringResource(R.string.login_cookie_submit)
+                            },
+                        enabled = !uiState.submitting && input.isNotBlank(),
+                        onClick = { viewModel.loginWithCookie(input) },
+                    )
+                }
+
+                if (uiState.errorMessage.isNotEmpty()) {
+                    Text(
+                        text = uiState.errorMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
+            CookieRemoteInput(
+                modifier = Modifier.width(240.dp),
+                onInput = { text ->
+                    if (!uiState.submitting && !uiState.success) {
+                        input = text
+                        viewModel.resetCookieLogin()
+                        softwareKeyboard?.hide()
+                    }
+                },
+            )
         }
     }
 }
@@ -190,7 +205,7 @@ fun CookieLoginContent(
  * Cookie 登录次级按钮（导入文件 / 清空）。
  */
 @Composable
-private fun CookieSecondaryButton(
+internal fun CookieSecondaryButton(
     text: String,
     onClick: () -> Unit,
 ) {
@@ -221,7 +236,8 @@ private fun CookiePrimaryButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = Modifier.touchClickable(onClick = onClick),
+        enabled = enabled,
+        modifier = if (enabled) Modifier.touchClickable(onClick = onClick) else Modifier,
         shape = ButtonDefaults.shape(shape = MaterialTheme.shapes.medium),
         scale = ButtonDefaults.scale(focusedScale = 1f),
         colors =
