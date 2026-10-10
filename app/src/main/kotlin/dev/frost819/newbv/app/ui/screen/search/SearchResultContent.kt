@@ -90,7 +90,7 @@ private val searchTypeLabels =
  * 搜索结果页内容。
  *
  * TopNav 切换 5 类结果，网格无限滚动加载，菜单键打开筛选弹窗。
- * 进入页面时自动根据 keyword 触发搜索。
+ * ViewModel 根据路由关键词初始化搜索，返回页面时保留已有结果。
  */
 @Composable
 fun SearchResultContent(
@@ -126,12 +126,6 @@ fun SearchResultContent(
 
     BackHandler(focusOnContent) {
         runCatching { tabRowFocusRequester.requestFocus() }
-    }
-
-    LaunchedEffect(keyword) {
-        if (keyword.isNotBlank()) {
-            viewModel.search(keyword)
-        }
     }
 
     InfiniteScrollEffect(

@@ -2,6 +2,7 @@ package dev.frost819.newbv.app.viewmodel.search
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.app.testutil.InMemoryPreferencesDataStore
 import dev.frost819.newbv.biliapi.repositories.SearchFilterDuration
@@ -75,6 +76,39 @@ class SearchResultViewModelTest {
             play = 10000,
             danmaku = 500,
         )
+
+    @Test
+    fun `route keyword loads results once on initialization`() = runTest(testDispatcher) {
+        val vm = SearchResultViewModel(searchRepo, SavedStateHandle(mapOf("keyword" to "  route query  ")))
+        advanceUntilIdle()
+        assertThat(vm.uiState.value.keyword).isEqualTo("route query")
+        assertThat(vm.uiState.value.results[SearchType.Video]!!.items).hasSize(20)
+        SearchType.entries.forEach { type ->
+            coVerify(exactly = 1) { searchRepo.searchType("route query", type, any(), any(), any(), any(), any()) }
+        }
+    }
+
+    @Test
+    fun `blank route keyword does not send search requests`() = runTest(testDispatcher) {
+        val vm = SearchResultViewModel(searchRepo, SavedStateHandle(mapOf("keyword" to "  ")))
+        advanceUntilIdle()
+        assertThat(vm.uiState.value.keyword).isEmpty()
+        coVerify(exactly = 0) { searchRepo.searchType(any(), any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `new route initializes independent results for its keyword`() = runTest(testDispatcher) {
+        val first = SearchResultViewModel(searchRepo, SavedStateHandle(mapOf("keyword" to "first")))
+        advanceUntilIdle()
+        val second = SearchResultViewModel(searchRepo, SavedStateHandle(mapOf("keyword" to "second")))
+        advanceUntilIdle()
+        assertThat(first.uiState.value.keyword).isEqualTo("first")
+        assertThat(second.uiState.value.keyword).isEqualTo("second")
+        SearchType.entries.forEach { type ->
+            coVerify(exactly = 1) { searchRepo.searchType("first", type, any(), any(), any(), any(), any()) }
+            coVerify(exactly = 1) { searchRepo.searchType("second", type, any(), any(), any(), any(), any()) }
+        }
+    }
 
     @Test
     fun `old search cannot overwrite new search even if request ignores cancellation`() = runTest(testDispatcher) {
@@ -256,7 +290,7 @@ class SearchResultViewModelTest {
             )
         } returns fakeLiveRoomSearchResult(listOf(fakeLiveRoomResult(1718159119L)))
 
-        viewModel = SearchResultViewModel(searchRepo)
+        viewModel = SearchResultViewModel(searchRepo, SavedStateHandle())
     }
 
     @AfterEach

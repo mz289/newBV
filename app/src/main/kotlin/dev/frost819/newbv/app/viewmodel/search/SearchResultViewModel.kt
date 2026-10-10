@@ -1,5 +1,6 @@
 package dev.frost819.newbv.app.viewmodel.search
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +27,7 @@ import javax.inject.Inject
  * 搜索结果页 ViewModel。
  *
  * 管理 5 类搜索结果（视频/番剧/影视/用户/直播间）的加载、分页、筛选。
+ * 路由关键词在初始化时加载，返回页面沿用已有结果。
  *
  * @param searchRepository 搜索数据仓库
  */
@@ -34,6 +36,7 @@ class SearchResultViewModel
     @Inject
     constructor(
         private val searchRepository: SearchRepository,
+        savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
         private val logger = Loggers.get("SearchResultViewModel")
 
@@ -41,6 +44,13 @@ class SearchResultViewModel
         val uiState = _uiState.asStateFlow()
         private val loadJobs = mutableMapOf<SearchType, Job>()
         private var searchGeneration = 0L
+
+        init {
+            val keyword = savedStateHandle.get<String>("keyword").orEmpty()
+            if (keyword.isNotBlank()) {
+                search(keyword)
+            }
+        }
 
         /**
          * 设置搜索关键词并启动搜索。

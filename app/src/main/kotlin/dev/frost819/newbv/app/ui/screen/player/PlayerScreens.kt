@@ -57,6 +57,7 @@ fun NavGraphBuilder.videoPlayerScreen(navController: NavController) {
             playerViewModel.initVideoPlayer(context)
             // 3. 初始化弹幕播放器
             danmakuViewModel.init()
+            danmakuViewModel.updateSpeed(playerViewModel.uiState.value.playSpeed)
             // 4. 加载视频详情（获取正确 cid、相关视频、历史进度）
             //    仅当历史 cid 与当前 cid 一致时才应用断点续播
             playerViewModel.loadVideoDetail(route.aid, route.bvid)
@@ -136,6 +137,7 @@ fun NavGraphBuilder.externalMediaScreen(navController: NavController) {
             playerViewModel.initVideoPlayer(context)
             // 3. 初始化弹幕播放器（外部媒体无弹幕数据，仅渲染器占位）
             danmakuViewModel.init()
+            danmakuViewModel.updateSpeed(playerViewModel.uiState.value.playSpeed)
             // 4. 投屏指定的初始倍速
             if (route.initialSpeed > 0f) {
                 playerViewModel.updatePlaySpeed(speed = route.initialSpeed, forceUpdate = true)

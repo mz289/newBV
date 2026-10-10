@@ -183,6 +183,11 @@ fun VideoPlayerScreen(
         }
     }
 
+    // 默认倍速、菜单、快捷键与投屏均由播放速度状态同步到弹幕引擎。
+    LaunchedEffect(uiState.playSpeed) {
+        danmakuViewModel.updateSpeed(uiState.playSpeed)
+    }
+
     // 心跳循环（5s 延迟后，每 15s 发送）
     LaunchedEffect(Unit) {
         delay(PlayerConstants.HEARTBEAT_INITIAL_DELAY_MS)
@@ -328,7 +333,6 @@ fun VideoPlayerScreen(
         onPlaySpeedChange = { speed ->
             logger.info { "[PLAYBACK] speedChange aid=${uiState.aid}, speed=$speed" }
             playerViewModel.updatePlaySpeed(speed)
-            danmakuViewModel.updateSpeed(speed)
         },
         onDanmakuSettingChange = { action -> danmakuViewModel.updateDanmakuState(action) },
         onSubtitleChange = { subtitle -> subtitleViewModel.selectSubtitle(subtitle.id) },
