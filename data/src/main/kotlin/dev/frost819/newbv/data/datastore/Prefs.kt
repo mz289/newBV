@@ -362,6 +362,7 @@ object Prefs {
 
     /** 默认合并重复弹幕模式固定编码，0=关闭，2=相似。 */
     var danmakuMergeMode by pref(PrefKeys.danmakuMergeMode, 0)
+    var danmakuBlockLevel by pref(PrefKeys.danmakuBlockLevel, 0)
 
     // --- 播放器 - 字幕（PRD 7.4） ---
 

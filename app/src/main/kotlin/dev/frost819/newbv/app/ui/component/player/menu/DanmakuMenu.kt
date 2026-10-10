@@ -64,10 +64,13 @@ fun DanmakuMenuList(
     onBlockRulesChange: (List<DanmakuBlockRule>) -> Unit,
     onMergeModeChange: (DanmakuMergeMode) -> Unit,
     onFocusStateChange: (MenuFocusState) -> Unit,
+    currentBlockLevel: Int = 0,
+    onBlockLevelChange: (Int) -> Unit = {},
+    showBlockLevel: Boolean = true,
 ) {
     PlayerThreeLevelMenu(
         modifier = modifier,
-        categories = VideoPlayerDanmakuMenuItem.entries,
+        categories = VideoPlayerDanmakuMenuItem.entries.filter { showBlockLevel || it != VideoPlayerDanmakuMenuItem.BlockLevel },
         categoryLabel = { it.displayName },
         onFocusStateChange = onFocusStateChange,
     ) { selectedItem, itemModifier, backToMenu ->
@@ -159,6 +162,17 @@ fun DanmakuMenuList(
                     rules = currentBlockRules,
                     onEnabledChange = onBlockEnabledChange,
                     onRulesChange = onBlockRulesChange,
+                    onFocusBackToParent = backToMenu,
+                )
+
+            VideoPlayerDanmakuMenuItem.BlockLevel ->
+                StepLessMenuItem(
+                    modifier = itemModifier,
+                    value = currentBlockLevel.toFloat(),
+                    step = 1f,
+                    range = 0f..12f,
+                    text = if (currentBlockLevel == 0) "0（关闭）" else "等级 $currentBlockLevel",
+                    onValueChange = { onBlockLevelChange(it.toInt()) },
                     onFocusBackToParent = backToMenu,
                 )
 

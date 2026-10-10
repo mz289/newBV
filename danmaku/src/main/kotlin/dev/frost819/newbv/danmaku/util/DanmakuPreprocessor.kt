@@ -6,7 +6,7 @@ import dev.frost819.newbv.danmaku.config.DanmakuState
 import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.danmaku.filter.DanmakuBlockFilter
 
-/** 屏蔽原始内容 → 过滤显示类型 → 初版相似合并。每次处理使用同一份状态快照。 */
+/** 权重屏蔽 → 屏蔽原始内容 → 过滤显示类型 → 相似合并。每次处理使用同一份状态快照。 */
 object DanmakuPreprocessor {
     fun process(
         items: List<DanmakuItemData>,
@@ -14,6 +14,8 @@ object DanmakuPreprocessor {
         onBlockHit: ((String) -> Unit)? = null,
         onItemBlockHit: ((Long, String) -> Unit)? = null,
     ): List<DanmakuItemData> {
+        val level = state.blockLevel.coerceIn(0, 12)
+        val eligible = if (level == 0) items else items.filter { it.score >= level }
         val filtered =
             if (state.blockEnabled) {
                 val filter =
@@ -21,7 +23,7 @@ object DanmakuPreprocessor {
                         enable = true
                         setRules(state.blockRules)
                     }
-                items.filterNot { item ->
+                eligible.filterNot { item ->
                     val key = filter.matchedRuleKey(item.content, item.userId, item.textColor)
                     if (key != null) {
                         onBlockHit?.invoke(key)
@@ -30,7 +32,7 @@ object DanmakuPreprocessor {
                     key != null
                 }
             } else {
-                items
+                eligible
             }
         // 先按原始类型过滤，避免被隐藏的簇首吞掉允许显示的其他类型。
         val visible =

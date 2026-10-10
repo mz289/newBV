@@ -10,6 +10,24 @@ import org.junit.jupiter.api.Test
 
 class DanmakuPreprocessorTest {
     @Test
+    fun `屏蔽等级关闭保留全部而开启保留达到阈值的弹幕`() {
+        val items = listOf(item(1, score = 0), item(2, score = 8), item(3, score = 9), item(4, score = 12))
+        assertThat(DanmakuPreprocessor.process(items, DanmakuState(blockLevel = 0))).containsExactlyElementsIn(items)
+        assertThat(DanmakuPreprocessor.process(items, DanmakuState(blockLevel = 9))).containsExactly(items[2], items[3])
+        assertThat(DanmakuPreprocessor.process(items, DanmakuState(blockLevel = 12))).containsExactly(items[3])
+    }
+
+    @Test
+    fun `等级过滤先于合并且不依赖自定义屏蔽开关`() {
+        val items = listOf(item(1, score = 8), item(2, score = 9), item(3, score = 11))
+        val state = DanmakuState(blockLevel = 9, blockEnabled = false, mergeMode = DanmakuMergeMode.Similar)
+        val result = DanmakuPreprocessor.process(items, state).single()
+        assertThat(result.mergedCount).isEqualTo(2)
+        assertThat(result.content).isEqualTo("abcd ×2")
+        assertThat(DanmakuPreprocessor.process(items, state.copy(blockLevel = 0)).single().mergedCount).isEqualTo(3)
+    }
+
+    @Test
     fun `关闭合并不再执行密度优选`() {
         val items = (1L..100L).map { item(it) }
         assertThat(DanmakuPreprocessor.process(items, DanmakuState())).containsExactlyElementsIn(items)

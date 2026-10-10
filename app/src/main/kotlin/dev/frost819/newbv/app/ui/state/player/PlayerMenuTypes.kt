@@ -40,6 +40,7 @@ enum class VideoPlayerDanmakuMenuItem(
     Area("区域"),
     Mask("防遮挡"),
     Block("屏蔽"),
+    BlockLevel("弹幕屏蔽等级"),
     Merge("合并重复"),
 }
 

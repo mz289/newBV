@@ -121,6 +121,7 @@ class DanmakuViewModel
                         savedTypes.map { it.toDanmakuEntity() }
                     },
                 blockEnabled = DanmakuBlockRuleStore.state.value.enabled,
+                blockLevel = Prefs.danmakuBlockLevel.coerceIn(0, 12),
                 blockRules = DanmakuBlockRuleStore.state.value.rules,
                 mergeMode =
                     DanmakuMergeMode.fromPreference(Prefs.danmakuMergeMode),
@@ -596,6 +597,7 @@ class DanmakuViewModel
                     is DanmakuSettingAction.SetBlockEnabled -> old.copy(blockEnabled = action.enabled)
                     is DanmakuSettingAction.SetBlockRules -> old.copy(blockRules = action.rules)
                     is DanmakuSettingAction.SetMergeMode -> old.copy(mergeMode = action.mode)
+                    is DanmakuSettingAction.SetBlockLevel -> old.copy(blockLevel = action.level.coerceIn(0, 12))
                 }
             if (old == new) return
 
@@ -635,11 +637,17 @@ class DanmakuViewModel
                 // 经共享仓库写入（Prefs + StateFlow），其他入口的规则变化也会触发缓存重算
                 DanmakuBlockRuleStore.setBlockState(new.blockEnabled, new.blockRules)
             }
+            if (new.blockLevel != old.blockLevel) {
+                Prefs.danmakuBlockLevel = new.blockLevel
+            }
+            if (new.mergeMode != old.mergeMode) {
+                Prefs.danmakuMergeMode = new.mergeMode.preferenceValue
+            }
             if (new.mergeMode != old.mergeMode ||
+                new.blockLevel != old.blockLevel ||
                 new.blockEnabled != old.blockEnabled ||
                 new.blockRules != old.blockRules
             ) {
-                Prefs.danmakuMergeMode = new.mergeMode.preferenceValue
                 // 合并不可逆，重新处理原始缓存以恢复被合并或屏蔽的条目
                 reloadDanmakuSegments()
             }

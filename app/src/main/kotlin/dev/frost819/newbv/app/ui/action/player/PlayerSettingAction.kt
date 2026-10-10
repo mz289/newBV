@@ -60,6 +60,10 @@ sealed interface DanmakuSettingAction {
     data class SetMergeMode(
         val mode: DanmakuMergeMode,
     ) : DanmakuSettingAction
+
+    data class SetBlockLevel(
+        val level: Int,
+    ) : DanmakuSettingAction
 }
 
 /**

@@ -728,6 +728,7 @@ fun VideoPlayerController(
                 onBlockEnabledChange = { onDanmakuSettingChange(DanmakuSettingAction.SetBlockEnabled(it)) },
                 onBlockRulesChange = { onDanmakuSettingChange(DanmakuSettingAction.SetBlockRules(it)) },
                 onMergeModeChange = { onDanmakuSettingChange(DanmakuSettingAction.SetMergeMode(it)) },
+                onBlockLevelChange = { onDanmakuSettingChange(DanmakuSettingAction.SetBlockLevel(it)) },
                 onSubtitleChange = { subtitle -> onSubtitleChange(subtitle) },
                 onSubtitleSizeChange = { onSubtitleSettingChange(SubtitleSettingAction.SetFontSize(it)) },
                 onSubtitleBackgroundOpacityChange = { onSubtitleSettingChange(SubtitleSettingAction.SetOpacity(it)) },

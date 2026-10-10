@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.tv.material3.MaterialTheme
@@ -27,6 +28,46 @@ import org.robolectric.annotation.Config
 class DanmakuMergeMenuTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test
+    fun `屏蔽等级菜单逐级调整且限制在零到十二`() {
+        var level by mutableStateOf(0)
+        var focus by mutableStateOf(MenuFocusState.Menu)
+        compose.setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalMenuFocusStateData provides MenuFocusStateData(focusState = focus)) {
+                    DanmakuMenuList(
+                        currentEnabledTypes = listOf(DanmakuType.Rolling),
+                        currentScale = 1f,
+                        currentOpacity = 0.7f,
+                        currentSpeedFactor = 1f,
+                        currentArea = 0.5f,
+                        currentMaskEnabled = false,
+                        currentBlockEnabled = false,
+                        currentBlockRules = emptyList(),
+                        currentMergeMode = DanmakuMergeMode.Off,
+                        onDanmakuSwitchChange = {},
+                        onDanmakuSizeChange = {},
+                        onDanmakuOpacityChange = {},
+                        onDanmakuSpeedFactorChange = {},
+                        onDanmakuAreaChange = {},
+                        onDanmakuMaskChange = {},
+                        onBlockEnabledChange = {},
+                        onBlockRulesChange = {},
+                        onMergeModeChange = {},
+                        onFocusStateChange = { focus = it },
+                        currentBlockLevel = level,
+                        onBlockLevelChange = { level = it },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("弹幕屏蔽等级").performScrollTo().performClick()
+        repeat(13) { compose.onNodeWithContentDescription("增加").performClick() }
+        compose.runOnIdle { assertThat(level).isEqualTo(12) }
+        repeat(13) { compose.onNodeWithContentDescription("减少").performClick() }
+        compose.runOnIdle { assertThat(level).isEqualTo(0) }
+    }
 
     @Test
     fun `合并菜单只有开关且开启后使用相似模式`() {

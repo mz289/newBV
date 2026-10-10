@@ -245,6 +245,7 @@ private fun LiveMenuList(
                     currentBlockEnabled = danmakuState.blockEnabled,
                     currentBlockRules = danmakuState.blockRules,
                     currentMergeMode = danmakuState.mergeMode,
+                    showBlockLevel = false,
                     onDanmakuSwitchChange = { types ->
                         onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(types.toDanmakuEntities()))
                     },

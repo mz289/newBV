@@ -31,6 +31,8 @@ data class DanmakuState(
             DanmakuType.Bottom,
         ),
     val blockEnabled: Boolean = false,
+    /** 视频弹幕权重阈值：0 关闭，1–12 仅保留不低于此值的弹幕。 */
+    val blockLevel: Int = 0,
     val blockRules: List<DanmakuBlockRule> = emptyList(),
     val mergeMode: DanmakuMergeMode = DanmakuMergeMode.Off,
 ) {

@@ -62,6 +62,8 @@ class DanmakuViewModelTest {
         every { android.util.Log.d(any(), any()) } returns 0
         every { android.util.Log.d(any(), any(), any()) } returns 0
         mockkObject(Prefs)
+        every { Prefs.danmakuBlockLevel } returns 0
+        every { Prefs.danmakuBlockLevel = any() } answers {}
         every { Prefs.defaultDanmakuScale } returns 1.75f
         every { Prefs.defaultDanmakuOpacity } returns 0.7f
         every { Prefs.defaultDanmakuArea } returns 0.5f
@@ -92,6 +94,47 @@ class DanmakuViewModelTest {
     fun tearDown() {
         unmockkAll()
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `屏蔽等级保存限制范围且初始化读取保存值`() = runTest(testDispatcher) {
+        every { Prefs.danmakuBlockLevel } returns 9
+        val vm = DanmakuViewModel(videoPlayRepository).apply { preprocessingDispatcher = testDispatcher }
+        assertThat(vm.danmakuState.value.blockLevel).isEqualTo(9)
+        vm.updateDanmakuState(DanmakuSettingAction.SetBlockLevel(20))
+        advanceUntilIdle()
+        assertThat(vm.danmakuState.value.blockLevel).isEqualTo(12)
+        verify { Prefs.danmakuBlockLevel = 12 }
+        vm.updateDanmakuState(DanmakuSettingAction.SetBlockLevel(-1))
+        advanceUntilIdle()
+        assertThat(vm.danmakuState.value.blockLevel).isEqualTo(0)
+        verify { Prefs.danmakuBlockLevel = 0 }
+        vm.clearDanmaku()
+    }
+
+    @Test
+    fun `屏蔽等级切换从原始缓存重算且关闭恢复所有弹幕`() = runTest(testDispatcher) {
+        val player = mockk<DanmakuPlayer>(relaxed = true)
+        val outputs = mutableListOf<List<DanmakuItemData>>()
+        every { player.updateData(any()) } answers {
+            outputs.add(firstArg())
+            emptyList()
+        }
+        viewModel.danmakuPlayer = player
+        coEvery { videoPlayRepository.getDanmakuMeta(any(), any()) } returns DanmakuMeta(360_000, 1, false, 3)
+        coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) } returns
+            listOf(fakeDanmakuData(1, 0f).copy(level = 8), fakeDanmakuData(2, 1f).copy(level = 9), fakeDanmakuData(3, 2f).copy(level = 11))
+        viewModel.loadDanmaku(1, 2)
+        advanceUntilIdle()
+        assertThat(outputs.last()).hasSize(3)
+        viewModel.updateDanmakuState(DanmakuSettingAction.SetBlockLevel(10))
+        advanceUntilIdle()
+        assertThat(outputs.last().single().danmakuId).isEqualTo(3)
+        viewModel.updateDanmakuState(DanmakuSettingAction.SetBlockLevel(0))
+        advanceUntilIdle()
+        assertThat(outputs.last()).hasSize(3)
+        coVerify(exactly = 1) { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) }
+        viewModel.clearDanmaku()
     }
 
     @Test
