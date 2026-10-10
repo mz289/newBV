@@ -9,17 +9,17 @@ import org.junit.jupiter.api.Test
  */
 class DanmakuMergerTest {
     @Test
-    fun `过期簇不占用后续相似比较预算`() {
-        val history = (1..65).map { item("历史文本$it" + "x".repeat(81), 0) }
+    fun `大量超窗历史簇定案后不影响后续合并`() {
+        val history = (1..65).map { item("历史文本$it", 0) }
         val merged =
             DanmakuMerger.mergeSimilar(history + listOf(item("aaaaaaaaaa", 40_000), item("aaaaaaaabb", 41_000)))
         assertThat(merged.last().content).isEqualTo("aaaaaaaaaa ×2")
     }
 
     @Test
-    fun `达到比较上限后已匹配变体仍能精确归入原簇`() {
+    fun `已并入变体的归一化 key 仍精确归入原簇`() {
         val variants = listOf(item("aaaaaaaaaa", 0), item("aaaaaaaabb", 1000))
-        val unrelated = (1..65).map { item("其他文本$it" + "x".repeat(81), 2000) }
+        val unrelated = (1..65).map { item("其他文本$it", 2000) }
         val merged = DanmakuMerger.mergeSimilar(variants + unrelated + item("aaaaaaaabb", 3000))
         assertThat(merged.first().content).isEqualTo("aaaaaaaaaa ×3")
     }
@@ -31,16 +31,24 @@ class DanmakuMergerTest {
     }
 
     @Test
-    fun `初版算法不匹配同音词且保持三十秒窗口`() {
-        assertThat(DanmakuMerger.mergeSimilar(listOf(item("再见", 0), item("在建", 1000)))).hasSize(2)
+    fun `同音词经拼音距离合并且保持三十秒窗口`() {
+        // 再见/在建：字形完全不同但读音相同（zài jiàn），拼音距离命中
+        assertThat(DanmakuMerger.mergeSimilar(listOf(item("再见", 0), item("在建", 1000))).single().content)
+            .isEqualTo("再见 ×2")
         assertThat(DanmakuMerger.mergeSimilar(listOf(item("同文", 0), item("同文", 25_000))).single().content)
             .isEqualTo("同文 ×2")
     }
 
     @Test
-    fun `百分之八十边界的插入差异仍合并`() {
+    fun `距离预算按文本长度缩放`() {
+        // 短文本：预算 = maxDistance × lenSum ÷ minDanmakuSize
         assertThat(DanmakuMerger.isSimilar("abcd", "abcde")).isTrue()
-        assertThat(DanmakuMerger.isSimilar("abc", "abcd")).isFalse()
+        assertThat(DanmakuMerger.isSimilar("abc", "wxy")).isFalse()
+        // 长文本：预算封顶 maxDistance，且低重叠文本余弦也救不回来
+        assertThat(DanmakuMerger.isSimilar("aaaaaaaaaa", "aaaaaaaa")).isTrue()
+        assertThat(DanmakuMerger.isSimilar("aaaaaaaaaa", "aaaabbbbbb")).isFalse()
+        // 长度差是距离下界，超过 maxDistance 直接淘汰
+        assertThat(DanmakuMerger.isSimilar("ab", "aaaaaaaaaa")).isFalse()
     }
 
     private fun item(
@@ -159,6 +167,7 @@ class DanmakuMergerTest {
                     ),
                     item("text", 2_000),
                 ),
+                crossMode = true,
             )
         val mergedItem = merged.single()
         assertThat(mergedItem.mode).isEqualTo(DanmakuItemData.DANMAKU_MODE_CENTER_TOP)
@@ -201,12 +210,12 @@ class DanmakuMergerTest {
     }
 
     @Test
-    fun `编辑距离相近的文本合并`() {
+    fun `多重集距离相近的文本合并`() {
         val merged =
             DanmakuMerger.mergeSimilar(
                 listOf(
                     item("aaaaaaaaaa", 1_000),
-                    item("aaaaaaaabb", 2_000), // 10 字符差 2，相似度 0.8
+                    item("aaaaaaaabb", 2_000), // 10 字符 2 替换，多重集距离 4 <= 5
                 ),
             )
         assertThat(merged).hasSize(1)
@@ -258,12 +267,58 @@ class DanmakuMergerTest {
     }
 
     @Test
-    fun `isSimilar 长度预筛与阈值判断`() {
-        assertThat(DanmakuMerger.isSimilar("abcd", "abcd")).isTrue()
-        // dist 1 / len 6 = 相似度 0.833 >= 0.8
+    fun `maxAllowedDistance 与 withinDistance 判定严格一致`() {
+        for (maxDistance in 0..8) {
+            for (lenSum in 0..40) {
+                val budget = DanmakuMerger.maxAllowedDistance(lenSum, maxDistance)
+                // budget 恰好可通过，budget+1 必不可通过
+                assertThat(DanmakuMerger.withinDistance(budget, lenSum, maxDistance)).isTrue()
+                assertThat(DanmakuMerger.withinDistance(budget + 1, lenSum, maxDistance)).isFalse()
+            }
+        }
+    }
+
+    @Test
+    fun `isSimilar 替换计二且短文本缩放保护`() {        assertThat(DanmakuMerger.isSimilar("abcd", "abcd")).isTrue()
+        // 1 次替换 = 多重集距离 2 <= 5
         assertThat(DanmakuMerger.isSimilar("abcdef", "abcdeg")).isTrue()
-        assertThat(DanmakuMerger.isSimilar("abcd", "dcba")).isFalse()
-        // 长度差 3 > 4*(1-0.8)=0.8，直接判不相似
-        assertThat(DanmakuMerger.isSimilar("abcd", "abcdefg")).isFalse()
+        // 同字异序的多重集相同，距离为 0（bag 距离固有特性，pakku 同）
+        assertThat(DanmakuMerger.isSimilar("abcd", "dcba")).isTrue()
+        // 4 次替换 = 距离 8，lenSum 8 < 10 按比例缩放后 8×10 不小于 5×8
+        assertThat(DanmakuMerger.isSimilar("aaaa", "bbbb")).isFalse()
+        // 两字弹幕替换一字的距离为 2，2×10 不小于预算 5×4，不合并
+        assertThat(DanmakuMerger.isSimilar("你好", "你哈")).isFalse()
+    }
+
+    // ── 拼音 / 余弦 / 跨类型 ──────────────────────────────────────
+
+    @Test
+    fun `拼音距离合并同音字`() {
+        // 在/再 同音（zài）：字符路径被短文本缩放预算挡住，拼音路径命中
+        val pair = listOf(item("在吗在吗", 1_000), item("再吗再吗", 2_000))
+        assertThat(DanmakuMerger.mergeSimilar(pair)).hasSize(1)
+        // 关闭拼音后各路径都不命中，不再合并
+        assertThat(DanmakuMerger.mergeSimilar(pair, usePinyin = false)).hasSize(2)
+    }
+
+    @Test
+    fun `余弦相似度合并部分重叠文本`() {
+        // 刷屏加长版：字符距离 8 超预算、拼音长度差 8 超预筛，但 2-gram 完全重叠
+        val pair = listOf(item("哈哈哈哈", 1_000), item("哈哈哈哈哈哈哈哈哈哈哈哈", 2_000))
+        assertThat(DanmakuMerger.mergeSimilar(pair)).hasSize(1)
+        // 阈值 >100 视为关闭余弦，不再合并
+        assertThat(DanmakuMerger.mergeSimilar(pair, maxCosine = 101)).hasSize(2)
+    }
+
+    @Test
+    fun `同文不同类型默认合并且可显式关闭`() {
+        val rolling = item("前方高能", 1_000)
+        val top = item("前方高能", 2_000, mode = DanmakuItemData.DANMAKU_MODE_CENTER_TOP)
+        // 默认跨类型合并：同文归入簇首（滚动）一簇
+        val merged = DanmakuMerger.mergeSimilar(listOf(rolling, top))
+        assertThat(merged).hasSize(1)
+        assertThat(merged.single().mode).isEqualTo(DanmakuItemData.DANMAKU_MODE_ROLLING)
+        // 算法保留关闭能力（crossMode = false 时同文不同类型各自成簇）
+        assertThat(DanmakuMerger.mergeSimilar(listOf(rolling, top), crossMode = false)).hasSize(2)
     }
 }

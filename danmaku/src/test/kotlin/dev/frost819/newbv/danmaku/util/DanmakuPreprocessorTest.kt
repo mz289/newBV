@@ -116,13 +116,12 @@ class DanmakuPreprocessorTest {
         val result = DanmakuPreprocessor.process(items, state).single()
         assertThat(result.mode).isEqualTo(5)
         assertThat(result.mergedCount).isEqualTo(1)
-        assertThat(
+        // 恢复类型后默认跨类型合并：同文归入簇首（滚动）一簇
+        val merged =
             DanmakuPreprocessor
-                .process(
-                    items,
-                    state.copy(enabledTypes = dev.frost819.newbv.danmaku.entity.DanmakuType.entries),
-                ).single()
-                .mergedCount,
-        ).isEqualTo(2)
+                .process(items, state.copy(enabledTypes = dev.frost819.newbv.danmaku.entity.DanmakuType.entries))
+                .single()
+        assertThat(merged.mode).isEqualTo(1)
+        assertThat(merged.mergedCount).isEqualTo(2)
     }
 }

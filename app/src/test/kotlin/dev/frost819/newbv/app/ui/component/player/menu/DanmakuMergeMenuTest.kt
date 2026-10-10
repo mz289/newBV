@@ -107,5 +107,6 @@ class DanmakuMergeMenuTest {
         compose.onNodeWithText("高级设置").assertDoesNotExist()
         compose.onNodeWithText("关闭").performScrollTo().performClick()
         compose.runOnIdle { assertThat(mode).isEqualTo(DanmakuMergeMode.Off) }
+        compose.onNodeWithText("合并跨类型").assertDoesNotExist()
     }
 }
