@@ -90,7 +90,7 @@ internal class DataSystem(
                     val item = entity.dataComponent?.item ?: continue
                     val data = item.data
                     item.duration =
-                        if (item.layoutMode == DanmakuItemData.DANMAKU_MODE_ROLLING) {
+                        if (data.mode == DanmakuItemData.DANMAKU_MODE_ROLLING) {
                             config.rollingDurationMs
                         } else {
                             config.durationMs
@@ -219,13 +219,12 @@ internal class DataSystem(
             return
         }
 
-        item.layoutMode = danmakuContext.renderer.layoutMode(item, danmakuContext.displayer, danmakuContext.config)
         val entity = engine.createEntity()
         entity.apply {
             createComponent(ItemDataComponent::class.java, entity, item) ?: return
-            if (item.layoutMode > 0) {
+            if (item.data.mode > 0) {
                 createComponent(LayoutComponent::class.java, entity, item) ?: return
-                when (item.layoutMode) {
+                when (item.data.mode) {
                     DanmakuItemData.DANMAKU_MODE_ROLLING -> add(RollingComponent())
                     DanmakuItemData.DANMAKU_MODE_CENTER_TOP -> add(TopComponent())
                     DanmakuItemData.DANMAKU_MODE_CENTER_BOTTOM -> add(BottomComponent())

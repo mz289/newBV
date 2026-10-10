@@ -5,7 +5,6 @@ import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
 import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
-import dev.frost819.newbv.app.data.DanmakuMergeConfigStore
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMeta
@@ -13,7 +12,6 @@ import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRuleType
-import dev.frost819.newbv.danmaku.config.DanmakuMergeConfig
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.data.datastore.Prefs
@@ -730,9 +728,6 @@ class DanmakuViewModelTest {
                 )
             mockkObject(DanmakuBlockRuleStore)
             every { DanmakuBlockRuleStore.state } returns blockState
-            mockkObject(DanmakuMergeConfigStore)
-            every { DanmakuMergeConfigStore.load() } returns DanmakuMergeConfig()
-            every { DanmakuMergeConfigStore.save(any()) } answers {}
             every { Prefs.danmakuMergeMode } returns 2
             val vm = DanmakuViewModel(videoPlayRepository).apply { preprocessingDispatcher = testDispatcher }
             val player = mockk<DanmakuPlayer>(relaxed = true)

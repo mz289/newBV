@@ -39,7 +39,7 @@ open class TypedDanmakuLayouter(
 ) : DanmakuLayouter {
     private val layouters = layouter.toMap().toMutableMap()
 
-    protected open fun getDanmakuLayoutType(item: DanmakuItem): Int = item.layoutMode
+    protected open fun getDanmakuLayoutType(item: DanmakuItem): Int = item.data.mode
 
     private fun getLayouter(item: DanmakuItem): DanmakuLayouter {
         val type = getDanmakuLayoutType(item)

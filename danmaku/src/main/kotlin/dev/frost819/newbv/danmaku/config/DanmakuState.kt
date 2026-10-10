@@ -33,7 +33,6 @@ data class DanmakuState(
     val blockEnabled: Boolean = false,
     val blockRules: List<DanmakuBlockRule> = emptyList(),
     val mergeMode: DanmakuMergeMode = DanmakuMergeMode.Off,
-    val mergeConfig: DanmakuMergeConfig = DanmakuMergeConfig(),
 ) {
     /**
      * 返回要传给 akdanmaku 的屏幕显示区域比例。

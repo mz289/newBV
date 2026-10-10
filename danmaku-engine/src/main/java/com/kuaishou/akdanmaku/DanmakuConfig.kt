@@ -103,7 +103,6 @@ data class DanmakuConfig(
     var dataFilter: List<DanmakuDataFilter> = emptyList(),
     var layoutFilter: List<DanmakuLayoutFilter> = emptyList(),
     var rollingSpeedFactor: Float = 1f,
-    var scrollThreshold: Int = 0,
 ) {
     /**
      * 弹幕的显示时长，滚动类型的弹幕为从屏幕一端出现到屏幕另一端完全移出的时间

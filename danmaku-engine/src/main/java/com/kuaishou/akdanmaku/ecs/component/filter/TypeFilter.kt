@@ -32,11 +32,5 @@ import com.kuaishou.akdanmaku.data.DanmakuItemData
  * @since 2021-06-30
  */
 class TypeFilter : SimpleDanmakuFilter<Int>(DanmakuFilters.FILTER_TYPE_TYPE) {
-    override fun filter(
-        item: com.kuaishou.akdanmaku.data.DanmakuItem,
-        timer: com.kuaishou.akdanmaku.utils.DanmakuTimer,
-        config: com.kuaishou.akdanmaku.DanmakuConfig,
-    ): Boolean = enable && filterSet.contains(item.layoutMode)
-
     override fun filterField(data: DanmakuItemData): Int = data.mode
 }

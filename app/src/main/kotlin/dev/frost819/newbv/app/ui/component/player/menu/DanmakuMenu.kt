@@ -4,14 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.frost819.newbv.app.ui.component.player.menu.component.CheckBoxMenuList
 import dev.frost819.newbv.app.ui.component.player.menu.component.DanmakuBlockPanel
-import dev.frost819.newbv.app.ui.component.player.menu.component.DanmakuMergeMenuPanel
 import dev.frost819.newbv.app.ui.component.player.menu.component.PlayerThreeLevelMenu
 import dev.frost819.newbv.app.ui.component.player.menu.component.RadioMenuList
 import dev.frost819.newbv.app.ui.component.player.menu.component.StepLessMenuItem
 import dev.frost819.newbv.app.ui.state.player.MenuFocusState
 import dev.frost819.newbv.app.ui.state.player.VideoPlayerDanmakuMenuItem
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
-import dev.frost819.newbv.danmaku.config.DanmakuMergeConfig
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.data.datastore.DanmakuType
 import java.text.NumberFormat
@@ -56,7 +54,6 @@ fun DanmakuMenuList(
     currentBlockEnabled: Boolean,
     currentBlockRules: List<DanmakuBlockRule>,
     currentMergeMode: DanmakuMergeMode,
-    currentMergeConfig: DanmakuMergeConfig,
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
     onDanmakuSizeChange: (Float) -> Unit,
     onDanmakuOpacityChange: (Float) -> Unit,
@@ -66,7 +63,6 @@ fun DanmakuMenuList(
     onBlockEnabledChange: (Boolean) -> Unit,
     onBlockRulesChange: (List<DanmakuBlockRule>) -> Unit,
     onMergeModeChange: (DanmakuMergeMode) -> Unit,
-    onMergeConfigChange: (DanmakuMergeConfig) -> Unit,
     onFocusStateChange: (MenuFocusState) -> Unit,
 ) {
     PlayerThreeLevelMenu(
@@ -167,12 +163,11 @@ fun DanmakuMenuList(
                 )
 
             VideoPlayerDanmakuMenuItem.Merge ->
-                DanmakuMergeMenuPanel(
-                    modifier = Modifier,
-                    mode = currentMergeMode,
-                    config = currentMergeConfig,
-                    onModeChange = onMergeModeChange,
-                    onConfigChange = onMergeConfigChange,
+                RadioMenuList(
+                    modifier = itemModifier,
+                    items = DanmakuMergeMode.entries.map { it.displayName },
+                    selected = DanmakuMergeMode.entries.indexOf(currentMergeMode),
+                    onSelectedChanged = { onMergeModeChange(DanmakuMergeMode.entries[it]) },
                     onFocusBackToParent = backToMenu,
                 )
         }

@@ -8,6 +8,41 @@ import org.junit.jupiter.api.Test
  * [DanmakuMerger] 重复弹幕合并测试。
  */
 class DanmakuMergerTest {
+    @Test
+    fun `过期簇不占用后续相似比较预算`() {
+        val history = (1..65).map { item("历史文本$it" + "x".repeat(81), 0) }
+        val merged =
+            DanmakuMerger.mergeSimilar(history + listOf(item("aaaaaaaaaa", 40_000), item("aaaaaaaabb", 41_000)))
+        assertThat(merged.last().content).isEqualTo("aaaaaaaaaa ×2")
+    }
+
+    @Test
+    fun `达到比较上限后已匹配变体仍能精确归入原簇`() {
+        val variants = listOf(item("aaaaaaaaaa", 0), item("aaaaaaaabb", 1000))
+        val unrelated = (1..65).map { item("其他文本$it" + "x".repeat(81), 2000) }
+        val merged = DanmakuMerger.mergeSimilar(variants + unrelated + item("aaaaaaaabb", 3000))
+        assertThat(merged.first().content).isEqualTo("aaaaaaaaaa ×3")
+    }
+
+    @Test
+    fun `纯标点不归并为空文本`() {
+        val merged = DanmakuMerger.mergeSimilar(listOf(item("!!!", 0), item("???", 1000)))
+        assertThat(merged).hasSize(2)
+    }
+
+    @Test
+    fun `初版算法不匹配同音词且保持三十秒窗口`() {
+        assertThat(DanmakuMerger.mergeSimilar(listOf(item("再见", 0), item("在建", 1000)))).hasSize(2)
+        assertThat(DanmakuMerger.mergeSimilar(listOf(item("同文", 0), item("同文", 25_000))).single().content)
+            .isEqualTo("同文 ×2")
+    }
+
+    @Test
+    fun `百分之八十边界的插入差异仍合并`() {
+        assertThat(DanmakuMerger.isSimilar("abcd", "abcde")).isTrue()
+        assertThat(DanmakuMerger.isSimilar("abc", "abcd")).isFalse()
+    }
+
     private fun item(
         content: String,
         positionMs: Long,
@@ -25,7 +60,7 @@ class DanmakuMergerTest {
     @Test
     fun `窗口内相同文本合并为一条并带 ×N 后缀`() {
         val merged =
-            DanmakuMerger.mergeDuplicate(
+            DanmakuMerger.mergeSimilar(
                 listOf(
                     item("前方高能", 1_000),
                     item("前方高能", 5_000),
@@ -40,7 +75,7 @@ class DanmakuMergerTest {
     @Test
     fun `不同文本互不合并`() {
         val merged =
-            DanmakuMerger.mergeDuplicate(
+            DanmakuMerger.mergeSimilar(
                 listOf(
                     item("aaaa", 1_000),
                     item("bbbb", 2_000),
@@ -53,7 +88,7 @@ class DanmakuMergerTest {
     @Test
     fun `超过窗口的重复文本分簇`() {
         val merged =
-            DanmakuMerger.mergeDuplicate(
+            DanmakuMerger.mergeSimilar(
                 listOf(
                     item("spam", 1_000),
                     item("spam", 2_000),
@@ -69,7 +104,7 @@ class DanmakuMergerTest {
     @Test
     fun `窗口按簇首起算而非相邻间隔链式延伸`() {
         val merged =
-            DanmakuMerger.mergeDuplicate(
+            DanmakuMerger.mergeSimilar(
                 listOf(
                     item("x", 0),
                     item("x", 20_000),
@@ -85,7 +120,7 @@ class DanmakuMergerTest {
     @Test
     fun `无重复时原样返回`() {
         val merged =
-            DanmakuMerger.mergeDuplicate(
+            DanmakuMerger.mergeSimilar(
                 listOf(item("a", 1_000), item("b", 2_000)),
             )
         assertThat(merged).hasSize(2)
@@ -96,7 +131,7 @@ class DanmakuMergerTest {
     @Test
     fun `乱序输入按时间排序后合并`() {
         val merged =
-            DanmakuMerger.mergeDuplicate(
+            DanmakuMerger.mergeSimilar(
                 listOf(
                     item("dup", 9_000),
                     item("dup", 1_000),
@@ -111,7 +146,7 @@ class DanmakuMergerTest {
     @Test
     fun `合并项保留簇首属性`() {
         val merged =
-            DanmakuMerger.mergeDuplicate(
+            DanmakuMerger.mergeSimilar(
                 listOf(
                     DanmakuItemData(
                         danmakuId = 1,
@@ -135,15 +170,15 @@ class DanmakuMergerTest {
 
     @Test
     fun `空列表与单条直接返回`() {
-        assertThat(DanmakuMerger.mergeDuplicate(emptyList())).isEmpty()
+        assertThat(DanmakuMerger.mergeSimilar(emptyList())).isEmpty()
         val single = listOf(item("only", 1_000))
-        assertThat(DanmakuMerger.mergeDuplicate(single)).hasSize(1)
+        assertThat(DanmakuMerger.mergeSimilar(single)).hasSize(1)
     }
 
     @Test
     fun `窗口为 0 时禁用合并`() {
         val merged =
-            DanmakuMerger.mergeDuplicate(
+            DanmakuMerger.mergeSimilar(
                 listOf(item("dup", 1_000), item("dup", 1_100)),
                 windowMs = 0,
             )

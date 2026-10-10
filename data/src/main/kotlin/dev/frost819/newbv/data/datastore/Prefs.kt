@@ -362,7 +362,6 @@ object Prefs {
 
     /** 默认合并重复弹幕模式固定编码，0=关闭，2=相似。 */
     var danmakuMergeMode by pref(PrefKeys.danmakuMergeMode, 0)
-    var danmakuMergeConfig by pref(PrefKeys.danmakuMergeConfig, "{}")
 
     // --- 播放器 - 字幕（PRD 7.4） ---
 
@@ -589,7 +588,7 @@ object Prefs {
 
     /**
      * 旧"合并模式"编码 1（相同文本合并）一次性迁移为 2（相似文本合并）。
-     * 两者在当前实现下行为一致（相似合并是相同合并的超集）。
+     * 当前只提供相似合并，兼容已保存的旧精确档位。
      */
     private fun migrateDanmakuMergeMode(prefs: Preferences) {
         if (prefs[PrefKeys.danmakuMergeMode] == 1) danmakuMergeMode = 2

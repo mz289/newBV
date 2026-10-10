@@ -38,13 +38,6 @@ import com.kuaishou.akdanmaku.utils.Size
  * @since 2021-06-17
  */
 interface DanmakuRenderer {
-    /** 实体创建时选择排版模式；默认保持原始类型。 */
-    fun layoutMode(
-        item: DanmakuItem,
-        displayer: DanmakuDisplayer,
-        config: DanmakuConfig,
-    ): Int = item.data.mode
-
     /**
      * 更新弹幕画笔，此方法会在 measure 和 draw 执行前调用此方法来更新内部的画笔
      *

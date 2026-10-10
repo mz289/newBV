@@ -59,8 +59,8 @@ internal fun DanmakuItem.willCollision(
         return false
     }
 
-    if (layoutMode == DanmakuItemData.DANMAKU_MODE_CENTER_TOP ||
-        layoutMode == DanmakuItemData.DANMAKU_MODE_CENTER_BOTTOM
+    if (data.mode == DanmakuItemData.DANMAKU_MODE_CENTER_TOP ||
+        data.mode == DanmakuItemData.DANMAKU_MODE_CENTER_BOTTOM
     ) {
         return true
     }

@@ -15,7 +15,6 @@ import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
 import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
-import dev.frost819.newbv.app.data.DanmakuMergeConfigStore
 import dev.frost819.newbv.app.data.toDanmakuEntity
 import dev.frost819.newbv.app.data.toDataDanmakuType
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
@@ -28,6 +27,7 @@ import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.danmaku.config.DanmakuState
+import dev.frost819.newbv.danmaku.util.DanmakuMerger
 import dev.frost819.newbv.danmaku.util.DanmakuPreprocessor
 import dev.frost819.newbv.data.datastore.Prefs
 import kotlinx.coroutines.CancellationException
@@ -124,7 +124,6 @@ class DanmakuViewModel
                 blockRules = DanmakuBlockRuleStore.state.value.rules,
                 mergeMode =
                     DanmakuMergeMode.fromPreference(Prefs.danmakuMergeMode),
-                mergeConfig = DanmakuMergeConfigStore.load(),
             )
         }
 
@@ -400,10 +399,7 @@ class DanmakuViewModel
             // 读取窗口覆盖的前段，断点续播或向后 seek 也能合并段边界两侧的文本。
             val state = _danmakuState.value
             val windowMs =
-                maxOf(
-                    if (state.mergeMode == DanmakuMergeMode.Off) 0L else state.mergeConfig.windowSeconds * 1000L,
-                    if (state.mergeConfig.dropThreshold > 0) 5_000L else 0L,
-                )
+                if (state.mergeMode == DanmakuMergeMode.Off) 0L else DanmakuMerger.DEFAULT_WINDOW_MS
             val behind = ((windowMs + segmentSizeMs - 1) / segmentSizeMs.coerceAtLeast(1)).toInt()
             val firstSeg = (targetSeg - behind).coerceAtLeast(1)
             for (seg in firstSeg..(targetSeg + DEFAULT_SEGMENT_PREFETCH_AHEAD)) {
@@ -485,7 +481,7 @@ class DanmakuViewModel
             }
         }
 
-        /** 连续原始时间轴统一处理，合并和密度预算都可跨分段；后台结果回到主线程提交。 */
+        /** 连续原始时间轴统一处理，合并可跨分段；后台结果回到主线程提交。 */
         private suspend fun rebuildDanmakuData() {
             val revision = dataRevision
             val generation = loadGeneration
@@ -525,8 +521,6 @@ class DanmakuViewModel
                 score = level,
                 // midHash 为 crc32 十六进制串，供按用户（发送者）屏蔽匹配
                 userId = midHash.toLongOrNull(16),
-                pool = pool,
-                originalMode = type,
             )
 
         /**
@@ -602,7 +596,6 @@ class DanmakuViewModel
                     is DanmakuSettingAction.SetBlockEnabled -> old.copy(blockEnabled = action.enabled)
                     is DanmakuSettingAction.SetBlockRules -> old.copy(blockRules = action.rules)
                     is DanmakuSettingAction.SetMergeMode -> old.copy(mergeMode = action.mode)
-                    is DanmakuSettingAction.SetMergeConfig -> old.copy(mergeConfig = action.config.sanitized())
                 }
             if (old == new) return
 
@@ -642,13 +635,7 @@ class DanmakuViewModel
                 // 经共享仓库写入（Prefs + StateFlow），其他入口的规则变化也会触发缓存重算
                 DanmakuBlockRuleStore.setBlockState(new.blockEnabled, new.blockRules)
             }
-            if (new.mergeConfig != old.mergeConfig) {
-                DanmakuMergeConfigStore.save(new.mergeConfig)
-                danmakuConfig = danmakuConfig.copy(scrollThreshold = new.mergeConfig.scrollThreshold)
-                danmakuPlayer?.updateConfig(danmakuConfig)
-            }
             if (new.mergeMode != old.mergeMode ||
-                new.mergeConfig != old.mergeConfig ||
                 new.blockEnabled != old.blockEnabled ||
                 new.blockRules != old.blockRules
             ) {
@@ -683,7 +670,6 @@ class DanmakuViewModel
                     density = 120,
                     textSizeScale = Prefs.defaultDanmakuScale,
                     screenPart = Prefs.defaultDanmakuArea,
-                    scrollThreshold = _danmakuState.value.mergeConfig.scrollThreshold,
                     dataFilter = listOf(danmakuTypeFilter),
                     rollingSpeedFactor = Prefs.defaultDanmakuSpeedFactor,
                 )
@@ -705,7 +691,6 @@ class DanmakuViewModel
         private fun updateDanmakuScale(scale: Float) {
             danmakuConfig = danmakuConfig.copy(textSizeScale = scale)
             danmakuPlayer?.updateConfig(danmakuConfig)
-            if (_danmakuState.value.mergeConfig.scrollThreshold > 0) reloadDanmakuSegments()
         }
 
         companion object {
