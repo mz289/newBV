@@ -476,10 +476,10 @@ object Prefs {
         restore = { ThemeMode.entries.getOrElse(it) { ThemeMode.FollowSystem } },
     )
 
-    /** 强调色预设（默认品牌蓝紫）。 */
+    /** 强调色预设（默认 B 站粉）。 */
     var accentColor by pref(
         PrefKeys.accentColor,
-        AccentColor.Brand,
+        AccentColor.BiliPink,
         save = { it.name },
         restore = { AccentColor.fromName(it) },
     )
@@ -510,7 +510,7 @@ object Prefs {
         val delegate = delegateMap[PrefKeys.accentColor] as PrefDelegate<AccentColor, String>
         delegate.flow
             .map { AccentColor.fromName(it as? String) }
-            .stateIn(scope, SharingStarted.Eagerly, AccentColor.Brand)
+            .stateIn(scope, SharingStarted.Eagerly, AccentColor.BiliPink)
     }
 
     /** Density Flow（实时响应设置变更）。 */

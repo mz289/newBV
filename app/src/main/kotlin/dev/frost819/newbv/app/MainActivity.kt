@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by Prefs.themeModeFlow.collectAsState(initial = ThemeMode.Dark)
             val density by Prefs.densityFlow.collectAsState(initial = 2.0f)
-            val accentColor by Prefs.accentColorFlow.collectAsState(initial = AccentColor.Brand)
+            val accentColor by Prefs.accentColorFlow.collectAsState(initial = AccentColor.BiliPink)
 
             BVTheme(themeMode = themeMode, density = density, accentColor = accentColor) {
                 SystemBarsEffect()

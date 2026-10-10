@@ -46,7 +46,7 @@ val LocalIsDark = staticCompositionLocalOf { true }
  *
  * @param themeMode 主题模式（跟随系统 / 深色 / 浅色）。
  * @param density 屏幕密度（TV 场景通常为 2.0）。
- * @param accentColor 强调色预设（默认品牌蓝紫）；派生色由 [AccentColor.resolve] 计算。
+ * @param accentColor 强调色预设（默认 B 站粉）；派生色由 [AccentColor.resolve] 计算。
  * @param surfaceColor 主题 Surface 的底色，null 表示使用 `colorScheme.surface`。
  *                     嵌套调用时（如播放器强制深色）可传 [Color.Black] 覆盖默认深灰底色。
  * @param content 主题包裹的内容。
@@ -56,7 +56,7 @@ val LocalIsDark = staticCompositionLocalOf { true }
 fun BVTheme(
     themeMode: ThemeMode = ThemeMode.FollowSystem,
     density: Float = 1f,
-    accentColor: AccentColor = AccentColor.Brand,
+    accentColor: AccentColor = AccentColor.BiliPink,
     surfaceColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
