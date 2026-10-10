@@ -6,7 +6,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import dev.frost819.newbv.BuildConfig
 import dev.frost819.newbv.app.cast.server.CastRequestLogger
 import dev.frost819.newbv.app.network.HttpServer
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
@@ -31,7 +30,6 @@ import dev.frost819.newbv.biliapi.repositories.VideoDetailRepository
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.core.interaction.InteractionTracker
 import dev.frost819.newbv.core.log.CrashHandler
-import dev.frost819.newbv.core.log.CrashUploader
 import dev.frost819.newbv.data.repository.SearchHistoryRepository
 import dev.frost819.newbv.data.repository.SearchHistoryRepositoryImpl
 import io.ktor.client.HttpClient
@@ -51,33 +49,15 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
     /**
-     * 提供 [CrashUploader] 单例。
-     *
-     * 使用 [BuildConfig.CRASH_REPORT_TOKEN]（从 `local.properties` 的 `crashReport.token` 注入）。
-     * token 为空时上传功能不可用，但实例仍会创建（调用时静默跳过）。
-     */
-    @Provides
-    @Singleton
-    fun provideCrashUploader(
-        @ApplicationContext context: Context,
-    ): CrashUploader = CrashUploader(context, BuildConfig.CRASH_REPORT_TOKEN)
-
-    /**
      * 提供 [CrashHandler] 单例。
      *
      * 安装全局未捕获异常处理器，崩溃日志写入 `filesDir/crash_logs`。
-     * 同时绑定 [CrashUploader] 用于崩溃日志上传。
      */
     @Provides
     @Singleton
     fun provideCrashHandler(
         @ApplicationContext context: Context,
-        crashUploader: CrashUploader,
-    ): CrashHandler =
-        CrashHandler(context).apply {
-            this.crashUploader = crashUploader
-            install()
-        }
+    ): CrashHandler = CrashHandler(context).apply { install() }
 
     /**
      * 提供 [AuthRepository] 单例。

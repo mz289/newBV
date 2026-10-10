@@ -39,14 +39,6 @@ class CrashHandler(
     private var originalHandler: Thread.UncaughtExceptionHandler? = null
 
     /**
-     * 崩溃上传器。
-     *
-     * 由 app 层通过 Hilt DI 注入后设置。
-     * 为 null 表示上传功能不可用（token 未配置或未启用）。
-     */
-    var crashUploader: CrashUploader? = null
-
-    /**
      * 安装崩溃处理器。
      *
      * 清空 logcat 缓冲，设置全局异常处理器。
@@ -153,9 +145,6 @@ class CrashHandler(
 
             // 追加 logcat 输出到文本日志
             appendLogcatText(crashFile, logcatText)
-
-            // best-effort 同步上传崩溃日志
-            crashUploader?.uploadCrash(deviceInfo, thread, exception, logcatText)
         }.onFailure { error ->
             logger.error(error) { "Failed to write crash log" }
         }

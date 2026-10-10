@@ -238,9 +238,6 @@ object Prefs {
         restore = { ApiType.entries.getOrElse(it) { ApiType.Web } },
     )
 
-    /** 是否启用崩溃日志上传（默认关闭）。 */
-    var crashReportEnabled by pref(PrefKeys.crashReportEnabled, false)
-
     /**
      * 起播前自动测速并选择最优 CDN（默认关闭）。
      *

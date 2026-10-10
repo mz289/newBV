@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
-import dev.frost819.newbv.BuildConfig
 import dev.frost819.newbv.app.cast.CastReceiverService
 import dev.frost819.newbv.app.cast.server.CastNetworkUtil
 import dev.frost819.newbv.app.cast.server.CastReceiverConfig
@@ -36,7 +35,7 @@ import dev.frost819.newbv.data.datastore.Prefs
 /**
  * 其他设置页。
  *
- * 接口选择/崩溃上报/查看日志。
+ * 接口选择/投屏接收/查看日志。
  *
  * @param onNavigateToLogViewer 跳转日志查看页回调。
  */
@@ -51,7 +50,6 @@ fun OtherSetting(
 
     var showPreferedApiDialog by remember { mutableStateOf(false) }
     var selectedApi by remember { mutableStateOf(Prefs.apiType) }
-    var crashReportEnabled by remember { mutableStateOf(Prefs.crashReportEnabled) }
     var castReceiverEnabled by remember { mutableStateOf(Prefs.enableCastReceiver) }
     // 组播/网络接口就绪前地址可能为空，进设置页后延迟展示
     val localIp by rememberLocalIpv4Address()
@@ -75,24 +73,6 @@ fun OtherSetting(
             title = "接口选择",
             supportText = "当前：${selectedApi.displayName}",
             onClick = { showPreferedApiDialog = true },
-        )
-
-        SettingListItem(
-            title = "上传崩溃日志",
-            supportText = "崩溃时自动上传日志到开发者服务器",
-            trailingContent = {
-                Switch(
-                    checked = crashReportEnabled,
-                    onCheckedChange = {
-                        crashReportEnabled = it
-                        Prefs.crashReportEnabled = it
-                    },
-                )
-            },
-            onClick = {
-                crashReportEnabled = !crashReportEnabled
-                Prefs.crashReportEnabled = crashReportEnabled
-            },
         )
 
         SettingListItem(
@@ -129,14 +109,6 @@ fun OtherSetting(
                 }
             },
         )
-
-        if (BuildConfig.DEBUG) {
-            SettingListItem(
-                title = "触发测试崩溃",
-                supportText = "仅用于测试崩溃上传流程",
-                onClick = { throw RuntimeException("Test crash for upload verification") },
-            )
-        }
 
         SettingListItem(
             modifier = screenFocusSaver?.let { Modifier.focusSaverItem(it, "content_log_viewer") } ?: Modifier,

@@ -19,7 +19,6 @@ import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
 import dev.frost819.newbv.biliapi.repositories.ChannelRepository
 import dev.frost819.newbv.core.log.CrashHandler
-import dev.frost819.newbv.core.log.CrashUploader
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
 import kotlinx.coroutines.CoroutineScope
@@ -49,9 +48,6 @@ class BVApplication : Application() {
 
     @Inject
     lateinit var crashHandler: CrashHandler
-
-    @Inject
-    lateinit var crashUploader: CrashUploader
 
     @Inject
     lateinit var httpServer: HttpServer
@@ -114,14 +110,6 @@ class BVApplication : Application() {
                     BiliHttpApi.buvid3 = spiResult.buvid3
                     BiliHttpApi.deviceCookies = spiResult.deviceCookies
                 }
-            }
-        }
-
-        // 根据用户设置启用崩溃上传，并尝试上传上次崩溃未发送的日志
-        crashUploader.enabled = Prefs.crashReportEnabled
-        if (crashUploader.canUpload()) {
-            CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
-                crashUploader.uploadPendingCrashLogs()
             }
         }
 
