@@ -12,6 +12,11 @@ android {
     namespace = AppConfiguration.appId
     compileSdk = AppConfiguration.compileSdk
 
+    // git 派生值一次取好，供 defaultConfig 与 APK 命名复用；
+    // 名字避开 DSL 属性，否则赋值目标会被解析成局部 val
+    val appVersionCode = AppConfiguration.versionCode(project)
+    val appVersionName = AppConfiguration.versionName(project)
+
     signingConfigs {
         // 本地和 CI 共用固定路径；缺失时由签名任务报错，禁止回退到临时密钥。
         create("distribution") {
@@ -26,8 +31,8 @@ android {
         applicationId = AppConfiguration.applicationId
         minSdk = AppConfiguration.minSdk
         targetSdk = AppConfiguration.targetSdk
-        versionCode = AppConfiguration.versionCode
-        versionName = AppConfiguration.versionName
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "dev.frost819.newbv.app.CustomTestRunner"
         vectorDrawables {
@@ -57,7 +62,7 @@ android {
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
                     output.outputFileName.set(
-                        "newBV_${AppConfiguration.versionCode}_${AppConfiguration.versionName}_${variant.name}.apk",
+                        "newBV_${appVersionCode}_${appVersionName}_${variant.name}.apk",
                     )
                 }
             }
@@ -72,6 +77,11 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    lint {
+        // lint 不作为构建关卡：跳过 assembleRelease 自动附带的 lintVital 分析
+        checkReleaseBuilds = false
     }
 
     testOptions {

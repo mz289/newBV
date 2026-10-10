@@ -9,9 +9,14 @@ on:
 permissions:
   contents: write
 
+# 连续推送时只构建最新提交，取消进行中的旧构建
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-debug:
-    name: Build Debug & Release APK
+  build-release:
+    name: Build Release APK
     runs-on: ubuntu-latest
 
     steps:
@@ -44,16 +49,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build debug & release APK
-        run: ./gradlew assembleDebug assembleRelease --stacktrace
+      - name: Build release APK
+        run: ./gradlew assembleRelease --stacktrace
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: newBV_apks_${{ github.sha }}
-          path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
+          name: newBV_apk_${{ github.sha }}
+          path: app/build/outputs/apk/release/*.apk
           retention-days: 7
           if-no-files-found: error
 
@@ -64,7 +67,7 @@ jobs:
       - name: Read version from build output
         id: version
         run: |
-          META=app/build/outputs/apk/debug/output-metadata.json
+          META=app/build/outputs/apk/release/output-metadata.json
           echo "versionCode=$(jq -r '.elements[0].versionCode' "$META")" >> "$GITHUB_OUTPUT"
           echo "versionName=$(jq -r '.elements[0].versionName' "$META")" >> "$GITHUB_OUTPUT"
 
@@ -76,14 +79,12 @@ jobs:
           VERSION_NAME: ${{ steps.version.outputs.versionName }}
         run: |
           TAG="v$VERSION_NAME"
-          DEBUG_APK="app/build/outputs/apk/debug/newBV_${VERSION_CODE}_${VERSION_NAME}_debug.apk"
           RELEASE_APK="app/build/outputs/apk/release/newBV_${VERSION_CODE}_${VERSION_NAME}_release.apk"
-          test -f "$DEBUG_APK"
           test -f "$RELEASE_APK"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$DEBUG_APK" "$RELEASE_APK" --clobber
+            gh release upload "$TAG" "$RELEASE_APK" --clobber
           else
-            gh release create "$TAG" "$DEBUG_APK" "$RELEASE_APK" \
+            gh release create "$TAG" "$RELEASE_APK" \
               --title "newBV $VERSION_NAME" \
               --generate-notes \
               --prerelease

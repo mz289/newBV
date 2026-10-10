@@ -1,3 +1,5 @@
+import org.gradle.api.Project
+
 /**
  * 应用全局配置。
  *
@@ -16,32 +18,40 @@ object AppConfiguration {
     private const val patch = 0
     private const val hotFix = 0
 
-    // git 信息在一次构建内只取一次：避免配置期多次求值导致数值漂移与进程泄漏
-    private val gitCommitCount: Int by lazy {
-        runGit("git", "rev-list", "--count", "HEAD").toIntOrNull() ?: 1
-    }
-    private val gitShortHash: String by lazy {
-        runGit("git", "rev-list", "HEAD", "--abbrev-commit", "--max-count=1")
-    }
+    private val versionBase =
+        "$major.$minor.$patch${".$hotFix".takeIf { hotFix != 0 } ?: ""}"
 
-    @Suppress("KotlinConstantConditions")
-    val versionName: String by lazy {
+    /**
+     * versionCode：当前 HEAD 的提交总数。
+     *
+     * 必须传 [project] 走 `providers.exec` 取值——configuration cache 下
+     * 配置期裸跑 git 会构建失败或把旧值冻结进缓存；providers.exec 会在
+     * 缓存复用时重跑进程、值变化则使缓存失效。
+     */
+    fun versionCode(project: Project): Int =
+        git(project, "rev-list", "--count", "HEAD").toIntOrNull() ?: 1
+
+    /** versionName：`<base>.r<提交数>.<短哈希>`，versionCode 同源。 */
+    fun versionName(project: Project): String {
         val base =
-            System.getenv("NEWBV_VERSION_BASE")?.takeIf { it.isNotBlank() }
-                ?: "$major.$minor.$patch${".$hotFix".takeIf { hotFix != 0 } ?: ""}"
-        "$base.r$gitCommitCount.$gitShortHash"
+            project.providers
+                .environmentVariable("NEWBV_VERSION_BASE")
+                .orElse(versionBase)
+                .get()
+                .ifBlank { versionBase }
+        val shortHash =
+            git(project, "rev-list", "HEAD", "--abbrev-commit", "--max-count=1")
+        return "$base.r${versionCode(project)}.$shortHash"
     }
-    val versionCode: Int get() = gitCommitCount
 
-    /** 执行外部命令并返回标准输出；命令缺失或失败时返回空串。 */
-    private fun runGit(vararg command: String): String =
+    /** 执行 git 并返回标准输出；命令缺失或失败时返回空串。 */
+    private fun git(
+        project: Project,
+        vararg args: String,
+    ): String =
         runCatching {
-            ProcessBuilder(*command)
-                .start()
-                .let { process ->
-                    process.inputStream.bufferedReader().readText().trim().also {
-                        process.waitFor()
-                    }
-                }
+            project.providers.exec {
+                commandLine("git", *args)
+            }.standardOutput.asText.get().trim()
         }.getOrDefault("")
 }
