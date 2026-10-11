@@ -48,8 +48,9 @@ object PlayerModule {
     /**
      * 提供 CDN 自动选择器。
      *
-     * 基于带自定义 SSL 配置的 OkHttpClient 对候选播放地址测速，
-     * 结果按 host 缓存，供 [dev.frost819.newbv.app.viewmodel.player.PlayerViewModel] 选流使用。
+     * 基于带自定义 SSL 配置的 OkHttpClient 对候选播放地址按视频维度实测评估
+     * （TTFB + 吞吐 → ETA 排序，样本不跨视频复用；主机可靠性冷却退避），
+     * 供 [dev.frost819.newbv.app.viewmodel.player.PlayerViewModel] 选流使用。
      */
     @Provides
     @Singleton

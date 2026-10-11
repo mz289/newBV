@@ -138,7 +138,7 @@ class PlayerViewModel
         /** 本次播放已尝试过的「画质|编码」组合，用于解码回退去重与终止。 */
         private val attemptedDecodeProfiles = mutableSetOf<String>()
 
-        /** 当前视频轨道按推荐顺序排列的 CDN 候选（开启自动选源时按测速排序）。 */
+        /** 当前视频轨道按推荐顺序排列的 CDN 候选（开启自动选源时按实测评估排序）。 */
         private var videoCdnCandidates: List<String> = emptyList()
 
         /** 当前音频轨道按推荐顺序排列的 CDN 候选。 */
@@ -146,6 +146,9 @@ class PlayerViewModel
 
         /** 运行时 CDN 回退已尝试到的候选下标。 */
         private var cdnFallbackIndex = 0
+
+        /** 当前视频的 CDN 评估 key（速度样本按视频隔离，不跨视频复用）。 */
+        private var cdnVideoKey: String? = null
 
         private val detachedWorkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -228,6 +231,8 @@ class PlayerViewModel
 
                 override fun onReady() {
                     logger.info { "onReady" }
+                    // 起播成功回报给选择器：重置当前主机的连续失败计数
+                    cdnSelector.noteSuccess(videoCdnCandidates.getOrNull(cdnFallbackIndex), cdnVideoKey)
                     _uiState.update { it.copy(playerState = PlayerState.Ready) }
                     updatePlaySpeed(forceUpdate = true)
                     startSeekerUpdater()
@@ -1466,12 +1471,15 @@ class PlayerViewModel
             val videoCandidates = officialCdnCandidates(videoUrls.filterNotNull())
             val audioCandidates = officialCdnCandidates(audioUrls)
 
-            // 开启自动选源时对候选测速排序（结果按 host 缓存），否则沿用原有顺序
+            // 开启自动选源时按视频维度实测评估候选（TTFB + 吞吐 → ETA 排序，样本不跨视频复用），
+            // 否则沿用原有顺序。视频/音频轨道共用同一个评估 key。
+            val cdnKey = "${state.aid}-${state.cid}-$targetQn"
+            cdnVideoKey = cdnKey
             videoCdnCandidates =
-                if (Prefs.autoSelectCdn) cdnSelector.rank(videoCandidates) else videoCandidates
+                if (Prefs.autoSelectCdn) cdnSelector.rank(videoCandidates, cdnKey) else videoCandidates
             audioCdnCandidates =
                 if (Prefs.autoSelectCdn && audioCandidates.isNotEmpty()) {
-                    cdnSelector.rank(audioCandidates)
+                    cdnSelector.rank(audioCandidates, cdnKey)
                 } else {
                     audioCandidates
                 }
@@ -1662,6 +1670,10 @@ class PlayerViewModel
          */
         private fun tryNextCdnFallback(): Boolean {
             val player = videoPlayer ?: return false
+            // 把失败回报给选择器：该主机按 STALL 冷却退避，连续失败会逐步拉长冷却时间
+            videoCdnCandidates.getOrNull(cdnFallbackIndex)?.let { failedUrl ->
+                cdnSelector.noteFailure(failedUrl, cdnVideoKey)
+            }
             val nextIndex = cdnFallbackIndex + 1
             val videoUrl = videoCdnCandidates.getOrNull(nextIndex) ?: return false
             cdnFallbackIndex = nextIndex

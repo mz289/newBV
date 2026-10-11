@@ -141,7 +141,7 @@ fun AudioVideoSetting(modifier: Modifier = Modifier) {
         )
         SettingSwitchListItem(
             title = "自动选择最优 CDN",
-            supportText = "起播前对候选节点测速并选择最快者，失败时自动切换；可能略微增加起播等待",
+            supportText = "起播前按视频实测各节点的首字节延迟与吞吐并按估计耗时排序，失败时自动切换；可能略微增加起播等待",
             checked = autoSelectCdn,
             onCheckedChange = {
                 autoSelectCdn = it
