@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>newBV 远程控制台</title>
+<style>
+  :root {
+    --md-primary: #D3497E;
+    --md-on-primary: #FFFFFF;
+    --md-secondary-container: #FBE3EC;
+    --md-on-secondary-container: #3B0A1E;
+    --md-surface: #FFFFFF;
+    --md-on-surface: #1C1B1F;
+    --md-on-surface-variant: #6B6470;
+    --md-outline: #857988;
+    --md-outline-variant: #E4DBE2;
+    --md-surface-container: #F7EEF2;
+    --md-inverse-surface: #322830;
+    --md-inverse-on-surface: #F4EDF2;
+    --md-shadow: rgba(0,0,0,0.20);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --md-primary: #FB7299;
+      --md-on-primary: #3A0014;
+      --md-secondary-container: #54293B;
+      --md-on-secondary-container: #FBD8E4;
+      --md-surface: #14121A;
+      --md-on-surface: #E6E0E6;
+      --md-on-surface-variant: #CBC4CE;
+      --md-outline: #978F9C;
+      --md-outline-variant: #48414C;
+      --md-surface-container: #211E26;
+      --md-inverse-surface: #F4EDF2;
+      --md-inverse-on-surface: #322830;
+      --md-shadow: rgba(0,0,0,0.40);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: var(--md-surface); color: var(--md-on-surface); -webkit-tap-highlight-color: transparent; }
+  #app { display: flex; flex-direction: column; height: 100%; max-width: 600px; margin: 0 auto; }
+  .md-toolbar { flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 18px 16px 14px; }
+  .md-toolbar .md-logo { width: 36px; height: 36px; border-radius: 10px; background: var(--md-primary); color: var(--md-on-primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+  .md-toolbar h1 { font-size: 18px; line-height: 24px; font-weight: 600; margin: 0; }
+  .app-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--md-surface); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: flex; flex-direction: column; min-height: 100%; padding: 20px 16px; }
+  .panel-content { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+  .md-nav-bar {
+    flex-shrink: 0; display: flex;
+    background: var(--md-surface-container);
+    border-top: 1px solid var(--md-outline-variant);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .md-nav-item {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 12px 0 16px; gap: 4px;
+    cursor: pointer; user-select: none;
+  }
+  .md-nav-indicator { width: 64px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: transparent; transition: background 0.2s; }
+  .md-nav-icon { width: 24px; height: 24px; fill: var(--md-on-surface-variant); transition: fill 0.2s; }
+  .md-nav-label { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.5px; color: var(--md-on-surface-variant); transition: color 0.2s; }
+  .md-nav-item.active .md-nav-indicator { background: var(--md-secondary-container); }
+  .md-nav-item.active .md-nav-icon { fill: var(--md-on-secondary-container); }
+  .md-nav-item.active .md-nav-label { color: var(--md-on-surface); font-weight: 700; }
+  .md-snackbar-host { position: fixed; inset: 0; z-index: 200; pointer-events: none; }
+  .md-snackbar {
+    position: absolute; bottom: 96px; left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100% - 32px);
+    background: var(--md-inverse-surface);
+    color: var(--md-inverse-on-surface);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 14px; line-height: 20px; letter-spacing: 0.25px;
+    box-shadow: 0 3px 5px -1px var(--md-shadow), 0 6px 10px rgba(0,0,0,0.14), 0 1px 18px rgba(0,0,0,0.12);
+    opacity: 0; transition: opacity 0.2s;
+    white-space: pre-wrap;
+  }
+  .md-snackbar.visible { opacity: 1; }
+</style>
+<body>
+<div id="app">
+  <header class="md-toolbar">
+    <div class="md-logo">B</div>
+    <h1>远程控制台</h1>
+  </header>
+  <div class="app-body">
+<!--REMOTE_PANELS-->
+  </div>
+  <nav class="md-nav-bar">
+<!--REMOTE_NAV_ITEMS-->
+  </nav>
+</div>
+<div class="md-snackbar-host"><div id="md_snackbar" class="md-snackbar"></div></div>
+<script>
+  let mdSnackbarTimer = null;
+
+  function showPanel(id) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel_' + id));
+    document.querySelectorAll('.md-nav-item').forEach(t => t.classList.toggle('active', t.id === 'tab_' + id));
+  }
+
+  function mdSnackbar(text, sticky) {
+    const s = document.getElementById('md_snackbar');
+    s.textContent = text;
+    s.classList.add('visible');
+    if (mdSnackbarTimer) clearTimeout(mdSnackbarTimer);
+    if (!sticky) mdSnackbarTimer = setTimeout(() => s.classList.remove('visible'), 4000);
+  }
+
+  /** 调用功能动作：返回 { ok, text }；body 为空串时也要 POST（动作可能无参数）。 */
+  async function remotePost(feature, action, body) {
+    const res = await fetch('action?do=' + encodeURIComponent(feature + ':' + action), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: body == null ? '' : body,
+      cache: 'no-store',
+      signal: AbortSignal.timeout(30000)
+    });
+    return { ok: res.ok, text: await res.text() };
+  }
+</script>
+</body>
+</html>

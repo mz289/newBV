@@ -1,0 +1,179 @@
+<style>
+  #db_panel section { background: var(--md-surface-container); border: 1px solid var(--md-outline-variant); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+  #db_panel h2 { font-size: 14px; color: var(--md-on-surface-variant); font-weight: 500; margin: 0 0 10px; }
+  #db_panel .sub { color: var(--md-on-surface-variant); font-size: 12px; }
+  #db_panel .row { display: flex; gap: 8px; }
+  #db_panel input[type=text], #db_panel select, #db_panel textarea, #db_panel button { font: inherit; border-radius: 10px; border: 1px solid var(--md-outline-variant); background: transparent; color: var(--md-on-surface); }
+  #db_panel input[type=text], #db_panel select { padding: 9px 12px; }
+  #db_panel input[type=text] { flex: 1; min-width: 0; }
+  #db_panel select { flex: none; }
+  #db_panel textarea { width: 100%; padding: 10px 12px; min-height: 110px; resize: vertical; font-size: 13px; }
+  #db_panel button { padding: 9px 16px; cursor: pointer; }
+  #db_panel button.primary { background: var(--md-primary); border-color: var(--md-primary); color: var(--md-on-primary); }
+  #db_panel .hint { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 8px; }
+  #db_panel ul { list-style: none; margin: 0; padding: 0; }
+  #db_panel li { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--md-outline-variant); }
+  #db_panel li:last-child { border-bottom: none; }
+  #db_panel .badge { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+  #db_panel .value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  #db_panel li.off .value { color: var(--md-on-surface-variant); text-decoration: line-through; }
+  #db_panel .hits { flex: none; font-size: 12px; background: var(--md-secondary-container); color: var(--md-on-secondary-container); padding: 2px 8px; border-radius: 6px; }
+  #db_panel .del { flex: none; color: var(--md-error); background: none; border: none; font-size: 20px; padding: 4px 8px; }
+  #db_panel .empty { color: var(--md-on-surface-variant); text-align: center; padding: 22px 0; font-size: 13px; }
+  #db_panel .switch { position: relative; width: 52px; height: 30px; flex: none; display: inline-block; }
+  #db_panel .switch input { opacity: 0; width: 100%; height: 100%; position: absolute; z-index: 2; cursor: pointer; margin: 0; }
+  #db_panel .switch .track { position: absolute; inset: 0; background: var(--md-outline); border-radius: 15px; transition: background .2s; }
+  #db_panel .switch .thumb { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; background: var(--md-surface); border-radius: 50%; transition: left .2s; }
+  #db_panel .switch input:checked ~ .track { background: var(--md-primary); }
+  #db_panel .switch input:checked ~ .thumb { left: 25px; }
+  #db_panel .toolbar { display: flex; gap: 8px; margin-top: 10px; }
+  #db_panel .toolbar button { flex: 1; }
+  #db_panel label.file { flex: 1; display: flex; align-items: center; justify-content: center; padding: 9px 16px; border-radius: 10px; border: 1px solid var(--md-outline-variant); cursor: pointer; }
+  #db_panel input[type=file] { display: none; }
+  #db_master_row { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 12px; }
+  #db_master_row .db-title { font-size: 15px; font-weight: 600; }
+</style>
+<div id="db_panel" class="db-wrap">
+  <div id="db_master_row">
+    <span class="db-title">总开关</span>
+    <label class="switch">
+      <input type="checkbox" id="db_master">
+      <span class="track"></span><span class="thumb"></span>
+    </label>
+  </div>
+  <section>
+    <h2>规则列表 <span id="db_count" class="sub"></span></h2>
+    <ul id="db_rules"></ul>
+    <div id="db_empty" class="empty" hidden>暂无规则</div>
+  </section>
+  <section>
+    <h2>添加规则</h2>
+    <div class="row">
+      <select id="db_type">
+        <option value="Keyword">关键词</option>
+        <option value="Regex">正则</option>
+        <option value="User">用户</option>
+        <option value="Color">颜色</option>
+      </select>
+      <input type="text" id="db_value" placeholder="关键词、/正则/、midHash 或颜色 hex">
+      <button class="primary" onclick="db_addRule()">添加</button>
+    </div>
+    <div class="hint">关键词：包含即屏蔽（忽略大小写）；正则可用 /pattern/ 包裹；用户填 8 位 midHash 或数字 UID；颜色填 6 位十六进制（如 FF6699）。与电视端实时同步，修改即时生效。</div>
+  </section>
+  <section>
+    <h2>导入屏蔽串</h2>
+    <textarea id="db_import_text" placeholder="粘贴 B 站 XML 屏蔽串（tv.bilibili.player.xml 内容）或每行一条的纯文本词库"></textarea>
+    <div class="toolbar">
+      <label class="file">选择文件<input type="file" id="db_file" accept=".xml,.txt,text/xml,text/plain"></label>
+      <button class="primary" onclick="db_doImport()">导入</button>
+    </div>
+    <div class="hint">支持 B 站 XML 屏蔽串、每行一条的文本词库（/正则/ 自动识别），重复规则自动跳过</div>
+  </section>
+  <section>
+    <h2>导出</h2>
+    <button class="primary" onclick="db_doExport()">下载 B 站 XML 屏蔽串</button>
+    <div class="hint">导出格式与 B 站播放器兼容，可导入其他客户端</div>
+  </section>
+</div>
+<script>
+  (function () {
+    const $ = id => document.getElementById(id);
+    let suppressPoll = false;
+
+    async function api(action, body) {
+      const res = await remotePost('danmaku_block', action, body === undefined ? '' : JSON.stringify(body));
+      if (!res.ok && !res.text.startsWith('{')) throw new Error('HTTP ' + res.text);
+      return JSON.parse(res.text);
+    }
+
+    function render(state) {
+      $('db_master').checked = state.enabled;
+      $('db_count').textContent = state.rules.length
+        ? `（${state.rules.length} 条` + (state.totalHits ? `，已屏蔽 ${state.totalHits}` : '') + '）'
+        : '';
+      const ul = $('db_rules');
+      ul.innerHTML = '';
+      $('db_empty').hidden = state.rules.length > 0;
+      const typeNames = { Keyword: '关键词', Regex: '正则', User: '用户', Color: '颜色' };
+      state.rules.forEach(r => {
+        const li = document.createElement('li');
+        if (!r.enabled) li.className = 'off';
+        const v = JSON.stringify(r.value).replace(/"/g, '&quot;');
+        li.innerHTML =
+          `<label class="switch"><input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="db_toggleRule(this,'${r.type}',${v})">` +
+          `<span class="track"></span><span class="thumb"></span></label>` +
+          `<span class="badge ${r.type}">${typeNames[r.type] || r.type}</span>` +
+          `<span class="value"></span>` +
+          (r.hitCount ? `<span class="hits" title="本会话命中">${r.hitCount}</span>` : '') +
+          `<button class="del" onclick="db_deleteRule('${r.type}',${v})">×</button>`;
+        li.querySelector('.value').textContent = r.value;
+        ul.appendChild(li);
+      });
+    }
+
+    async function refresh() {
+      try { render(await api('state')); } catch (e) { /* 轮询失败静默 */ }
+    }
+
+    async function mutate(promise, okMsg) {
+      suppressPoll = true;
+      try {
+        const data = await promise;
+        if (data.ok === false) { window.mdSnackbar(data.message || '操作失败'); }
+        else { render(data); if (okMsg) window.mdSnackbar(okMsg); }
+      } catch (e) { window.mdSnackbar('操作失败：' + e.message); }
+      suppressPoll = false;
+    }
+
+    const setEnabled = v => mutate(api('setEnabled', { enabled: v }));
+    window.db_addRule = () => {
+      const value = $('db_value').value.trim();
+      if (!value) { window.mdSnackbar('请输入规则内容'); return; }
+      mutate(api('addRule', { type: $('db_type').value, value }).then(d => { $('db_value').value = ''; return d; }), '已添加');
+    };
+    window.db_toggleRule = (el, type, value) => mutate(api('toggleRule', { type, value }));
+    window.db_deleteRule = (type, value) => mutate(api('deleteRule', { type, value }), '已删除');
+
+    window.db_doImport = async function () {
+      const text = $('db_import_text').value;
+      if (!text.trim()) { window.mdSnackbar('请粘贴屏蔽串或选择文件'); return; }
+      suppressPoll = true;
+      try {
+        const res = await remotePost('danmaku_block', 'import', text);
+        const data = JSON.parse(res.text);
+        if (data.ok) {
+          window.mdSnackbar(`导入 ${data.imported} 条` + (data.duplicates ? `，重复 ${data.duplicates} 条` : '') + (data.skipped ? `，跳过 ${data.skipped} 条` : ''));
+          $('db_import_text').value = '';
+          render(await api('state'));
+        } else { window.mdSnackbar(data.message || '导入失败'); }
+      } catch (e) { window.mdSnackbar('导入失败：' + e.message); }
+      suppressPoll = false;
+    };
+
+    window.db_doExport = async function () {
+      try {
+        const res = await remotePost('danmaku_block', 'export', '');
+        const blob = new Blob([res.text], { type: 'text/xml' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'tv.bilibili.player.xml';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (e) { window.mdSnackbar('导出失败：' + e.message); }
+    };
+
+    $('db_master').addEventListener('change', e => setEnabled(e.target.checked));
+    $('db_value').addEventListener('keydown', e => { if (e.key === 'Enter') db_addRule(); });
+    $('db_file').addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => { $('db_import_text').value = reader.result; db_doImport(); };
+      reader.readAsText(f, 'UTF-8');
+      e.target.value = '';
+    });
+
+    refresh();
+    setInterval(() => { if (!suppressPoll && !document.hidden) refresh(); }, 3000);
+  })();
+</script>

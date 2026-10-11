@@ -17,7 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.R
-import dev.frost819.newbv.app.network.CookieInputServer
+import dev.frost819.newbv.app.network.CookieLoginRemoteFeature
+import dev.frost819.newbv.app.network.RemoteConsoleServer
 import dev.frost819.newbv.core.log.Loggers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -43,25 +44,11 @@ internal fun CookieRemoteInput(
     LaunchedEffect(attempt) {
         url = null
         failed = false
-        val server =
-            CookieInputServer(
-                pageProvider = {
-                    context.assets
-                        .open("cookie_input_ui/index.html")
-                        .bufferedReader()
-                        .use { it.readText() }
-                },
-                onInput = { input ->
-                    // 页面关闭（服务停止）取消响应时，登录本身仍需完成
-                    withContext(NonCancellable) { onLogin(input) }
-                },
-            )
+        // 统一远程控制台：注册 Cookie 登录标签（其他功能标签由各自入口注册）
+        RemoteConsoleServer.start(context)
+        RemoteConsoleServer.register(CookieLoginRemoteFeature.create(onLogin))
         try {
-            url =
-                withContext(Dispatchers.IO) {
-                    val host = checkNotNull(CookieInputServer.localAddress())
-                    server.start(host)
-                }
+            url = RemoteConsoleServer.getUrl()
             logger.info { "remote input url: $url" }
             awaitCancellation()
         } catch (error: CancellationException) {
@@ -69,7 +56,10 @@ internal fun CookieRemoteInput(
         } catch (_: Exception) {
             failed = true
         } finally {
-            withContext(NonCancellable + Dispatchers.IO) { server.stop() }
+            withContext(NonCancellable) {
+                RemoteConsoleServer.unregister(CookieLoginRemoteFeature.ID)
+                RemoteConsoleServer.stop()
+            }
         }
     }
 

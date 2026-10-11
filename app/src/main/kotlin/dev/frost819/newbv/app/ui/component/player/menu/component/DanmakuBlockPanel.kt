@@ -58,7 +58,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
-import dev.frost819.newbv.app.network.DanmakuBlockServer
+import dev.frost819.newbv.app.network.DanmakuBlockRemoteFeature
+import dev.frost819.newbv.app.network.RemoteConsoleServer
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.confirmImeKeyboardOptions
 import dev.frost819.newbv.core.focus.confirmOpenIme
@@ -244,9 +245,9 @@ private fun DanmakuBlockQrDialog(onDismiss: () -> Unit) {
 /**
  * 远程管理二维码内容（可嵌入各弹窗复用）。
  *
- * 组合期间持有 [DanmakuBlockServer] 的一次引用（服务器按引用计数启停，
- * 多个展示组件共存时不会互相中断），显示管理页地址二维码，
- * 手机扫码即可管理屏蔽规则。
+ * 组合期间持有统一远程控制台的一次引用（服务器按引用计数启停，
+ * 多个展示组件共存时不会互相中断），注册弹幕屏蔽标签并显示控制台地址
+ * 二维码，手机扫码后在该标签页内即可管理屏蔽规则。
  *
  * @param qrSize 二维码边长
  * @param showUrl 是否显示文字地址
@@ -260,9 +261,13 @@ private fun DanmakuBlockQrContent(
     var url by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(Unit) {
-        DanmakuBlockServer.start(context)
-        url = DanmakuBlockServer.getUrl()
-        onDispose { DanmakuBlockServer.stop() }
+        RemoteConsoleServer.start(context)
+        RemoteConsoleServer.register(DanmakuBlockRemoteFeature.create(context))
+        url = RemoteConsoleServer.getUrl()
+        onDispose {
+            RemoteConsoleServer.unregister(DanmakuBlockRemoteFeature.ID)
+            RemoteConsoleServer.stop()
+        }
     }
 
     Column(
