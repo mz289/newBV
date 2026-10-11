@@ -45,6 +45,7 @@ private val keyboardKeys =
  * @param onClear 清除全部
  * @param onDelete 删除最后一个字符
  * @param onSearch 执行搜索
+ * @param onRemoteInput 打开手机远程输入二维码弹窗；缺省时不显示按钮
  */
 @Composable
 fun SoftKeyboard(
@@ -55,6 +56,7 @@ fun SoftKeyboard(
     onClear: () -> Unit,
     onDelete: () -> Unit,
     onSearch: () -> Unit,
+    onRemoteInput: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier.width(284.dp).padding(8.dp),
@@ -99,6 +101,13 @@ fun SoftKeyboard(
                         .then(searchButtonModifier),
                 key = "搜索",
                 onClick = onSearch,
+            )
+        }
+        if (onRemoteInput != null) {
+            SoftKeyboardButton(
+                modifier = Modifier.width(284.dp),
+                key = "手机远程输入",
+                onClick = onRemoteInput,
             )
         }
     }

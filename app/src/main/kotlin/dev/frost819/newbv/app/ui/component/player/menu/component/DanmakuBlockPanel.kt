@@ -35,8 +35,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -58,8 +56,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
+import dev.frost819.newbv.app.ui.component.RemoteConsoleQrContent
+import dev.frost819.newbv.app.ui.component.RemoteConsoleQrDialog
 import dev.frost819.newbv.app.network.DanmakuBlockRemoteFeature
-import dev.frost819.newbv.app.network.RemoteConsoleServer
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.confirmImeKeyboardOptions
 import dev.frost819.newbv.core.focus.confirmOpenIme
@@ -69,7 +68,6 @@ import dev.frost819.newbv.core.focus.touchClickable
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRuleType
 import dev.frost819.newbv.danmaku.filter.DanmakuBlockFilter
-import io.github.g0dkar.qrcode.QRCode
 
 /**
  * 弹幕屏蔽管理面板（弹幕设置菜单"屏蔽"子项的值面板）。
@@ -172,151 +170,12 @@ fun DanmakuBlockPanel(
     }
 
     if (showQrDialog) {
-        DanmakuBlockQrDialog(onDismiss = { showQrDialog = false })
+        RemoteConsoleQrDialog(
+            title = "远程管理弹幕屏蔽",
+            onDismiss = { showQrDialog = false },
+        )
     }
 }
-
-/**
- * 远程管理二维码弹窗。
- *
- * 打开期间启动本地管理服务器（随机端口，仅局域网），
- * 手机扫码或输入地址即可管理屏蔽规则（增删改/导入导出），
- * 修改与电视端实时双向同步；关闭弹窗即停止服务器。
- *
- * @param onDismiss 关闭回调
- */
-@Composable
-private fun DanmakuBlockQrDialog(onDismiss: () -> Unit) {
-    var showUrlText by remember { mutableStateOf(true) }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.55f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Surface(
-                colors =
-                    androidx.tv.material3.SurfaceDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-                shape = MaterialTheme.shapes.large,
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Text(
-                        text = "远程管理弹幕屏蔽",
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                    DanmakuBlockQrContent(
-                        qrSize = 200.dp,
-                        showUrl = showUrlText,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        androidx.tv.material3.Button(
-                            modifier =
-                                Modifier.touchClickable(onClick = { showUrlText = !showUrlText }),
-                            onClick = { showUrlText = !showUrlText },
-                        ) {
-                            Text(if (showUrlText) "隐藏地址" else "显示地址")
-                        }
-                        androidx.tv.material3.Button(
-                            modifier = Modifier.touchClickable(onClick = onDismiss),
-                            onClick = onDismiss,
-                        ) {
-                            Text("关闭")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 远程管理二维码内容（可嵌入各弹窗复用）。
- *
- * 组合期间持有统一远程控制台的一次引用（服务器按引用计数启停，
- * 多个展示组件共存时不会互相中断），注册弹幕屏蔽标签并显示控制台地址
- * 二维码，手机扫码后在该标签页内即可管理屏蔽规则。
- *
- * @param qrSize 二维码边长
- * @param showUrl 是否显示文字地址
- */
-@Composable
-private fun DanmakuBlockQrContent(
-    qrSize: Dp = 200.dp,
-    showUrl: Boolean = false,
-) {
-    val context = LocalContext.current
-    var url by remember { mutableStateOf<String?>(null) }
-
-    DisposableEffect(Unit) {
-        RemoteConsoleServer.start(context)
-        RemoteConsoleServer.register(DanmakuBlockRemoteFeature.create(context))
-        url = RemoteConsoleServer.getUrl()
-        onDispose {
-            RemoteConsoleServer.unregister(DanmakuBlockRemoteFeature.ID)
-            RemoteConsoleServer.stop()
-        }
-    }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(qrSize + 20.dp)
-                    .clip(MaterialTheme.shapes.large)
-                    .background(Color.White),
-            contentAlignment = Alignment.Center,
-        ) {
-            val qrImage =
-                url?.let {
-                    remember(it) { generateQrImage(it) }
-                }
-            if (qrImage != null) {
-                Image(
-                    modifier = Modifier.size(qrSize),
-                    bitmap = qrImage,
-                    contentDescription = "管理页二维码",
-                )
-            } else {
-                Text(
-                    text = "正在启动服务器…",
-                    color = Color.Black,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-        if (showUrl) {
-            Text(
-                text = url ?: "",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/** 生成二维码图片，失败返回 null。 */
-private fun generateQrImage(content: String): ImageBitmap? =
-    runCatching {
-        val graphics = QRCode(content).render()
-        val bitmap = graphics.nativeImage() as android.graphics.Bitmap
-        bitmap.asImageBitmap()
-    }.getOrNull()
 
 /** 面板内说明文字。 */
 @Composable
@@ -611,7 +470,7 @@ private fun DanmakuBlockAddDialog(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        DanmakuBlockQrContent(qrSize = 150.dp, showUrl = true)
+                        RemoteConsoleQrContent(qrSize = 150.dp, showUrl = true)
                         Text(
                             text = "输入不便？扫码用手机管理\n并导入屏蔽串",
                             style = MaterialTheme.typography.bodySmall,

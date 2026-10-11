@@ -25,7 +25,7 @@ class CookieLoginRemoteFeature
             const val ID = "cookie_login"
 
             /**
-             * @param onSubmit 提交处理（通常为 LoginViewModel.loginWithCookieRemote）。
+             * @param onSubmit 提交处理（应用启动时以 AccountRepositoryImpl.addCookieUser 创建（见 BVApplication））。
              */
             fun create(onSubmit: suspend (String) -> String): CookieLoginRemoteFeature = CookieLoginRemoteFeature(onSubmit)
 

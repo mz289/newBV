@@ -5,9 +5,10 @@ import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -16,12 +17,17 @@ import java.net.URL
  *
  * 验证统一远程控制台的页面按注册功能拼装、动作分发透传 body、
  * 未注册功能/未知动作的明确报错，以及注册注销的标签可见性。
+ *
+ * 服务器固定端口段内启停（生产为常驻），CIO 关闭异步释放端口有延迟，
+ * 类内逐用例快速启停会因端口未释放产生 BindException 未捕获异常并
+ * 污染同 JVM 后续测试——因此整个类只启停一次。
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RemoteConsoleServerTest {
     private lateinit var context: Context
     private lateinit var url: String
 
-    @BeforeEach
+    @BeforeAll
     fun setUp() {
         // 用内联模板替身：验证按注册功能拼装（标记被替换）而非真实 assets 内容
         val template =
@@ -40,7 +46,7 @@ class RemoteConsoleServerTest {
         url = checkNotNull(RemoteConsoleServer.getUrl())
     }
 
-    @AfterEach
+    @AfterAll
     fun tearDown() {
         RemoteConsoleServer.stop()
     }
@@ -109,6 +115,9 @@ class RemoteConsoleServerTest {
 
         assertThat(page).doesNotContain("TEST_PANEL_MARKER")
         assertThat(page).doesNotContain("tab_test_feature")
+
+        // 类内仅注册一次（PER_CLASS），用例后恢复注册避免污染字母序靠后的用例
+        RemoteConsoleServer.register(echoFeature())
     }
 
     @Test

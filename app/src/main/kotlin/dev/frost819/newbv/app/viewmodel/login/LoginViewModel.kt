@@ -208,17 +208,6 @@ class LoginViewModel
         }
 
         /**
-         * Cookie 登录（挂起版，供远程输入服务在收到提交时直接调用）。
-         *
-         * 参考 FongMi/TV 的远程输入模式：手机提交即触发登录并回传结果，
-         * 无需在电视上再次确认。
-         *
-         * @param input Cookie 串或凭证 JSON。
-         * @return 结果消息（成功为「登录成功」，失败为具体原因）。
-         */
-        suspend fun loginWithCookieRemote(input: String): String = submitCookieLogin(input) ?: "登录成功，本页可以关闭了"
-
-        /**
          * 解析并校验 Cookie 后持久化登录。
          *
          * @return 成功返回 null；失败返回要展示的具体原因。

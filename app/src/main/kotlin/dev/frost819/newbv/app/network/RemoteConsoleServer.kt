@@ -42,6 +42,11 @@ import java.util.concurrent.ConcurrentHashMap
  * - `POST|GET /action?do=<功能id>:<动作>` — 动作分发（body 原样透传给处理器）
  */
 object RemoteConsoleServer {
+    /** 优先尝试的固定端口段下界。 */
+    const val PORT_MIN = 8765
+
+    /** 固定端口段上界。 */
+    const val PORT_MAX = 8788
     private val logger = Loggers.get("RemoteConsoleServer")
 
     @Volatile
@@ -49,9 +54,6 @@ object RemoteConsoleServer {
 
     @Volatile
     private var resolvedPort: Int? = null
-
-    @Volatile
-    private var refCount = 0
 
     @Volatile
     private var assetProvider: (String) -> ByteArray? = { null }
@@ -70,13 +72,16 @@ object RemoteConsoleServer {
     }
 
     /**
-     * 启动服务器（随机端口，监听全部网卡），引用计数管理生命周期：
-     * 首个调用者真正启动，最后一个释放者才真正停止。
+     * 启动服务器（常驻）。
+     *
+     * 参考 FongMi/TV：应用启动时调用一次，随进程存活，不随页面启停；
+     * 已在运行时为 no-op。监听全部网卡，端口优先使用固定段
+     * [PORT_MIN]..[PORT_MAX]（地址稳定便于手机保存/重访），全部被占时
+     * 回落随机端口保证可用。
      *
      * @param context 用于读取控制台页模板资源
      */
     fun start(context: Context) {
-        refCount++
         if (server != null) return
         val appContext = context.applicationContext
         assetProvider = { path ->
@@ -84,13 +89,41 @@ object RemoteConsoleServer {
                 appContext.assets.open(path).use { it.readBytes() }
             }.getOrNull()
         }
+        // 固定端口段优先：地址稳定便于手机保存/重访；全被占时回落随机端口保证可用
+        var candidate: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
+        var boundPort = 0
+        for (port in PORT_MIN..PORT_MAX) {
+            candidate =
+                runCatching {
+                    embeddedServer(CIO, port = port) {
+                        routing {
+                            consoleRoute()
+                            actionRoute()
+                        }
+                    }.also { it.start(wait = false) }
+                }.getOrNull()
+            if (candidate != null) {
+                boundPort = port
+                break
+            }
+        }
         server =
-            embeddedServer(CIO, port = 0) {
-                routing {
-                    consoleRoute()
-                    actionRoute()
-                }
-            }.also { it.start(wait = false) }
+            candidate
+                ?: embeddedServer(CIO, port = 0) {
+                    routing {
+                        consoleRoute()
+                        actionRoute()
+                    }
+                }.also { it.start(wait = false) }
+        resolvedPort =
+            runBlocking {
+                server
+                    ?.engine
+                    ?.resolvedConnectors()
+                    ?.firstOrNull()
+                    ?.port
+                    ?.takeIf { it != 0 }
+            } ?: boundPort
         resolvedPort =
             runBlocking {
                 server
@@ -102,10 +135,10 @@ object RemoteConsoleServer {
         logger.info { "RemoteConsoleServer started on port $resolvedPort" }
     }
 
-    /** 停止服务器（引用计数归零时真正停止），全部功能注销。 */
+    /**
+     * 停止服务器（仅测试使用；生产代码服务随进程常驻）。
+     */
     fun stop() {
-        refCount = (refCount - 1).coerceAtLeast(0)
-        if (refCount > 0) return
         features.clear()
         server?.stop(gracePeriodMillis = 0, timeoutMillis = 2000)
         server = null
@@ -195,16 +228,32 @@ ${feature.panelHtml}
             .replace("<!--REMOTE_PANELS-->", panels)
     }
 
-    /** 扫描非回环 IPv4 地址（无线/有线均可），失败返回空串。 */
+    /**
+     * 获取局域网访问 IP（参考 FongMi/TV `Util.getIp()` 的优先级策略）：
+     * wlan 接口 → eth 接口 → 其余非回环 IPv4。
+     * 多网卡设备（存在虚拟网卡时）优先取无线/有线的物理网段地址，
+     * 避免返回手机无法访问的虚拟网卡 IP。失败返回空串。
+     */
     private fun getLocalIpAddress(): String =
         runCatching {
-            NetworkInterface
-                .getNetworkInterfaces()
-                .toList()
-                .filter { it.isUp && !it.isLoopback }
-                .flatMap { it.inetAddresses.toList() }
-                .filterIsInstance<Inet4Address>()
-                .firstOrNull()
-                ?.hostAddress ?: ""
+            val nifs =
+                NetworkInterface
+                    .getNetworkInterfaces()
+                    .toList()
+                    .filter { it.isUp && !it.isLoopback }
+
+            fun ipv4Of(nif: NetworkInterface?): String? =
+                nif?.inetAddresses
+                    ?.toList()
+                    ?.filterIsInstance<Inet4Address>()
+                    ?.firstOrNull { !it.isLoopbackAddress && !it.isLinkLocalAddress }
+                    ?.hostAddress
+
+            // 多网卡设备（存在虚拟网卡时）优先取无线/有线物理网段地址，
+            // 避免返回手机无法访问的虚拟网卡 IP
+            ipv4Of(nifs.firstOrNull { it.name.startsWith("wlan") })
+                ?: ipv4Of(nifs.firstOrNull { it.name.startsWith("eth") })
+                ?: nifs.firstNotNullOfOrNull { ipv4Of(it) }
+                ?: ""
         }.getOrDefault("")
 }

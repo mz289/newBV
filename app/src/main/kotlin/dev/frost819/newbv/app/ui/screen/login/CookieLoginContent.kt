@@ -189,7 +189,6 @@ fun CookieLoginContent(
             }
             CookieRemoteInput(
                 modifier = Modifier.width(240.dp),
-                onLogin = { text -> viewModel.loginWithCookieRemote(text) },
             )
         }
     }

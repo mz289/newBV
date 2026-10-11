@@ -130,6 +130,19 @@ fun MainScreen(
         drawerState = drawerState,
     ) {
         Box(modifier = Modifier) {
+            // 手机远程搜索：常驻控制台提交的关键词，与遥控器搜索走同一链路
+            val searchInputViewModel: dev.frost819.newbv.app.viewmodel.search.SearchInputViewModel =
+                androidx.hilt.navigation.compose.hiltViewModel()
+            LaunchedEffect(Unit) {
+                dev.frost819.newbv.app.network.RemoteSearchEvents.keywords.collect { keyword ->
+                    searchInputViewModel.commitSearch(keyword) {
+                        navController.navigate(
+                            dev.frost819.newbv.app.ui.navigation.SearchResultRoute(keyword = keyword),
+                        )
+                    }
+                }
+            }
+
             CompositionLocalProvider(LocalGridLeftExit provides sidebarFocusRequester) {
                 AnimatedContent(
                     targetState = selectedDrawerItem,
@@ -152,10 +165,7 @@ fun MainScreen(
                                 navController = navController,
                                 focusSaver = focusSaver,
                             )
-                        LeftNaviItem.Search -> {
-                            val searchInputViewModel: dev.frost819.newbv.app.viewmodel.search.SearchInputViewModel =
-                                androidx.hilt.navigation.compose
-                                    .hiltViewModel()
+                        LeftNaviItem.Search ->
                             dev.frost819.newbv.app.ui.screen.search.SearchInputContent(
                                 viewModel = searchInputViewModel,
                                 focusRequester = homeFocusRequester,
@@ -169,7 +179,6 @@ fun MainScreen(
                                     }
                                 },
                             )
-                        }
                         LeftNaviItem.Personal ->
                             dev.frost819.newbv.app.ui.screen.personal.PersonalContent(
                                 navFocusRequester = homeFocusRequester,

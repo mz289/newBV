@@ -11,6 +11,12 @@ import coil3.request.crossfade
 import dagger.hilt.android.HiltAndroidApp
 import dev.frost819.newbv.app.cast.CastReceiverService
 import dev.frost819.newbv.app.data.AccountRepositoryImpl
+import dev.frost819.newbv.app.data.CookieLoginParser
+import dev.frost819.newbv.app.network.CookieLoginRemoteFeature
+import dev.frost819.newbv.app.network.DanmakuBlockRemoteFeature
+import dev.frost819.newbv.app.network.RemoteConsoleServer
+import dev.frost819.newbv.app.network.RemoteSearchEvents
+import dev.frost819.newbv.app.network.SearchRemoteFeature
 import dev.frost819.newbv.app.network.HttpServer
 import dev.frost819.newbv.app.util.CacheManager
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
@@ -94,6 +100,24 @@ class BVApplication : Application() {
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
             accountRepository.syncParseAccountFromPrefs()
         }
+
+        // 统一远程控制台常驻（参考 FongMi/TV：应用启动即启动，随进程存活），
+        // 三个功能标签常驻注册，手机控制台页动态出现对应标签
+        RemoteConsoleServer.start(this)
+        RemoteConsoleServer.register(DanmakuBlockRemoteFeature.create(this))
+        RemoteConsoleServer.register(
+            CookieLoginRemoteFeature.create { input ->
+                val authData =
+                    runCatching { CookieLoginParser.parse(input) }.getOrElse { error ->
+                        throw IllegalArgumentException(error.message ?: "Cookie 解析失败")
+                    }
+                accountRepository.addCookieUser(authData)
+                "登录成功，本页可以关闭了"
+            },
+        )
+        RemoteConsoleServer.register(
+            SearchRemoteFeature.create { keyword -> RemoteSearchEvents.post(keyword) },
+        )
 
         if (!prefs.buvid3FromSpi) {
             CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {

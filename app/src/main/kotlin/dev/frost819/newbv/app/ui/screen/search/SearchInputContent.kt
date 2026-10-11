@@ -30,17 +30,14 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -48,15 +45,12 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import dev.frost819.newbv.app.network.RemoteConsoleServer
-import dev.frost819.newbv.app.network.SearchRemoteFeature
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.focusSaverItem
+import dev.frost819.newbv.app.ui.component.RemoteConsoleQrDialog
 import dev.frost819.newbv.app.ui.component.search.SearchKeyword
 import dev.frost819.newbv.app.ui.component.search.SoftKeyboard
 import dev.frost819.newbv.app.viewmodel.search.SearchInputViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.confirmImeKeyboardOptions
 import dev.frost819.newbv.core.focus.confirmOpenIme
@@ -68,6 +62,8 @@ import dev.frost819.newbv.data.datastore.Prefs
  * 搜索输入页内容。
  *
  * 三列水平布局：搜索框+软键盘 | 热词/建议 | 搜索历史。
+ * 手机远程搜索由常驻的统一远程控制台提供（软键盘区的按钮打开控制台地址
+ * 二维码，提交后经 [dev.frost819.newbv.app.network.RemoteSearchEvents] 回到本页导航）。
  * 组合期间注册统一远程控制台的搜索标签（不在本页显示二维码，
  * 控制台入口见 Cookie 登录页/弹幕屏蔽二维码）。
  * 所有可聚焦元素接入 [FocusSaver]，从搜索结果页返回后恢复焦点。
@@ -85,23 +81,12 @@ fun SearchInputContent(
     onSearch: (String) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
-
-    // 手机远程搜索：注册统一控制台的搜索标签（不显示二维码——
-    // 控制台入口在 Cookie 登录页/弹幕屏蔽二维码，同一控制台页会动态出现本标签）
-    val context = LocalContext.current
-    val latestOnSearch by rememberUpdatedState(onSearch)
-    DisposableEffect(Unit) {
-        RemoteConsoleServer.start(context)
-        RemoteConsoleServer.register(
-            SearchRemoteFeature.create { keyword ->
-                // 服务器协程在 IO 线程，搜索导航需回到主线程
-                withContext(Dispatchers.Main.immediate) { latestOnSearch(keyword) }
-            },
+    var showRemoteQr by remember { mutableStateOf(false) }
+    if (showRemoteQr) {
+        RemoteConsoleQrDialog(
+            title = "手机远程搜索",
+            onDismiss = { showRemoteQr = false },
         )
-        onDispose {
-            RemoteConsoleServer.unregister(SearchRemoteFeature.ID)
-            RemoteConsoleServer.stop()
-        }
     }
 
     Row(
@@ -122,6 +107,7 @@ fun SearchInputContent(
             keyword = uiState.keyword,
             onKeywordChange = { viewModel.updateKeyword(it) },
             onSearch = { onSearch(uiState.keyword) },
+            onRemoteInput = { showRemoteQr = true },
         )
 
         // 列 2：热词或建议
@@ -157,6 +143,7 @@ private fun SearchInputColumn(
     keyword: String,
     onKeywordChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onRemoteInput: () -> Unit,
 ) {
     val confirmIme = rememberConfirmImeBehavior()
     androidx.compose.foundation.layout.Box(
@@ -200,6 +187,7 @@ private fun SearchInputColumn(
                     }
                 },
                 onSearch = onSearch,
+                onRemoteInput = onRemoteInput,
             )
         }
     }

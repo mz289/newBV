@@ -347,23 +347,4 @@ class LoginViewModelTest {
         assertThat(viewModel.cookieUiState.value.success).isFalse()
         assertThat(viewModel.cookieUiState.value.errorMessage).contains("Cookie 已失效")
     }
-
-    @Test
-    fun `loginWithCookieRemote returns success message`() = runTest(testDispatcher) {
-        val result = viewModel.loginWithCookieRemote("SESSDATA=abc; bili_jct=jct; DedeUserID=123")
-
-        assertThat(result).contains("登录成功")
-        assertThat(viewModel.cookieUiState.value.success).isTrue()
-    }
-
-    @Test
-    fun `loginWithCookieRemote returns validation error as result message`() = runTest(testDispatcher) {
-        coEvery { accountRepository.addCookieUser(any()) } throws
-            IllegalArgumentException("Cookie 已失效或无效（SESSDATA 校验未通过），请重新从浏览器复制完整 Cookie")
-
-        val result = viewModel.loginWithCookieRemote("SESSDATA=dead; bili_jct=jct; DedeUserID=123")
-
-        assertThat(result).contains("Cookie 已失效")
-        assertThat(viewModel.cookieUiState.value.success).isFalse()
-    }
 }
