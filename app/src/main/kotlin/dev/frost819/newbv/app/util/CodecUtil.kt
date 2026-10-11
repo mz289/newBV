@@ -68,15 +68,15 @@ data class CodecInfoData(
                 colorFormats = capabilities.colorFormats.toList(),
                 audioBitrateRange =
                     runCatching {
-                        with(capabilities.audioCapabilities.bitrateRange) { lower..upper }
+                        capabilities.audioCapabilities?.bitrateRange?.let { it.lower..it.upper }
                     }.getOrNull(),
                 videoBitrateRange =
                     runCatching {
-                        with(capabilities.videoCapabilities.bitrateRange) { lower..upper }
+                        capabilities.videoCapabilities?.bitrateRange?.let { it.lower..it.upper }
                     }.getOrNull(),
                 videoFrame =
                     runCatching {
-                        with(capabilities.videoCapabilities.supportedFrameRates) { lower..upper }
+                        capabilities.videoCapabilities?.supportedFrameRates?.let { it.lower..it.upper }
                     }.getOrNull(),
                 supportedFrameRates =
                     runCatching {
@@ -185,7 +185,7 @@ private fun MediaCodecInfo.getSupportedFrameRates(): List<SupportedFrameRate> =
     resolutions.map { (width, height) ->
         val frameRates =
             runCatching {
-                val videoCapabilities = getCapabilitiesForType(supportedTypes.first()).videoCapabilities
+                val videoCapabilities = getCapabilitiesForType(supportedTypes.first()).videoCapabilities ?: return@runCatching null
                 videoCapabilities.getSupportedFrameRatesFor(width, height)
             }.getOrNull()
         SupportedFrameRate(
@@ -199,7 +199,7 @@ private fun MediaCodecInfo.getAchievableFrameRates(): List<SupportedFrameRate> =
     resolutions.map { (width, height) ->
         val frameRates =
             runCatching {
-                val videoCapabilities = getCapabilitiesForType(supportedTypes.first()).videoCapabilities
+                val videoCapabilities = getCapabilitiesForType(supportedTypes.first()).videoCapabilities ?: return@runCatching null
                 videoCapabilities.getAchievableFrameRatesFor(width, height)
             }.getOrNull()
         SupportedFrameRate(

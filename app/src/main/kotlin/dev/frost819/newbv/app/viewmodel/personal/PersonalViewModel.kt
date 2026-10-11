@@ -303,7 +303,7 @@ class PersonalViewModel
                         _uiState.update { it.copy(favoriteFolders = folders) }
                         if (folders.isNotEmpty()) {
                             firstFolderId = folders.first().id
-                            _uiState.update { it.copy(currentFolderId = firstFolderId!!) }
+                            _uiState.update { it.copy(currentFolderId = firstFolderId) }
                         }
                     }
                 }.onFailure { error ->
