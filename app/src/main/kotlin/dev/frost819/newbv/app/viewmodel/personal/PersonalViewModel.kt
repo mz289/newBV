@@ -281,7 +281,9 @@ class PersonalViewModel
         /**
          * 加载收藏夹列表。
          *
-         * 加载完成后自动加载第一个收藏夹的视频列表。
+         * 加载完成后自动加载第一个收藏夹的视频列表（在收藏夹请求完成、
+         * loading 标志复位后发起，避免被 [loadFavoriteItems] 的 loading
+         * 卫语句丢弃）。
          */
         fun loadFavoriteFolders() {
             viewModelScope.launch {
@@ -289,6 +291,7 @@ class PersonalViewModel
 
                 _uiState.update { it.copy(favoriteLoading = true, favoriteError = false) }
 
+                var firstFolderId: Long? = null
                 runCatching {
                     withTimeout(LOAD_TIMEOUT_MS) {
                         val mid = Prefs.uid
@@ -299,9 +302,8 @@ class PersonalViewModel
                             )
                         _uiState.update { it.copy(favoriteFolders = folders) }
                         if (folders.isNotEmpty()) {
-                            val firstFolder = folders.first()
-                            _uiState.update { it.copy(currentFolderId = firstFolder.id) }
-                            loadFavoriteItems(firstFolder.id, forceRefresh = true)
+                            firstFolderId = folders.first().id
+                            _uiState.update { it.copy(currentFolderId = firstFolderId!!) }
                         }
                     }
                 }.onFailure { error ->
@@ -311,6 +313,9 @@ class PersonalViewModel
                 }
 
                 _uiState.update { it.copy(favoriteLoading = false) }
+                // loading 复位后再发起首个收藏夹的视频加载，
+                // 否则会被 loadFavoriteItems 的 favoriteLoading 卫语句静默丢弃
+                firstFolderId?.let { loadFavoriteItems(it, forceRefresh = true) }
             }
         }
 
