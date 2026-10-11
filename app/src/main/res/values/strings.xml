@@ -36,7 +36,6 @@
     <string name="user_switch_parse_active">解析账号</string>
     <string name="user_switch_parse_set">设为解析账号</string>
     <string name="user_switch_parse_unset">取消解析账号</string>
-    <string name="user_switch_export">导出凭证</string>
 
     <!-- User Panel -->
     <string name="user_panel_incognito">无痕模式</string>

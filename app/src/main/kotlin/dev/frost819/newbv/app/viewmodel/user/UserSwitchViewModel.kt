@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.AccountRepositoryImpl
-import dev.frost819.newbv.app.data.AuthData
 import dev.frost819.newbv.data.db.entity.UserEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +30,7 @@ data class UserSwitchUiState(
 /**
  * 账号管理 ViewModel。
  *
- * 负责加载已登录的账户列表、切换账户、删除账户、设置双账号解析账号、导出账号凭证。
+ * 负责加载已登录的账户列表、切换账户、删除账户、设置双账号解析账号。
  *
  * @property accountRepository 账户仓库。
  */
@@ -91,17 +90,6 @@ class UserSwitchViewModel
                 updateData()
             }
         }
-
-        /**
-         * 获取指定账号的凭证 JSON（用于导出）。
-         *
-         * @param uid 账号 UID。
-         * @return 凭证 JSON 字符串，用户不存在或凭证无效时为 null。
-         */
-        suspend fun exportAuthJson(uid: Long): String? =
-            accountRepository.findUserByUid(uid)?.let { user ->
-                runCatching { AuthData.fromJson(user.auth).toJson() }.getOrNull()
-            }
 
         /**
          * 删除指定用户。

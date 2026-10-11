@@ -1,7 +1,5 @@
 package dev.frost819.newbv.app.ui.screen.user
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,20 +19,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -58,9 +50,7 @@ import dev.frost819.newbv.app.viewmodel.user.UserSwitchViewModel
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
-import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.db.entity.UserEntity
-import kotlinx.coroutines.launch
 
 /**
  * 账号管理页面。
@@ -70,7 +60,6 @@ import kotlinx.coroutines.launch
  * - 添加新账户（跳转登录页）
  * - 删除账户
  * - 设置/取消双账号解析账号（星标，指定账号仅用于播放地址解析以解锁会员权益）
- * - 导出账号凭证（JSON 文件，用于迁移到其他设备或作为 Cookie 登录备份）
  *
  * 从登录页返回时自动刷新用户列表。
  *
@@ -84,27 +73,8 @@ fun UserSwitchScreen(
     onNavigateLogin: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val focusSaver = rememberFocusSaver()
     focusSaver.RestoreFocus()
-
-    // 待导出凭证的账号 UID（CreateDocument 回调时无法携带数据，暂存于组合状态）
-    var exportUid by remember { mutableStateOf(0L) }
-    val exportLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-            if (uri != null) {
-                scope.launch {
-                    viewModel.exportAuthJson(exportUid)?.let { json ->
-                        runCatching {
-                            context.contentResolver.openOutputStream(uri)?.use { stream ->
-                                stream.write(json.toByteArray())
-                            }
-                        }.onFailure { Loggers.get("UserSwitchScreen").error(it) { "export auth json failed" } }
-                    }
-                }
-            }
-        }
 
     LifecycleResumeEffect(Unit) {
         viewModel.updateData()
@@ -175,10 +145,6 @@ fun UserSwitchScreen(
                             isParseAccount = user.uid == uiState.parseUid,
                             onClick = { viewModel.switchUser(user) },
                             onToggleParse = { viewModel.toggleParseAccount(user.uid) },
-                            onExport = {
-                                exportUid = user.uid
-                                exportLauncher.launch("newbv-auth-${user.uid}.json")
-                            },
                             onDelete = { viewModel.deleteUser(user) },
                             modifier = Modifier.focusSaverItem(focusSaver, "user_${user.uid}"),
                         )
@@ -198,14 +164,13 @@ fun UserSwitchScreen(
 /**
  * 用户列表项。
  *
- * 头像 + 用户名 + 当前用户/解析账号标识 + 解析账号切换 + 导出凭证 + 删除按钮。
+ * 头像 + 用户名 + 当前用户/解析账号标识 + 解析账号切换 + 删除按钮。
  *
  * @param user 用户数据。
  * @param isCurrentUser 是否为当前登录用户。
  * @param isParseAccount 是否为解析账号。
  * @param onClick 点击切换用户回调。
  * @param onToggleParse 设置/取消解析账号回调。
- * @param onExport 导出凭证回调。
  * @param onDelete 删除用户回调。
  */
 @Composable
@@ -215,7 +180,6 @@ private fun UserListItem(
     isParseAccount: Boolean,
     onClick: () -> Unit,
     onToggleParse: () -> Unit,
-    onExport: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -340,24 +304,6 @@ private fun UserListItem(
         }
 
         IconButton(
-            onClick = onExport,
-            modifier = Modifier.touchClickable(onClick = onExport),
-            shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
-            scale = IconButtonDefaults.scale(focusedScale = 1f),
-            colors =
-                ControlFocusDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            border = ControlFocusDefaults.buttonBorder(),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.FileDownload,
-                contentDescription = stringResource(R.string.user_switch_export),
-            )
-        }
-
-        IconButton(
             onClick = onDelete,
             modifier = Modifier.touchClickable(onClick = onDelete),
             shape = IconButtonDefaults.shape(shape = ControlFocusDefaults.shape),
@@ -424,7 +370,6 @@ private fun UserListItemPreview() {
             isParseAccount = false,
             onClick = {},
             onToggleParse = {},
-            onExport = {},
             onDelete = {},
         )
     }
