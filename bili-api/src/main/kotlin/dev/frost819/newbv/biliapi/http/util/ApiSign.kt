@@ -134,11 +134,13 @@ fun HttpRequestBuilder.encAppGet() {
 
 suspend fun HttpRequestBuilder.encWbi() {
     if (BiliHttpApi.wbiImgKey == null || BiliHttpApi.wbiSubKey == null) BiliHttpApi.updateWbi()
-    val mixinKey =
-        getMixinKey(
-            requireNotNull(BiliHttpApi.wbiImgKey) { "wbiImgKey can't be null!" } +
-                requireNotNull(BiliHttpApi.wbiSubKey) { "wbiSubKey can't be null!" },
-        )
+    val imgKey =
+        BiliHttpApi.wbiImgKey
+            ?: throw IllegalStateException("WBI 密钥获取失败（nav 接口异常），请检查网络后重试")
+    val subKey =
+        BiliHttpApi.wbiSubKey
+            ?: throw IllegalStateException("WBI 密钥获取失败（nav 接口异常），请检查网络后重试")
+    val mixinKey = getMixinKey(imgKey + subKey)
 
     val wts = (System.currentTimeMillis() / 1000).toInt()
     parameter("wts", wts)

@@ -7,6 +7,8 @@ import dev.frost819.newbv.biliapi.entity.SpiResult
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
 import dev.frost819.newbv.biliapi.http.entity.BiliResponse
 import dev.frost819.newbv.biliapi.http.entity.BiliResponseWithoutData
+import dev.frost819.newbv.biliapi.util.BiliLogger
+import kotlinx.coroutines.CancellationException
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
 import dev.frost819.newbv.biliapi.http.entity.dynamic.DynamicData
 import dev.frost819.newbv.biliapi.http.entity.history.HistoryData
@@ -1730,6 +1732,9 @@ object BiliHttpApi {
 
     /**
      * 更新 wbi keys
+     *
+     * nav 接口失败（网络异常/风控 -352/未返回数据）时密钥保持 null，
+     * 失败原因记录日志——密钥缺失会使所有 WBI 签名请求失败，必须可诊断。
      */
     suspend fun updateWbi() {
         val now = System.currentTimeMillis()
@@ -1741,10 +1746,16 @@ object BiliHttpApi {
         if (!needToUpdate) return
 
         runCatching {
-            val wbiData = getWebInterfaceNav().data!!.wbiImg
-            wbiImgKey = wbiData.getImgKey()
-            wbiSubKey = wbiData.getSubKey()
+            val nav = getWebInterfaceNav()
+            val wbiImg =
+                nav.data?.wbiImg
+                    ?: throw IllegalStateException("nav 未返回数据（code=${nav.code}, message=${nav.message}）")
+            wbiImgKey = wbiImg.getImgKey()
+            wbiSubKey = wbiImg.getSubKey()
             wbiLastRefreshDate = now
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            BiliLogger.error(error) { "Update wbi keys failed" }
         }
     }
 
