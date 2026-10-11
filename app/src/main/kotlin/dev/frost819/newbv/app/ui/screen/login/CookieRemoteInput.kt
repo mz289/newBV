@@ -72,7 +72,14 @@ internal fun CookieRemoteInput(
             text = stringResource(R.string.login_cookie_remote_title),
             style = MaterialTheme.typography.titleMedium,
         )
-        url?.let { QrCodeImage(url = it, modifier = Modifier.size(220.dp)) }
+        url?.let {
+            QrCodeImage(url = it, modifier = Modifier.size(220.dp))
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             text =
                 stringResource(

@@ -187,7 +187,7 @@ fun DanmakuBlockPanel(
  */
 @Composable
 private fun DanmakuBlockQrDialog(onDismiss: () -> Unit) {
-    var showUrlText by remember { mutableStateOf(false) }
+    var showUrlText by remember { mutableStateOf(true) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -611,7 +611,7 @@ private fun DanmakuBlockAddDialog(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        DanmakuBlockQrContent(qrSize = 150.dp)
+                        DanmakuBlockQrContent(qrSize = 150.dp, showUrl = true)
                         Text(
                             text = "输入不便？扫码用手机管理\n并导入屏蔽串",
                             style = MaterialTheme.typography.bodySmall,
