@@ -70,6 +70,27 @@ class UpdateWbiTest {
         }
 
     @Test
+    fun `nav data parses logged-in payload with fractional money`() {
+        // 回归：登录用户的 nav 返回 money 为小数（如 2880.1），
+        // 实体不得声明 Int 字段，否则整个 nav 解析失败导致 WBI 密钥拿不到
+        val json =
+            kotlinx.serialization.json.Json {
+                ignoreUnknownKeys = true
+                coerceInputValues = true
+            }
+        val data =
+            json.decodeFromString(
+                NavResponseData.serializer(),
+                """{"isLogin":true,"mid":3706973981772485,"uname":"u","face":"","vipStatus":2,"vipType":2,"money":2880.1,"wbi_img":{"img_url":"https://i.hdslb.com/k1.png","sub_url":"https://i.hdslb.com/k2.png"}}""",
+            )
+
+        assertThat(data.isLogin).isTrue()
+        assertThat(data.mid).isEqualTo(3706973981772485L)
+        assertThat(data.vipStatus).isEqualTo(2)
+        assertThat(data.wbiImg.getImgKey()).isEqualTo("k1")
+    }
+
+    @Test
     fun `updateWbi keeps keys null when nav request throws`() =
         runTest {
             coEvery { BiliHttpApi.getWebInterfaceNav(any()) } throws java.io.IOException("offline")

@@ -21,7 +21,6 @@ data class NavResponseData(
     val vipStatus: Int = 0,
     /** 会员类型：0 无、1 月度、2 年度。 */
     val vipType: Int = 0,
-    val money: Int = 0,
 ) {
     @Serializable
     data class WbiImg(
