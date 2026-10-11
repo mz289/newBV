@@ -344,8 +344,8 @@ object Prefs {
         },
     )
 
-    /** 默认弹幕大小。 */
-    var defaultDanmakuScale by pref(PrefKeys.defaultDanmakuScale, 1.75f)
+    /** 默认弹幕大小（100%）。 */
+    var defaultDanmakuScale by pref(PrefKeys.defaultDanmakuScale, 1.0f)
 
     /** 默认弹幕透明度。 */
     var defaultDanmakuOpacity by pref(PrefKeys.defaultDanmakuOpacity, 0.7f)
