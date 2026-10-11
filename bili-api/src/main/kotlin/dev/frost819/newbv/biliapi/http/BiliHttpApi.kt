@@ -1716,9 +1716,17 @@ object BiliHttpApi {
     /**
      * 获取导航栏用户信息
      *
-     * 内含 wbi keys
+     * 内含 wbi keys 与当前登录账号的 mid、昵称、会员状态。
+     *
+     * @param cookieOverride 覆写 Cookie 头（Cookie 登录校验：以待验证凭证请求），
+     * 非空时 injectCookies 拦截器不再注入全局登录 Cookie。
      */
-    suspend fun getWebInterfaceNav(): BiliResponse<NavResponseData> = client.get("/x/web-interface/nav").body()
+    suspend fun getWebInterfaceNav(cookieOverride: String? = null): BiliResponse<NavResponseData> =
+        client.get("/x/web-interface/nav") {
+            if (cookieOverride != null) {
+                header("Cookie", cookieOverride)
+            }
+        }.body()
 
     /**
      * 更新 wbi keys

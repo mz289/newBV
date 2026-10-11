@@ -7,9 +7,11 @@ import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
 import dev.frost819.newbv.biliapi.repositories.ChannelRepository
 import dev.frost819.newbv.biliapi.repositories.ParseAccountRepository
+import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.db.dao.UserDao
 import dev.frost819.newbv.data.db.entity.UserEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +49,7 @@ class AccountRepositoryImpl
         private val _uiState = MutableStateFlow(AccountUiState())
         val uiState: StateFlow<AccountUiState> = _uiState.asStateFlow()
         private var accountGeneration = 0L
+        private val logger = Loggers.get("AccountRepository")
 
         init {
             initFromPrefs()
@@ -256,6 +259,50 @@ class AccountRepositoryImpl
                 )
             }
             refreshUserInfo()
+        }
+
+        /**
+         * 添加 Cookie 登录账号（入库前服务端校验）。
+         *
+         * Cookie 凭证完全来自用户粘贴，可能已失效或被改动；而 playurl 等接口对无效
+         * SESSDATA 不报错、静默按游客降级，入库后无法察觉。因此入库前先以待验证
+         * Cookie 请求 nav 接口确认登录态：
+         * - 未登录（-101/isLogin=false）或校验失败：抛 [IllegalArgumentException] 拒绝入库；
+         * - 校验通过：以服务端返回的 mid 为准（粘贴的 DedeUserID 可能被改动），
+         *   用户名、头像由 [addUser] 内的 [refreshUserInfo] 拉取。
+         *
+         * @param authData Cookie 解析出的凭证。
+         * @return 实际入库的凭证（uid 已修正为服务端 mid）。
+         * @throws IllegalArgumentException Cookie 已失效、校验未通过或网络异常。
+         */
+        suspend fun addCookieUser(authData: AuthData): AuthData {
+            val nav =
+                runCatching {
+                    withTimeout(LOAD_TIMEOUT_MS) {
+                        BiliHttpApi.getWebInterfaceNav(
+                            cookieOverride = "SESSDATA=${authData.sessData}; DedeUserID=${authData.uid}",
+                        )
+                    }
+                }.getOrElse { error ->
+                    if (error is CancellationException) throw error
+                    throw IllegalArgumentException("Cookie 校验失败：网络异常，请检查网络后重试", error)
+                }
+            val navData = nav.data
+            if (nav.code != 0 || navData == null || !navData.isLogin || navData.mid <= 0L) {
+                throw IllegalArgumentException(
+                    if (nav.code == -101) {
+                        "Cookie 已失效或无效（SESSDATA 校验未通过），请重新从浏览器复制完整 Cookie"
+                    } else {
+                        "Cookie 校验失败：${nav.message}（code=${nav.code}）"
+                    },
+                )
+            }
+            logger.info {
+                "cookie account validated: uid=${navData.mid}, uname=${navData.uname}, vip=${navData.vipStatus > 0}"
+            }
+            val validated = authData.copy(uid = navData.mid)
+            addUser(validated)
+            return validated
         }
 
         /**

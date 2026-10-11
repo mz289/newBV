@@ -8,6 +8,7 @@ import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.BiliResponse
 import dev.frost819.newbv.biliapi.http.entity.user.LevelInfo
 import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
+import dev.frost819.newbv.biliapi.http.entity.web.NavResponseData
 import dev.frost819.newbv.biliapi.repositories.AuthRepository
 import dev.frost819.newbv.biliapi.repositories.ChannelRepository
 import dev.frost819.newbv.biliapi.repositories.ParseAccountRepository
@@ -662,4 +663,82 @@ class AccountRepositoryImplTest {
         repository.toggleIncognitoMode()
         assertThat(Prefs.incognitoMode).isEqualTo(initial)
     }
+
+    // ===== addCookieUser（Cookie 登录入库前校验） =====
+
+    /** 构造 Cookie 登录解析出的凭证（uid 来自粘贴的 DedeUserID，可能与服务端不符）。 */
+    private fun cookieAuthData(uid: Long = 100L) =
+        AuthData(
+            uid = uid,
+            uidCkMd5 = "md5",
+            sid = "sid",
+            biliJct = "jct",
+            sessData = "sess",
+            tokenExpiredDate = 0L,
+        )
+
+    private fun fakeWbiImg() = NavResponseData.WbiImg("https://i.hdslb.com/img.png", "https://i.hdslb.com/sub.png")
+
+    @Test
+    fun `addCookieUser rejects invalid cookie and does not persist`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebInterfaceNav(any()) } returns
+                BiliResponse(
+                    code = -101,
+                    message = "账号未登录",
+                    data = NavResponseData(isLogin = false, wbiImg = fakeWbiImg()),
+                )
+
+            val error =
+                runCatching {
+                    repository.addCookieUser(cookieAuthData())
+                }.exceptionOrNull()
+
+            assertThat(error).isInstanceOf(IllegalArgumentException::class.java)
+            assertThat(error!!.message).contains("Cookie 已失效")
+            coVerify(exactly = 0) { userDao.insert(any()) }
+            assertThat(repository.isLogin()).isFalse()
+        }
+
+    @Test
+    fun `addCookieUser validates via nav and adopts server mid`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebInterfaceNav(any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "OK",
+                    data =
+                        NavResponseData(
+                            isLogin = true,
+                            wbiImg = fakeWbiImg(),
+                            mid = 999L,
+                            uname = "vipuser",
+                            vipStatus = 2,
+                        ),
+                )
+            coEvery { userDao.findUserByUid(999L) } returns null
+
+            val validated = repository.addCookieUser(cookieAuthData(uid = 100L))
+
+            assertThat(validated.uid).isEqualTo(999L)
+            coVerify { userDao.insert(any()) }
+            assertThat(repository.isLogin()).isTrue()
+            assertThat(repository.currentUid()).isEqualTo(999L)
+            assertThat(repository.uiState.value.uid).isEqualTo(999L)
+        }
+
+    @Test
+    fun `addCookieUser fails with friendly message when nav request throws`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebInterfaceNav(any()) } throws java.io.IOException("offline")
+
+            val error =
+                runCatching {
+                    repository.addCookieUser(cookieAuthData())
+                }.exceptionOrNull()
+
+            assertThat(error).isInstanceOf(IllegalArgumentException::class.java)
+            assertThat(error!!.message).contains("网络异常")
+            assertThat(repository.isLogin()).isFalse()
+        }
 }

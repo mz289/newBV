@@ -19,6 +19,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -324,4 +325,26 @@ class LoginViewModelTest {
             assertThat(viewModel.uiState.value.state).isAtLeast(QrLoginState.RequestingQRCode)
             viewModel.cancelPolling()
         }
+
+    @Test
+    fun `loginWithCookie validates via addCookieUser before persisting`() = runTest(testDispatcher) {
+        viewModel.loginWithCookie("SESSDATA=abc; bili_jct=jct; DedeUserID=123")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { accountRepository.addCookieUser(any()) }
+        coVerify(exactly = 0) { accountRepository.addUser(any()) }
+        assertThat(viewModel.cookieUiState.value.success).isTrue()
+    }
+
+    @Test
+    fun `loginWithCookie surfaces validation error message`() = runTest(testDispatcher) {
+        coEvery { accountRepository.addCookieUser(any()) } throws
+            IllegalArgumentException("Cookie 已失效或无效（SESSDATA 校验未通过），请重新从浏览器复制完整 Cookie")
+
+        viewModel.loginWithCookie("SESSDATA=dead; bili_jct=jct; DedeUserID=123")
+        advanceUntilIdle()
+
+        assertThat(viewModel.cookieUiState.value.success).isFalse()
+        assertThat(viewModel.cookieUiState.value.errorMessage).contains("Cookie 已失效")
+    }
 }

@@ -197,7 +197,8 @@ class LoginViewModel
          * Cookie 登录。
          *
          * 解析输入（浏览器 Cookie 串 / 凭证 JSON，见 [CookieLoginParser]）后
-         * 调用 [AccountRepositoryImpl.addUser] 持久化并登录。
+         * 调用 [AccountRepositoryImpl.addCookieUser]：先以待验证 Cookie 请求 nav
+         * 接口确认登录态（失效 Cookie 拒绝入库并提示），再持久化并登录。
          * Cookie 登录无 access_token，仅 Web 通道可用（不影响播放解析账号用途）。
          *
          * @param input Cookie 串或凭证 JSON。
@@ -208,7 +209,7 @@ class LoginViewModel
             viewModelScope.launch {
                 runCatching { CookieLoginParser.parse(input) }
                     .mapCatching { authData ->
-                        accountRepository.addUser(authData)
+                        accountRepository.addCookieUser(authData)
                     }.fold(
                         onSuccess = {
                             logger.info { "cookie login success" }
