@@ -54,7 +54,6 @@ import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.search.SearchKeyword
 import dev.frost819.newbv.app.ui.component.search.SoftKeyboard
-import dev.frost819.newbv.app.ui.screen.login.QrCodeImage
 import dev.frost819.newbv.app.viewmodel.search.SearchInputViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -69,6 +68,8 @@ import dev.frost819.newbv.data.datastore.Prefs
  * 搜索输入页内容。
  *
  * 三列水平布局：搜索框+软键盘 | 热词/建议 | 搜索历史。
+ * 组合期间注册统一远程控制台的搜索标签（不在本页显示二维码，
+ * 控制台入口见 Cookie 登录页/弹幕屏蔽二维码）。
  * 所有可聚焦元素接入 [FocusSaver]，从搜索结果页返回后恢复焦点。
  *
  * @param focusRequester 内容区入口焦点请求器（由 MainScreen 传入）。
@@ -84,6 +85,24 @@ fun SearchInputContent(
     onSearch: (String) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // 手机远程搜索：注册统一控制台的搜索标签（不显示二维码——
+    // 控制台入口在 Cookie 登录页/弹幕屏蔽二维码，同一控制台页会动态出现本标签）
+    val context = LocalContext.current
+    val latestOnSearch by rememberUpdatedState(onSearch)
+    DisposableEffect(Unit) {
+        RemoteConsoleServer.start(context)
+        RemoteConsoleServer.register(
+            SearchRemoteFeature.create { keyword ->
+                // 服务器协程在 IO 线程，搜索导航需回到主线程
+                withContext(Dispatchers.Main.immediate) { latestOnSearch(keyword) }
+            },
+        )
+        onDispose {
+            RemoteConsoleServer.unregister(SearchRemoteFeature.ID)
+            RemoteConsoleServer.stop()
+        }
+    }
 
     Row(
         modifier =
@@ -127,69 +146,6 @@ fun SearchInputContent(
             onDelete = { viewModel.deleteHistory(it) },
             onDeleteAll = { viewModel.clearAllHistories() },
             focusSaver = focusSaver,
-        )
-
-        // 列 4：手机远程输入（扫码后在手机上输入关键词，电视端立即搜索）
-        SearchRemoteColumn(onSearch = onSearch)
-    }
-}
-
-/**
- * 列 4：手机远程输入（参考 FongMi/TV：手机提交关键词，电视端立即搜索）。
- *
- * 组合期间注册统一远程控制台的搜索标签并显示控制台地址二维码；
- * 手机提交关键词后经 [onSearch] 走与遥控器一致的搜索链路
- * （记录历史并跳转结果页）。离开搜索页时注销标签并停止服务。
- */
-@Composable
-private fun SearchRemoteColumn(
-    onSearch: (String) -> Unit,
-) {
-    val context = LocalContext.current
-    val latestOnSearch by rememberUpdatedState(onSearch)
-    var url by remember { mutableStateOf<String?>(null) }
-
-    DisposableEffect(Unit) {
-        RemoteConsoleServer.start(context)
-        RemoteConsoleServer.register(
-            SearchRemoteFeature.create { keyword ->
-                // 服务器协程在 IO 线程，搜索导航需回到主线程
-                withContext(Dispatchers.Main.immediate) { latestOnSearch(keyword) }
-            },
-        )
-        url = RemoteConsoleServer.getUrl()
-        onDispose {
-            RemoteConsoleServer.unregister(SearchRemoteFeature.ID)
-            RemoteConsoleServer.stop()
-        }
-    }
-
-    Column(
-        modifier =
-            Modifier
-                .width(180.dp)
-                .fillMaxHeight()
-                .focusGroup(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = "手机远程输入",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        url?.let {
-            QrCodeImage(url = it, modifier = Modifier.size(150.dp))
-            Text(
-                text = it,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Text(
-            text = "手机扫码后输入关键词，提交即在电视上搜索",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 8.dp),
         )
     }
 }
