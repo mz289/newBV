@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -29,14 +30,17 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -44,11 +48,16 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import dev.frost819.newbv.app.network.RemoteConsoleServer
+import dev.frost819.newbv.app.network.SearchRemoteFeature
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.search.SearchKeyword
 import dev.frost819.newbv.app.ui.component.search.SoftKeyboard
+import dev.frost819.newbv.app.ui.screen.login.QrCodeImage
 import dev.frost819.newbv.app.viewmodel.search.SearchInputViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.confirmImeKeyboardOptions
 import dev.frost819.newbv.core.focus.confirmOpenIme
@@ -118,6 +127,69 @@ fun SearchInputContent(
             onDelete = { viewModel.deleteHistory(it) },
             onDeleteAll = { viewModel.clearAllHistories() },
             focusSaver = focusSaver,
+        )
+
+        // 列 4：手机远程输入（扫码后在手机上输入关键词，电视端立即搜索）
+        SearchRemoteColumn(onSearch = onSearch)
+    }
+}
+
+/**
+ * 列 4：手机远程输入（参考 FongMi/TV：手机提交关键词，电视端立即搜索）。
+ *
+ * 组合期间注册统一远程控制台的搜索标签并显示控制台地址二维码；
+ * 手机提交关键词后经 [onSearch] 走与遥控器一致的搜索链路
+ * （记录历史并跳转结果页）。离开搜索页时注销标签并停止服务。
+ */
+@Composable
+private fun SearchRemoteColumn(
+    onSearch: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val latestOnSearch by rememberUpdatedState(onSearch)
+    var url by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(Unit) {
+        RemoteConsoleServer.start(context)
+        RemoteConsoleServer.register(
+            SearchRemoteFeature.create { keyword ->
+                // 服务器协程在 IO 线程，搜索导航需回到主线程
+                withContext(Dispatchers.Main.immediate) { latestOnSearch(keyword) }
+            },
+        )
+        url = RemoteConsoleServer.getUrl()
+        onDispose {
+            RemoteConsoleServer.unregister(SearchRemoteFeature.ID)
+            RemoteConsoleServer.stop()
+        }
+    }
+
+    Column(
+        modifier =
+            Modifier
+                .width(180.dp)
+                .fillMaxHeight()
+                .focusGroup(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = "手机远程输入",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        url?.let {
+            QrCodeImage(url = it, modifier = Modifier.size(150.dp))
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = "手机扫码后输入关键词，提交即在电视上搜索",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 8.dp),
         )
     }
 }
