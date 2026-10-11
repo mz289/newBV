@@ -1,9 +1,7 @@
 package dev.frost819.newbv.data.di
 
 import android.content.Context
-import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import androidx.datastore.preferences.core.Preferences
 import androidx.room.Room
 import dagger.Module
 import dagger.Provides
@@ -13,6 +11,7 @@ import dagger.hilt.components.SingletonComponent
 import dev.frost819.newbv.data.db.AppDatabase
 import dev.frost819.newbv.data.db.dao.SearchHistoryDao
 import dev.frost819.newbv.data.db.dao.UserDao
+import dev.frost819.newbv.data.datastore.Prefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +20,7 @@ import javax.inject.Singleton
 /**
  * 数据层 Hilt 模块。
  *
- * 提供 Room 数据库、DAO、DataStore 的单例绑定。
+ * 提供 Room 数据库、DAO、Prefs（含其内部 DataStore）的单例绑定。
  * 所有绑定注册到 [SingletonComponent]，全应用生命周期共享。
  */
 @Module
@@ -51,18 +50,28 @@ object DatabaseModule {
     fun provideUserDao(database: AppDatabase): UserDao = database.userDao()
 
     /**
-     * 提供 DataStore 单例。
+     * 提供 [Prefs] 单例（进程级全局对象）。
      *
-     * 使用 [PreferenceDataStoreFactory] 创建，持久化文件名为 `Settings.preferences_pb`。
+     * Prefs 的初始化（[Prefs.init]，阻塞读取 DataStore 首帧）在此完成：
+     * DataStore 是 Prefs 的实现细节，由本方法内部创建，不单独暴露。
+     * 这样"初始化先于任何读取"由依赖图结构保证——任何注入 [Prefs]
+     * 或传递依赖它的组件，构造时磁盘数据必然已加载，
+     * 不再依赖 Application.onCreate 中的手工调用顺序。
+     *
+     * DataStore 持久化文件为 `datastore/Settings.preferences_pb`，
      * 协程作用域使用 IO 调度器 + SupervisorJob。
      */
     @Provides
     @Singleton
-    fun provideDataStore(
+    fun providePrefs(
         @ApplicationContext context: Context,
-    ): DataStore<Preferences> =
-        PreferenceDataStoreFactory.create(
-            scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-            produceFile = { java.io.File(context.filesDir, "datastore/Settings.preferences_pb") },
-        )
+    ): Prefs {
+        val dataStore =
+            PreferenceDataStoreFactory.create(
+                scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
+                produceFile = { java.io.File(context.filesDir, "datastore/Settings.preferences_pb") },
+            )
+        Prefs.init(dataStore)
+        return Prefs
+    }
 }

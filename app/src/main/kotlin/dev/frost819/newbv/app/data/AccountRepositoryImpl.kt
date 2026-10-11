@@ -28,6 +28,8 @@ import javax.inject.Singleton
  *
  * 通过 [uiState] 暴露当前登录状态给 UI 层观察。
  *
+ * @property prefs 偏好设置。依赖图保证构造时已完成磁盘加载初始化
+ * （`DatabaseModule.providePrefs`），构造期 [initFromPrefs] 读到的是真实登录态。
  * @property userDao Room DAO。
  * @property authRepository bili-api 鉴权状态。
  */
@@ -35,6 +37,7 @@ import javax.inject.Singleton
 class AccountRepositoryImpl
     @Inject
     constructor(
+        private val prefs: Prefs,
         private val userDao: UserDao,
         private val authRepository: AuthRepository,
         private val channelRepository: ChannelRepository,
@@ -56,17 +59,17 @@ class AccountRepositoryImpl
          * 将 Prefs 中已有的凭证同步到 [AuthRepository] 和 [uiState]。
          */
         private fun initFromPrefs() {
-            if (Prefs.isLogin) {
+            if (prefs.isLogin) {
                 syncToAuthRepository(
-                    uid = Prefs.uid,
-                    sessData = Prefs.sessData,
-                    biliJct = Prefs.biliJct,
-                    accessToken = Prefs.accessToken,
+                    uid = prefs.uid,
+                    sessData = prefs.sessData,
+                    biliJct = prefs.biliJct,
+                    accessToken = prefs.accessToken,
                 )
                 _uiState.update {
                     it.copy(
                         isLogin = true,
-                        uid = Prefs.uid,
+                        uid = prefs.uid,
                         username = "",
                         avatar = "",
                     )
@@ -95,15 +98,15 @@ class AccountRepositoryImpl
             authRepository.sessionData = sessData
             authRepository.biliJct = biliJct
             authRepository.accessToken = accessToken
-            authRepository.buvid3 = Prefs.buvid3
-            authRepository.buvid = Prefs.buvid
+            authRepository.buvid3 = prefs.buvid3
+            authRepository.buvid = prefs.buvid
 
             BiliHttpApi.sessData = sessData
             BiliHttpApi.biliJct = biliJct
             BiliHttpApi.mid = uid
             BiliHttpApi.accessToken = accessToken
-            if (accessToken.isNotBlank() && Prefs.buvid.isNotBlank()) {
-                channelRepository.initDefaultChannel(accessToken, Prefs.buvid)
+            if (accessToken.isNotBlank() && prefs.buvid.isNotBlank()) {
+                channelRepository.initDefaultChannel(accessToken, prefs.buvid)
             } else {
                 channelRepository.close()
             }
@@ -114,7 +117,7 @@ class AccountRepositoryImpl
         suspend fun findUserByUid(uid: Long): UserEntity? = userDao.findUserByUid(uid)
 
         /** 当前解析账号 UID（0 = 关闭）。 */
-        fun parseAccountUid(): Long = Prefs.parseAccountUid
+        fun parseAccountUid(): Long = prefs.parseAccountUid
 
         /**
          * 设置双账号解析账号。
@@ -124,7 +127,7 @@ class AccountRepositoryImpl
          * @param uid 解析账号 UID，0 表示关闭。
          */
         suspend fun setParseAccount(uid: Long) {
-            Prefs.parseAccountUid = uid
+            prefs.parseAccountUid = uid
             syncParseAccount(uid)
         }
 
@@ -134,7 +137,7 @@ class AccountRepositoryImpl
          * 在应用启动时调用（播放解析可能早于任何账号操作）。
          */
         suspend fun syncParseAccountFromPrefs() {
-            syncParseAccount(Prefs.parseAccountUid)
+            syncParseAccount(prefs.parseAccountUid)
         }
 
         /**
@@ -155,7 +158,7 @@ class AccountRepositoryImpl
                 parseAccountRepository.update(authData.uid, authData.sessData, authData.biliJct)
             } else {
                 parseAccountRepository.clear()
-                Prefs.parseAccountUid = 0L
+                prefs.parseAccountUid = 0L
             }
         }
 
@@ -171,14 +174,14 @@ class AccountRepositoryImpl
 
         suspend fun deleteUser(user: UserEntity) {
             userDao.delete(user)
-            if (Prefs.parseAccountUid == user.uid) {
+            if (prefs.parseAccountUid == user.uid) {
                 setParseAccount(0L)
             }
         }
 
-        fun isLogin(): Boolean = Prefs.isLogin
+        fun isLogin(): Boolean = prefs.isLogin
 
-        fun currentUid(): Long = Prefs.uid
+        fun currentUid(): Long = prefs.uid
 
         /**
          * 设置当前登录用户。
@@ -261,20 +264,20 @@ class AccountRepositoryImpl
          * 调用 BiliHttpApi 获取用户自身信息，更新 Room 和 [uiState]。
          */
         suspend fun refreshUserInfo() {
-            if (!Prefs.isLogin) return
-            val uid = Prefs.uid
+            if (!prefs.isLogin) return
+            val uid = prefs.uid
             val generation = accountGeneration
             runCatching {
                 val response: MyInfoData =
                     withTimeout(LOAD_TIMEOUT_MS) { BiliHttpApi.getUserSelfInfo().getResponseData() }
-                if (generation != accountGeneration || !Prefs.isLogin || Prefs.uid != uid) return
+                if (generation != accountGeneration || !prefs.isLogin || prefs.uid != uid) return
                 val user = userDao.findUserByUid(uid) ?: return
                 if (generation != accountGeneration) return
                 user.username = response.name
                 user.avatar = response.face
                 userDao.update(user)
                 _uiState.update {
-                    if (generation != accountGeneration || !Prefs.isLogin || Prefs.uid != uid) {
+                    if (generation != accountGeneration || !prefs.isLogin || prefs.uid != uid) {
                         it
                     } else {
                         it.copy(
@@ -294,12 +297,12 @@ class AccountRepositoryImpl
          * 从 Room 加载当前用户的用户名和头像（不请求网络）。
          */
         suspend fun reloadAvatar() {
-            if (!Prefs.isLogin) return
-            val uid = Prefs.uid
+            if (!prefs.isLogin) return
+            val uid = prefs.uid
             val generation = accountGeneration
             val user = userDao.findUserByUid(uid) ?: return
             _uiState.update {
-                if (generation != accountGeneration || !Prefs.isLogin || Prefs.uid != uid) {
+                if (generation != accountGeneration || !prefs.isLogin || prefs.uid != uid) {
                     it
                 } else {
                     it.copy(
@@ -312,11 +315,11 @@ class AccountRepositoryImpl
 
         suspend fun logout() {
             accountGeneration++
-            val user = userDao.findUserByUid(Prefs.uid)
+            val user = userDao.findUserByUid(prefs.uid)
             if (user != null) {
                 userDao.delete(user)
             }
-            Prefs.apply {
+            prefs.apply {
                 isLogin = false
                 uid = 0L
                 sid = ""
@@ -346,10 +349,10 @@ class AccountRepositoryImpl
         /**
          * 切换无痕模式。
          *
-         * 状态只存于 [Prefs]（UI 经 [Prefs.incognitoModeFlow] 观察），不进入 [AccountUiState]。
+         * 状态只存于 [Prefs]（UI 经 [prefs.incognitoModeFlow] 观察），不进入 [AccountUiState]。
          */
         fun toggleIncognitoMode() {
-            Prefs.incognitoMode = !Prefs.incognitoMode
+            prefs.incognitoMode = !prefs.incognitoMode
         }
     }
 

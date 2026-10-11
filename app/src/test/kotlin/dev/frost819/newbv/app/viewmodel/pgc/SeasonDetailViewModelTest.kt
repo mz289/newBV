@@ -6,6 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.app.data.VideoInfoRepository
 import dev.frost819.newbv.app.data.VideoSharedState
 import dev.frost819.newbv.app.entity.player.VideoListItem
+import dev.frost819.newbv.app.testutil.InMemoryPreferencesDataStore
 import dev.frost819.newbv.biliapi.entity.video.Dimension
 import dev.frost819.newbv.biliapi.entity.video.season.Episode
 import dev.frost819.newbv.biliapi.entity.video.season.PgcSeason
@@ -13,6 +14,7 @@ import dev.frost819.newbv.biliapi.entity.video.season.SeasonDetail
 import dev.frost819.newbv.biliapi.entity.video.season.Section
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.biliapi.repositories.VideoDetailRepository
+import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -50,6 +52,8 @@ class SeasonDetailViewModelTest {
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        Prefs.resetForTesting()
+        Prefs.init(InMemoryPreferencesDataStore())
         videoDetailRepository = mockk()
         userRepository = mockk()
         videoInfoRepository = mockk()

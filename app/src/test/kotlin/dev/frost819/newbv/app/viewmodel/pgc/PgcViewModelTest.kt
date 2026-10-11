@@ -1,6 +1,7 @@
 package dev.frost819.newbv.app.viewmodel.pgc
 
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.app.testutil.InMemoryPreferencesDataStore
 import dev.frost819.newbv.biliapi.entity.CarouselData
 import dev.frost819.newbv.biliapi.entity.pgc.PgcType
 import dev.frost819.newbv.biliapi.entity.pgc.PgcWebPage
@@ -32,8 +33,8 @@ import java.util.Date
  * 索引分组，国创额外聚合放送时间表；以及分区间状态隔离、懒加载去重、刷新、
  * 页面数据与时间表的失败隔离。使用 MockK mock 仓库层。
  *
- * 时间表加载读取 [Prefs.apiType]：用 resetForTesting 重置内存缓存即可
- * 读到默认值，无需初始化 DataStore（避免多测试类共享 JVM 时的实例冲突）。
+ * 时间表加载读取 [Prefs.apiType]：每个测试前用内存版 DataStore 重新初始化
+ * Prefs（未初始化的读取会立即失败），读到默认值。
  */
 class PgcViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -46,6 +47,7 @@ class PgcViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         Prefs.resetForTesting()
+        Prefs.init(InMemoryPreferencesDataStore())
         pgcRepository = mockk()
         seasonRepository = mockk()
     }

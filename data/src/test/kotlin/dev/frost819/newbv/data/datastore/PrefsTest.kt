@@ -166,6 +166,32 @@ class PrefsTest {
         }
 
     @Test
+    fun `read throws before init`() {
+        Prefs.resetForTesting()
+        try {
+            Prefs.isLogin
+            assert(false) { "应该抛出 IllegalStateException" }
+        } catch (e: IllegalStateException) {
+            assertThat(e.message).contains("尚未初始化")
+        } finally {
+            Prefs.init(dataStore)
+        }
+    }
+
+    @Test
+    fun `write throws before init`() {
+        Prefs.resetForTesting()
+        try {
+            Prefs.isLogin = true
+            assert(false) { "应该抛出 IllegalStateException" }
+        } catch (e: IllegalStateException) {
+            assertThat(e.message).contains("尚未初始化")
+        } finally {
+            Prefs.init(dataStore)
+        }
+    }
+
+    @Test
     fun `clear resets all prefs to defaults`() =
         runBlocking {
             Prefs.isLogin = true

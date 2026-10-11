@@ -52,23 +52,34 @@ class PrefDelegate<T, P>(
     /** 内存缓存流，初始值为默认值的持久化形式。 */
     internal val flow: MutableStateFlow<Any?> = MutableStateFlow(save(defaultValue))
 
-    /** 读取当前值：直接读内存缓存（初始值恒为默认值的持久化形式，永不为 null）。 */
+    /**
+     * 读取当前值：直接读内存缓存（初始值恒为默认值的持久化形式，永不为 null）。
+     *
+     * 未初始化时内存缓存只有编码默认值，读取会静默拿到与磁盘不符的数据，
+     * 因此未初始化的读取立即失败（见 [Prefs.checkInitialized]）。
+     */
     override fun getValue(
         thisRef: Any?,
         property: KProperty<*>,
-    ): T = restore(flow.value as P)
+    ): T {
+        Prefs.checkInitialized()
+        return restore(flow.value as P)
+    }
 
     /**
      * 写入新值。
      *
      * 1. 立即更新内存缓存，UI 瞬间响应。
      * 2. 异步写入 DataStore，不阻塞调用方。
+     *
+     * 未初始化时写入会被随后的首帧磁盘加载覆盖，因此同样立即失败。
      */
     override fun setValue(
         thisRef: Any?,
         property: KProperty<*>,
         value: T,
     ) {
+        Prefs.checkInitialized()
         val persistValue = save(value)
         flow.value = persistValue
         val dataStore = Prefs.dataStore
@@ -87,12 +98,14 @@ class PrefDelegate<T, P>(
  * 偏好设置管理器。
  *
  * 集中管理全部应用偏好项，通过 [PrefDelegate] 暴露读写属性。
- * 使用前必须在 Application.onCreate 调用 [init] 完成内存缓存初始化。
+ * 由依赖图（`DatabaseModule.providePrefs`）调用 [init] 完成内存缓存初始化。
  *
  * 设计要点：
  * - [dataStore] 由 Hilt 注入（见 di 模块的 DataStoreModule）。
  * - 读操作同步无锁（命中内存），写操作异步持久化。
- * - [init] 阻塞读取首帧 DataStore 数据，再启动 collect 保持内存与磁盘同步。
+ * - [init] 由依赖图（`DatabaseModule.providePrefs`）在创建 DataStore 时调用：
+ *   阻塞读取首帧数据填充内存缓存，保证任何消费者构造前完成初始化；
+ *   未初始化的读写经 [checkInitialized] 立即失败。
  * - [init] 自动检查并生成 buvid / buvid3（若缺失）。
  *
  * 已删除（相对原版 BV）的偏好项：
@@ -102,8 +115,7 @@ class PrefDelegate<T, P>(
  *
  * 使用示例：
  * ```
- * Prefs.init(dataStore)      // Application.onCreate
- * val isLogin = Prefs.isLogin // 任意位置读取
+ * val isLogin = Prefs.isLogin // 任意位置读取（须在依赖图初始化之后，未初始化会抛异常）
  * Prefs.isLogin = true        // 任意位置写入
  * ```
  *
@@ -542,20 +554,24 @@ object Prefs {
     /**
      * 初始化偏好设置。
      *
-     * **必须在 Application.onCreate 调用**，且在依赖 Prefs 的模块初始化之前。
+     * 由依赖图在提供 [Prefs] 的 Provider 中调用（见 `DatabaseModule.providePrefs`），
+     * 保证任何组件构造或读取 Prefs 之前已完成磁盘加载，不依赖手工调用顺序。
      *
      * 阻塞读取 DataStore 首帧数据，填充所有委托的内存缓存。
      * 之后不再监听 DataStore 变化——所有写入都经过 [PrefDelegate.setValue]，
      * 已同步更新内存缓存，无需 collect 反向同步（且避免部分写入时的竞态）。
      *
-     * @param dataStore DataStore 实例（由 Hilt 注入）。
+     * @param dataStore DataStore 实例。
      */
     fun init(dataStore: DataStore<Preferences>) {
         check(!initialized) { "Prefs 已经初始化，禁止重复调用 init()" }
         dataStoreRef = dataStore
+
+        // 阻塞加载磁盘数据，加载完成后才置位 initialized：
+        // 消除"已置位但未加载"窗口（期间读到默认值、写入被首帧覆盖）。
+        val initialPrefs = runBlocking { dataStore.data.first() }
         initialized = true
 
-        val initialPrefs = runBlocking { dataStore.data.first() }
         delegateMap.forEach { (key, delegate) ->
             if (initialPrefs.contains(key)) {
                 (delegate as PrefDelegate<Any?, Any?>).flow.value = initialPrefs[key]
@@ -564,6 +580,18 @@ object Prefs {
         migrateVideoColumnsToCardWidth(initialPrefs)
         migrateDanmakuMergeMode(initialPrefs)
         checkAndInitBuvid(initialPrefs)
+    }
+
+    /**
+     * 校验初始化状态，未初始化立即失败。
+     *
+     * 未初始化时读取只能拿到编码默认值、写入会被随后的首帧磁盘加载覆盖，
+     * 都属于初始化时序错误，必须立即失败暴露，而不是静默继续。
+     */
+    internal fun checkInitialized() {
+        check(initialized) {
+            "Prefs 尚未初始化，禁止读写（初始化由依赖图 providePrefs 完成，先于任何 Prefs 消费者构造）"
+        }
     }
 
     /**

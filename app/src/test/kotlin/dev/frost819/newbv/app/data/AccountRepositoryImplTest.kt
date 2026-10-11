@@ -88,7 +88,7 @@ class AccountRepositoryImplTest {
             )
         coEvery { BiliHttpApi.getUserSelfInfo() } returns mockResponse
 
-        repository = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), ParseAccountRepository())
+        repository = AccountRepositoryImpl(Prefs, userDao, authRepository, ChannelRepository(), ParseAccountRepository())
     }
 
     @AfterEach
@@ -339,7 +339,7 @@ class AccountRepositoryImplTest {
         Prefs.biliJct = "test-jct"
         Prefs.accessToken = "test-token"
 
-        val newRepo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), ParseAccountRepository())
+        val newRepo = AccountRepositoryImpl(Prefs, userDao, authRepository, ChannelRepository(), ParseAccountRepository())
 
         assertThat(authRepository.mid).isEqualTo(300L)
         assertThat(authRepository.sessionData).isEqualTo("test-sess")
@@ -353,7 +353,7 @@ class AccountRepositoryImplTest {
     fun `initFromPrefs does nothing when not logged in`() {
         Prefs.isLogin = false
 
-        val newRepo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), ParseAccountRepository())
+        val newRepo = AccountRepositoryImpl(Prefs, userDao, authRepository, ChannelRepository(), ParseAccountRepository())
 
         assertThat(authRepository.mid).isNull()
         assertThat(newRepo.uiState.value.isLogin).isFalse()
@@ -379,7 +379,7 @@ class AccountRepositoryImplTest {
                 UserEntity(uid = 222L, username = "vip", avatar = "", auth = authData.toJson())
 
             val parseRepo = ParseAccountRepository()
-            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+            val repo = AccountRepositoryImpl(Prefs, userDao, authRepository, ChannelRepository(), parseRepo)
             repo.setParseAccount(222L)
 
             assertThat(Prefs.parseAccountUid).isEqualTo(222L)
@@ -403,7 +403,7 @@ class AccountRepositoryImplTest {
             coEvery { userDao.findUserByUid(222L) } returns
                 UserEntity(uid = 222L, username = "vip", avatar = "", auth = authData.toJson())
             val parseRepo = ParseAccountRepository()
-            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+            val repo = AccountRepositoryImpl(Prefs, userDao, authRepository, ChannelRepository(), parseRepo)
             repo.setParseAccount(222L)
             assertThat(parseRepo.uid).isEqualTo(222L)
 
@@ -419,7 +419,7 @@ class AccountRepositoryImplTest {
         runTest {
             coEvery { userDao.findUserByUid(999L) } returns null
             val parseRepo = ParseAccountRepository()
-            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+            val repo = AccountRepositoryImpl(Prefs, userDao, authRepository, ChannelRepository(), parseRepo)
 
             repo.setParseAccount(999L)
 
@@ -442,7 +442,7 @@ class AccountRepositoryImplTest {
             coEvery { userDao.findUserByUid(222L) } returns
                 UserEntity(uid = 222L, username = "vip", avatar = "", auth = authData.toJson())
             val parseRepo = ParseAccountRepository()
-            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+            val repo = AccountRepositoryImpl(Prefs, userDao, authRepository, ChannelRepository(), parseRepo)
             repo.setParseAccount(222L)
             assertThat(parseRepo.uid).isEqualTo(222L)
 
@@ -470,7 +470,7 @@ class AccountRepositoryImplTest {
             Prefs.parseAccountUid = 222L
 
             val parseRepo = ParseAccountRepository()
-            val repo = AccountRepositoryImpl(userDao, authRepository, ChannelRepository(), parseRepo)
+            val repo = AccountRepositoryImpl(Prefs, userDao, authRepository, ChannelRepository(), parseRepo)
             repo.syncParseAccountFromPrefs()
 
             assertThat(parseRepo.uid).isEqualTo(222L)
