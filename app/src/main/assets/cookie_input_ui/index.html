@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>newBV Cookie 远程输入</title>
 <style>
   body { font-family: system-ui, sans-serif; background: #101720; color: #edf2fa; margin: 0; padding: 24px; }
@@ -13,16 +14,18 @@
   button { padding: 12px 18px; border: 0; border-radius: 10px; background: #a9ccff; color: #10213a; font-size: 16px; margin-top: 20px; }
   button:disabled { opacity: .5; }
   #status { min-height: 48px; }
+  #status.ok { color: #7ee2a8; }
+  #status.err { color: #ffb38a; }
 </style>
 <main>
   <h1>Cookie 远程输入</h1>
-  <p>粘贴浏览器 Cookie（含 SESSDATA、bili_jct、DedeUserID）或 newBV / NeoBV 凭证 JSON。发送后，在电视上点击「登录」。手机与电视需连接同一网络。</p>
+  <p>粘贴浏览器 Cookie（含 SESSDATA、bili_jct、DedeUserID）或 newBV / NeoBV 凭证 JSON。发送后将自动在电视上登录，结果会显示在本页。手机与电视需连接同一网络。</p>
   <form id="form">
     <label for="input">Cookie 或凭证 JSON</label>
     <textarea id="input" required maxlength="65536" autocomplete="off" spellcheck="false" placeholder="在这里粘贴凭证"></textarea>
     <label for="file">也可从凭证文件导入</label>
     <input id="file" type="file" accept=".json,.txt,application/json,text/plain">
-    <br><button id="send" type="submit">发送到电视</button>
+    <br><button id="send" type="submit">发送并在电视上登录</button>
   </form>
   <p id="status" role="status" aria-live="polite"></p>
 </main>
@@ -30,26 +33,28 @@
   const input = document.getElementById('input');
   const status = document.getElementById('status');
   const send = document.getElementById('send');
+  function show(text, cls) { status.textContent = text; status.className = cls || ''; }
   document.getElementById('file').addEventListener('change', async event => {
     const file = event.target.files[0];
     if (!file) return;
-    if (file.size > 65536) { status.textContent = '文件过大，请选择小于 64 KB 的凭证文件'; return; }
-    try { input.value = await file.text(); status.textContent = '文件已导入，请点击发送'; }
-    catch { status.textContent = '无法读取文件，请重新选择'; }
+    if (file.size > 65536) { show('文件过大，请选择小于 64 KB 的凭证文件', 'err'); return; }
+    try { input.value = await file.text(); show('文件已导入，请点击发送'); }
+    catch { show('无法读取文件，请重新选择', 'err'); }
   });
   document.getElementById('form').addEventListener('submit', async event => {
     event.preventDefault();
-    if (!input.value.trim()) { status.textContent = '请输入 Cookie 或凭证 JSON'; return; }
+    if (!input.value.trim()) { show('请输入 Cookie 或凭证 JSON', 'err'); return; }
     send.disabled = true;
-    status.textContent = '正在发送…';
+    show('正在发送并在电视上登录，请稍候…');
     try {
       const response = await fetch(new URL('input', location.href), {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-        body: input.value, cache: 'no-store', signal: AbortSignal.timeout(10000)
+        body: input.value, cache: 'no-store', signal: AbortSignal.timeout(30000)
       });
-      status.textContent = await response.text();
+      const message = await response.text();
+      show(response.ok ? `✅ ${message}` : `❌ ${message}`, response.ok ? 'ok' : 'err');
       if (response.ok) { input.value = ''; document.getElementById('file').value = ''; }
-    } catch { status.textContent = '发送失败，请检查网络并确认电视仍在 Cookie 登录页'; }
+    } catch { show('发送失败，请检查网络并确认电视仍在 Cookie 登录页', 'err'); }
     finally { send.disabled = false; }
   });
 </script>

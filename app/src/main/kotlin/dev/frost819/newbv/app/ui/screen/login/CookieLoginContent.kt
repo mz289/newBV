@@ -189,13 +189,7 @@ fun CookieLoginContent(
             }
             CookieRemoteInput(
                 modifier = Modifier.width(240.dp),
-                onInput = { text ->
-                    if (!uiState.submitting && !uiState.success) {
-                        input = text
-                        viewModel.resetCookieLogin()
-                        softwareKeyboard?.hide()
-                    }
-                },
+                onLogin = { text -> viewModel.loginWithCookieRemote(text) },
             )
         }
     }

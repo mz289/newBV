@@ -8,7 +8,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,19 +18,24 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.frost819.newbv.R
 import dev.frost819.newbv.app.network.CookieInputServer
+import dev.frost819.newbv.core.log.Loggers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withContext
 
-/** 页面离开组合时关闭服务，切换登录方式后旧二维码即失效。 */
+/**
+ * 手机远程输入（参考 FongMi/TV 的提交即生效模式）：
+ * 手机页面提交后直接触发登录并回传结果，无需在电视上再次确认。
+ */
 @Composable
 internal fun CookieRemoteInput(
-    onInput: (String) -> Unit,
+    onLogin: suspend (String) -> String,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
-    val receiveInput by rememberUpdatedState(onInput)
+    val logger = Loggers.get("CookieRemoteInput")
     var url by remember { mutableStateOf<String?>(null) }
     var failed by remember { mutableStateOf(false) }
     var attempt by remember { mutableStateOf(0) }
@@ -40,19 +44,26 @@ internal fun CookieRemoteInput(
         url = null
         failed = false
         val server =
-            CookieInputServer {
-                context.assets
-                    .open("cookie_input_ui/index.html")
-                    .bufferedReader()
-                    .use { it.readText() }
-            }
+            CookieInputServer(
+                pageProvider = {
+                    context.assets
+                        .open("cookie_input_ui/index.html")
+                        .bufferedReader()
+                        .use { it.readText() }
+                },
+                onInput = { input ->
+                    // 页面关闭（服务停止）取消响应时，登录本身仍需完成
+                    withContext(NonCancellable) { onLogin(input) }
+                },
+            )
         try {
             url =
                 withContext(Dispatchers.IO) {
                     val host = checkNotNull(CookieInputServer.localAddress())
                     server.start(host)
                 }
-            server.inputs.collect { receiveInput(it) }
+            logger.info { "remote input url: $url" }
+            awaitCancellation()
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {

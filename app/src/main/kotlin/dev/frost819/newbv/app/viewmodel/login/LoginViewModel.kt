@@ -204,26 +204,44 @@ class LoginViewModel
          * @param input Cookie 串或凭证 JSON。
          */
         fun loginWithCookie(input: String) {
-            if (_cookieUiState.value.submitting) return
+            viewModelScope.launch { submitCookieLogin(input) }
+        }
+
+        /**
+         * Cookie 登录（挂起版，供远程输入服务在收到提交时直接调用）。
+         *
+         * 参考 FongMi/TV 的远程输入模式：手机提交即触发登录并回传结果，
+         * 无需在电视上再次确认。
+         *
+         * @param input Cookie 串或凭证 JSON。
+         * @return 结果消息（成功为「登录成功」，失败为具体原因）。
+         */
+        suspend fun loginWithCookieRemote(input: String): String = submitCookieLogin(input) ?: "登录成功，本页可以关闭了"
+
+        /**
+         * 解析并校验 Cookie 后持久化登录。
+         *
+         * @return 成功返回 null；失败返回要展示的具体原因。
+         */
+        private suspend fun submitCookieLogin(input: String): String? {
+            if (_cookieUiState.value.submitting) return "正在处理上一次提交，请稍候重试"
             _cookieUiState.value = CookieLoginUiState(submitting = true)
-            viewModelScope.launch {
-                runCatching { CookieLoginParser.parse(input) }
-                    .mapCatching { authData ->
-                        accountRepository.addCookieUser(authData)
-                    }.fold(
-                        onSuccess = {
-                            logger.info { "cookie login success" }
-                            _cookieUiState.value = CookieLoginUiState(success = true)
-                        },
-                        onFailure = { error ->
-                            logger.error(error) { "cookie login failed" }
-                            _cookieUiState.value =
-                                CookieLoginUiState(
-                                    errorMessage = error.message ?: "登录失败，请检查 Cookie",
-                                )
-                        },
-                    )
-            }
+            return runCatching { CookieLoginParser.parse(input) }
+                .mapCatching { authData ->
+                    accountRepository.addCookieUser(authData)
+                }.fold(
+                    onSuccess = {
+                        logger.info { "cookie login success" }
+                        _cookieUiState.value = CookieLoginUiState(success = true)
+                        null
+                    },
+                    onFailure = { error ->
+                        logger.error(error) { "cookie login failed" }
+                        val message = error.message ?: "登录失败，请检查 Cookie"
+                        _cookieUiState.value = CookieLoginUiState(errorMessage = message)
+                        message
+                    },
+                )
         }
 
         /**
