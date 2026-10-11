@@ -28,7 +28,7 @@ class SeasonRepository(
         pageSize: Int = 30,
         preferApiType: ApiType,
     ): FollowingSeasonData =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "season")) {
             ApiType.Web -> {
                 BiliHttpApi
                     .getFollowingSeasons(
@@ -69,7 +69,7 @@ class SeasonRepository(
         filter: TimelineFilter = TimelineFilter.All,
         preferApiType: ApiType,
     ): List<Timeline> =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "season")) {
             ApiType.Web -> {
                 BiliHttpApi
                     .getTimeline(

@@ -11,7 +11,7 @@ class LikeRepository(
         preferApiType: ApiType,
         bvid: String? = null,
     ): Boolean =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "like")) {
             ApiType.Web ->
                 BiliHttpApi.checkVideoLiked(
                     avid = aid,
@@ -33,7 +33,7 @@ class LikeRepository(
         bvid: String? = null,
     ) {
         val (success, message) =
-            when (preferApiType) {
+            when (authRepository.effectiveApiType(preferApiType, "like")) {
                 ApiType.Web ->
                     BiliHttpApi.sendVideoLike(
                         avid = aid,

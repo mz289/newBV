@@ -11,7 +11,7 @@ class CoinRepository(
         preferApiType: ApiType,
         bvid: String? = null,
     ): Boolean =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "coin")) {
             ApiType.Web ->
                 BiliHttpApi.checkVideoSentCoin(
                     avid = aid,
@@ -33,7 +33,7 @@ class CoinRepository(
         bvid: String? = null,
     ) {
         val (success, message) =
-            when (preferApiType) {
+            when (authRepository.effectiveApiType(preferApiType, "coin")) {
                 ApiType.Web ->
                     BiliHttpApi.sendVideoCoin(
                         avid = aid,

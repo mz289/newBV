@@ -91,29 +91,17 @@ class ToViewRepositoryUnitTest {
         }
 
     @Test
-    fun `getToView App throws when accessToken is blank`() =
+    fun `getToView without access_token falls back to Web`() =
         runTest {
-            authRepository.accessToken = ""
-
-            val exception =
-                assertThrows<IllegalStateException> {
-                    repository.getToView(cursor = 0L, preferApiType = ApiType.App)
-                }
-
-            assertThat(exception.message).isEqualTo("access_token is empty")
-        }
-
-    @Test
-    fun `getToView App throws when accessToken is null`() =
-        runTest {
+            // Cookie 登录账号没有 access_token，App 通道持久不可用，应回退 Web 通道
             authRepository.accessToken = null
+            coEvery { BiliHttpApi.getToView(any()) } returns
+                BiliResponse(code = 0, message = "", data = toViewDataResponse())
 
-            val exception =
-                assertThrows<IllegalStateException> {
-                    repository.getToView(cursor = 0L, preferApiType = ApiType.App)
-                }
+            val result = repository.getToView(cursor = 0L, preferApiType = ApiType.App)
 
-            assertThat(exception.message).isEqualTo("access_token is empty")
+            assertThat(result.data).hasSize(2)
+            coVerify { BiliHttpApi.getToView(isNull()) }
         }
 
     // ------------------------------------------------------------------

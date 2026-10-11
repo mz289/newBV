@@ -45,7 +45,7 @@ class CommentRepository(
         nextCursor: Long? = null,
         preferApiType: ApiType,
     ): CommentPage =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "comment")) {
             ApiType.Web -> {
                 val data =
                     BiliHttpApi.getVideoComments(aid, sort, page, accessKey = null).getResponseData()
@@ -101,7 +101,7 @@ class CommentRepository(
         nextCursor: Long? = null,
         preferApiType: ApiType,
     ): CommentPage =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "comment")) {
             ApiType.Web -> {
                 val data =
                     BiliHttpApi

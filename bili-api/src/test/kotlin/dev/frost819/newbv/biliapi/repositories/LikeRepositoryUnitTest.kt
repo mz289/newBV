@@ -253,13 +253,14 @@ class LikeRepositoryUnitTest {
         }
 
     @Test
-    fun `updateVideoLiked App uses empty accessKey when null`() =
+    fun `updateVideoLiked App passes accessKey when present`() =
         runTest {
-            authRepository.accessToken = null
+            // 无 token 会回退 Web，App 分支测试需提供 token
+            authRepository.accessToken = "test-token"
             coEvery { BiliHttpApi.sendVideoLikeApp(any(), any(), any()) } returns Pair(true, "")
 
             repository.updateVideoLiked(aid = AID, like = false, preferApiType = ApiType.App)
 
-            coVerify { BiliHttpApi.sendVideoLikeApp(eq(AID), eq(false), eq("")) }
+            coVerify { BiliHttpApi.sendVideoLikeApp(eq(AID), eq(false), eq("test-token")) }
         }
 }

@@ -197,14 +197,15 @@ class OneClickTripleActionRepositoryUnitTest {
         }
 
     @Test
-    fun `App uses empty accessKey when null`() =
+    fun `App passes accessKey when present`() =
         runTest {
-            authRepository.accessToken = null
+            // 无 token 会回退 Web，App 分支测试需提供 token
+            authRepository.accessToken = "test-token"
             coEvery { BiliHttpApi.sendVideoOneClickTripleActionApp(any(), any()) } returns
                 Triple(true, "", null)
 
             repository.sendVideoOneClickTripleAction(aid = AID, preferApiType = ApiType.App)
 
-            coVerify { BiliHttpApi.sendVideoOneClickTripleActionApp(eq(AID), eq("")) }
+            coVerify { BiliHttpApi.sendVideoOneClickTripleActionApp(eq(AID), eq("test-token")) }
         }
 }

@@ -267,13 +267,14 @@ class CoinRepositoryUnitTest {
         }
 
     @Test
-    fun `sendVideoCoin App uses empty accessKey when null`() =
+    fun `sendVideoCoin App passes accessKey when present`() =
         runTest {
-            authRepository.accessToken = null
+            // 无 token 会回退 Web，App 分支测试需提供 token
+            authRepository.accessToken = "test-token"
             coEvery { BiliHttpApi.sendVideoCoinApp(any(), any(), any(), any()) } returns Pair(true, "")
 
             repository.sendVideoCoin(aid = AID, preferApiType = ApiType.App)
 
-            coVerify { BiliHttpApi.sendVideoCoinApp(eq(AID), any(), any(), eq("")) }
+            coVerify { BiliHttpApi.sendVideoCoinApp(eq(AID), any(), any(), eq("test-token")) }
         }
 }

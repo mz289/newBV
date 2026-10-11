@@ -56,6 +56,8 @@ class VideoDetailRepositoryUnitTest {
     fun setUp() {
         mockkObject(BiliHttpApi)
         authRepository = mockk()
+        // effectiveApiType 直接透传偏好通道（Web 测试不受无 token 回退影响）
+        every { authRepository.effectiveApiType(any(), any()) } answers { firstArg() }
         channelRepository = mockk()
         favoriteRepository = mockk()
         likeRepository = mockk()

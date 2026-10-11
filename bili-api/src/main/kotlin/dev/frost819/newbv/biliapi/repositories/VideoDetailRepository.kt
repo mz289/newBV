@@ -32,7 +32,7 @@ class VideoDetailRepository(
         preferApiType: ApiType,
         bvid: String = "",
     ): VideoDetail =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "video-detail")) {
             ApiType.Web -> {
                 withContext(Dispatchers.IO) {
                     val videoDetailWithoutUserActions =
@@ -133,7 +133,7 @@ class VideoDetailRepository(
         preferApiType: ApiType,
     ): List<VideoPage> =
         try {
-            when (preferApiType) {
+            when (authRepository.effectiveApiType(preferApiType, "video-detail")) {
                 ApiType.Web -> {
                     val detail =
                         BiliHttpApi
@@ -184,7 +184,7 @@ class VideoDetailRepository(
         preferApiType: ApiType,
         bvid: String = "",
     ): String? =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "video-detail")) {
             ApiType.Web ->
                 withContext(Dispatchers.IO) {
                     BiliHttpApi
@@ -217,7 +217,7 @@ class VideoDetailRepository(
         seasonId: Int? = null,
         preferApiType: ApiType,
     ): SeasonDetail {
-        return when (preferApiType) {
+        return when (authRepository.effectiveApiType(preferApiType, "video-detail")) {
             ApiType.Web -> {
                 val webSeasonData =
                     BiliHttpApi

@@ -21,7 +21,7 @@ class HistoryRepository(
         cursor: Long,
         preferApiType: ApiType,
     ): HistoryData =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "history")) {
             ApiType.Web -> {
                 val data =
                     BiliHttpApi

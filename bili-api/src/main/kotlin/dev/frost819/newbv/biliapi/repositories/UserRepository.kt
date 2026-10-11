@@ -37,7 +37,7 @@ class UserRepository(
         preferApiType: ApiType,
     ): Boolean {
         val response =
-            when (preferApiType) {
+            when (authRepository.effectiveApiType(preferApiType, "user")) {
                 ApiType.Web ->
                     BiliHttpApi.modifyFollow(
                         mid = mid,
@@ -85,7 +85,7 @@ class UserRepository(
         seasonId: Int,
         preferApiType: ApiType,
     ): String =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "user")) {
             ApiType.Web ->
                 BiliHttpApi
                     .addSeasonFollow(
@@ -107,7 +107,7 @@ class UserRepository(
         seasonId: Int,
         preferApiType: ApiType,
     ): String =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "user")) {
             ApiType.Web ->
                 BiliHttpApi
                     .delSeasonFollow(
@@ -131,7 +131,7 @@ class UserRepository(
         page: SpaceVideoPage = SpaceVideoPage(),
         preferApiType: ApiType,
     ): SpaceVideoData =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "user")) {
             ApiType.Web -> {
                 val webSpaceVideoData =
                     BiliHttpApi
@@ -164,7 +164,7 @@ class UserRepository(
         updateBaseline: String,
         preferApiType: ApiType,
     ): DynamicVideoData =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "user")) {
             ApiType.Web -> {
                 val responseData =
                     BiliHttpApi
@@ -200,7 +200,7 @@ class UserRepository(
         mid: Long,
         preferApiType: ApiType,
     ): List<FollowedUser> =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "user")) {
             ApiType.Web -> {
                 val result = mutableListOf<FollowedUser>()
                 val firstResponse =

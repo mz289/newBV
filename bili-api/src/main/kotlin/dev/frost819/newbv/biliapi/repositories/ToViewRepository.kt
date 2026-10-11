@@ -19,7 +19,7 @@ class ToViewRepository(
         cursor: Long,
         preferApiType: ApiType,
     ): ToViewData =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "to-view")) {
             ApiType.Web -> {
                 val data =
                     BiliHttpApi
@@ -45,7 +45,7 @@ class ToViewRepository(
         preferApiType: ApiType,
     ) {
         val (success, message) =
-            when (preferApiType) {
+            when (authRepository.effectiveApiType(preferApiType, "to-view")) {
                 ApiType.Web ->
                     BiliHttpApi.addToView(avid = aid, bvid = bvid, csrf = requireCsrf())
                 ApiType.App ->
@@ -64,7 +64,7 @@ class ToViewRepository(
         preferApiType: ApiType,
     ) {
         val (success, message) =
-            when (preferApiType) {
+            when (authRepository.effectiveApiType(preferApiType, "to-view")) {
                 ApiType.Web ->
                     BiliHttpApi.delToView(viewed = viewed, avid = aid, csrf = requireCsrf())
                 ApiType.App ->

@@ -13,7 +13,7 @@ class OneClickTripleActionRepository(
         bvid: String? = null,
     ): OneClickTripleAction? {
         val (success, message, data) =
-            when (preferApiType) {
+            when (authRepository.effectiveApiType(preferApiType, "one-click-triple-action")) {
                 ApiType.Web ->
                     BiliHttpApi.sendVideoOneClickTripleAction(
                         avid = aid,
