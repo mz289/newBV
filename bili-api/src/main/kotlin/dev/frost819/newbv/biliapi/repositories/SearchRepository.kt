@@ -35,7 +35,7 @@ class SearchRepository(
         limit: Int = 30,
         preferApiType: ApiType,
     ): List<Hotword> =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "search-hotwords")) {
             ApiType.Web ->
                 BiliHttpApi
                     .getWebSearchSquare(limit = limit)
@@ -55,7 +55,7 @@ class SearchRepository(
         keyword: String,
         preferApiType: ApiType,
     ): List<String> =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "search-suggest")) {
             ApiType.Web ->
                 BiliHttpApi
                     .getKeywordSuggest(
@@ -89,7 +89,7 @@ class SearchRepository(
         page: SearchTypePage,
         preferApiType: ApiType,
     ): SearchTypeResult =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "search-type")) {
             ApiType.Web -> {
                 val response =
                     BiliHttpApi

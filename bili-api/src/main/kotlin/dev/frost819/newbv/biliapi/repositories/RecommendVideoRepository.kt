@@ -24,7 +24,7 @@ class RecommendVideoRepository(
         page: PopularVideoPage,
         preferApiType: ApiType,
     ): PopularVideoData =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "popular")) {
             ApiType.Web -> {
                 val response =
                     BiliHttpApi
@@ -46,8 +46,8 @@ class RecommendVideoRepository(
             }
 
             ApiType.App -> {
-                // 不主动回退 Web：App 通道未就绪时抛明确异常，
-                // 由上层展示错误并允许重试，避免静默返回空列表造成"加载不完整"假象
+                // App 通道未就绪（有 token 但 channel 未初始化等瞬态）时抛明确异常，
+                // 由上层展示错误并允许重试；无 token 的持久缺失已在 effectiveApiType 回退 Web
                 val stub =
                     popularStub
                         ?: throw IllegalStateException("App gRPC channel is not initialized")
@@ -82,8 +82,9 @@ class RecommendVideoRepository(
         // App 接口的下一页游标必须基于原始列表（含被过滤掉的卡片）推进，
         // 否则整页卡片被过滤时会返回与上次相同的游标，导致重复请求同一页
         var appNextIdx: Int? = null
+        val apiType = authRepository.effectiveApiType(preferApiType, "recommend")
         val items =
-            when (preferApiType) {
+            when (apiType) {
                 ApiType.Web ->
                     BiliHttpApi
                         .getFeedRcmd(
@@ -109,7 +110,7 @@ class RecommendVideoRepository(
                 }
             }
         val nextPage =
-            when (preferApiType) {
+            when (apiType) {
                 ApiType.Web ->
                     RecommendPage(
                         nextWebIdx = page.nextWebIdx + 1,

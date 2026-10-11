@@ -420,6 +420,9 @@ class SearchRepositoryUnitTest {
     @Test
     fun `searchType App throws IllegalStateException when gRPC stub is null`() =
         runTest {
+            // 有 token 时 App 通道视为可用：通道未就绪（瞬态）抛明确异常供上层重试；
+            // 无 token 的持久缺失才在 effectiveApiType 回退 Web
+            authRepository.accessToken = "test-access-token"
             org.junit.jupiter.api.assertThrows<IllegalStateException> {
                 repository.searchType(
                     keyword = KEYWORD,
@@ -431,6 +434,19 @@ class SearchRepositoryUnitTest {
                     preferApiType = ApiType.App,
                 )
             }
+        }
+
+    @Test
+    fun `getSearchHotwords without access_token falls back to Web`() =
+        runTest {
+            // Cookie 登录账号没有 access_token，App 通道持久不可用，应回退 Web 通道
+            coEvery { BiliHttpApi.getWebSearchSquare(any(), any()) } returns
+                BiliResponse(code = 0, message = "", data = webSquareDataEmpty())
+
+            val result = repository.getSearchHotwords(limit = 30, preferApiType = ApiType.App)
+
+            coVerify(exactly = 1) { BiliHttpApi.getWebSearchSquare(any(), any()) }
+            assertThat(result).isEmpty()
         }
 
     // ------------------------------------------------------------------

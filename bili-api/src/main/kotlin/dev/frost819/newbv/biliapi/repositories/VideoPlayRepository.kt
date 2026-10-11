@@ -81,9 +81,10 @@ class VideoPlayRepository(
             }
         }
 
+        val apiType = authRepository.effectiveApiType(preferApiType, "play")
         return if (epid != 0) {
             try {
-                getPgcPlayData(cid = cid, epid = epid, preferApiType = preferApiType)
+                getPgcPlayData(cid = cid, epid = epid, preferApiType = apiType)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -91,10 +92,10 @@ class VideoPlayRepository(
                 // PGC 通道技术性失败（网络/风控/解析）时回退 UGC 通道兜底，保证免费剧集仍可播；
                 // 权限类错误携带引导信息（会员/充电/付费），直接抛出供 UI 分类展示
                 BiliLogger.error(e) { "pgc play data failed, fallback to ugc channel: [epid=$epid, cid=$cid]" }
-                getUgcPlayData(aid = aid, cid = cid, preferApiType = preferApiType)
+                getUgcPlayData(aid = aid, cid = cid, preferApiType = apiType)
             }
         } else {
-            getUgcPlayData(aid = aid, cid = cid, preferApiType = preferApiType)
+            getUgcPlayData(aid = aid, cid = cid, preferApiType = apiType)
         }
     }
 
@@ -292,7 +293,7 @@ class VideoPlayRepository(
         cid: Long,
         preferApiType: ApiType,
     ): List<Subtitle> =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "subtitle")) {
             ApiType.Web -> {
                 val response =
                     BiliHttpApi
@@ -355,7 +356,7 @@ class VideoPlayRepository(
         preferApiType: ApiType,
     ) {
         val result =
-            when (preferApiType) {
+            when (authRepository.effectiveApiType(preferApiType, "heartbeat")) {
                 ApiType.Web ->
                     BiliHttpApi.sendHeartbeat(
                         avid = aid,
@@ -407,7 +408,7 @@ class VideoPlayRepository(
         segmentIndex: Int,
         preferApiType: ApiType,
     ): List<DanmakuData> =
-        when (preferApiType) {
+        when (authRepository.effectiveApiType(preferApiType, "danmaku-segment")) {
             ApiType.Web ->
                 BiliHttpApi.getDanmakuSeg(
                     cid = cid,
@@ -437,6 +438,7 @@ class VideoPlayRepository(
         cid: Long,
         preferApiType: ApiType,
     ): DanmakuMask? {
+        val preferApiType = authRepository.effectiveApiType(preferApiType, "danmaku-mask")
         val danmakuMaskUrl =
             when (preferApiType) {
                 ApiType.Web -> {
@@ -485,7 +487,7 @@ class VideoPlayRepository(
         preferApiType: ApiType,
     ): VideoShot? {
         val videoShortResponse =
-            when (preferApiType) {
+            when (authRepository.effectiveApiType(preferApiType, "video-shot")) {
                 ApiType.Web -> BiliHttpApi.getWebVideoShot(aid = aid, cid = cid)
                 ApiType.App -> BiliHttpApi.getAppVideoShot(aid = aid, cid = cid)
             }

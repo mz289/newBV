@@ -204,7 +204,9 @@ class RecommendVideoRepositoryUnitTest {
     @Test
     fun `getPopularVideos App throws when gRPC stub is null`() =
         runTest {
-            // 通道未就绪时不回退 Web，也不静默返回空列表，而是抛明确异常供上层报错重试
+            // 有 token 时 App 通道视为可用：通道未就绪（瞬态）不回退 Web、不静默返回空列表，
+            // 而是抛明确异常供上层报错重试；无 token 的持久缺失才在 effectiveApiType 回退 Web
+            authRepository.accessToken = "test-access-token"
             val error =
                 runCatching {
                     repository.getPopularVideos(
@@ -214,6 +216,28 @@ class RecommendVideoRepositoryUnitTest {
                 }.exceptionOrNull()
 
             assertThat(error).isInstanceOf(IllegalStateException::class.java)
+        }
+
+    @Test
+    fun `getPopularVideos without access_token falls back to Web`() =
+        runTest {
+            // Cookie 登录账号没有 access_token，App 通道持久不可用，应回退 Web 通道
+            coEvery { BiliHttpApi.getPopularVideoData(any(), any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "OK",
+                    data = PopularVideoData(list = emptyList(), noMore = true),
+                )
+
+            val result =
+                repository.getPopularVideos(
+                    page = PopularVideoPage(),
+                    preferApiType = ApiType.App,
+                )
+
+            coVerify(exactly = 1) { BiliHttpApi.getPopularVideoData(any(), any()) }
+            assertThat(result.list).isEmpty()
+            assertThat(result.noMore).isTrue()
         }
 
     // ------------------------------------------------------------------
