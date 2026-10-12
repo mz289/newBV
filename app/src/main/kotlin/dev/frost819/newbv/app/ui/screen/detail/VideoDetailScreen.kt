@@ -990,40 +990,6 @@ private fun EpisodeRow(
                     )
                 }
             }
-            if (cells.size > 1 && lastPlayedCid != 0L) {
-                val lastCell = cells.find { it.cid == lastPlayedCid }
-                if (lastCell != null) {
-                    Surface(
-                        onClick = { onClick(lastCell) },
-                        modifier = Modifier.touchClickable(onClick = { onClick(lastCell) }),
-                        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                        // 不放大，避免盖住相邻的选集按钮。
-                        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-                        colors =
-                            ControlFocusDefaults.surfaceColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.History,
-                                contentDescription = "历史",
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Text(
-                                text = "上次看到：${lastCell.title}",
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                    }
-                }
-            }
         }
         val focusRequester = focusSaver.focusRequesterFor(rowKey)
         LazyRow(
