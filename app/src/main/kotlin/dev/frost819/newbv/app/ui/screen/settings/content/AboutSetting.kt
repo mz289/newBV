@@ -58,7 +58,7 @@ fun AboutSetting(modifier: Modifier = Modifier) {
                         .getLatestBuild(
                             includePrerelease = acceptPrerelease,
                             assetChannels = updateChannel.assetKeywords,
-                        )?.name ?: "无可用更新"
+                        )?.versionLabel ?: "无可用更新"
                 logger.info { "Find latest version $latestVersionName" }
             }.onFailure {
                 logger.error(it) { "Failed to get latest version" }

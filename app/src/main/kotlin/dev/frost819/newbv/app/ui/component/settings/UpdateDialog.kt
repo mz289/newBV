@@ -187,7 +187,7 @@ fun UpdateDialog(
                     text =
                         when (updateStatus) {
                             UpdateStatus.UpdatingInfo -> "获取更新信息中"
-                            UpdateStatus.Ready -> latestRelease?.name ?: "Loading..."
+                            UpdateStatus.Ready -> latestRelease?.versionLabel ?: "Loading..."
                             UpdateStatus.Downloading -> "下载中"
                             UpdateStatus.NoAvailableUpdate -> "无可用更新"
                             UpdateStatus.CheckError -> "检查更新失败"

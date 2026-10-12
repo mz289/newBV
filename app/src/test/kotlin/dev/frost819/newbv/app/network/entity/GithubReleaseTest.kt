@@ -175,6 +175,27 @@ class GithubReleaseTest {
     }
 
     @Test
+    fun `versionLabel strips newBV prefix to match BuildConfig version format`() {
+        val release = releaseWithName("newBV 1.1.0.r145.0b1c2d3e")
+        assertThat(release.versionLabel).isEqualTo("1.1.0.r145.0b1c2d3e")
+    }
+
+    @Test
+    fun `versionLabel keeps name unchanged when no prefix`() {
+        val release = releaseWithName("1.1.0.r145.0b1c2d3e")
+        assertThat(release.versionLabel).isEqualTo("1.1.0.r145.0b1c2d3e")
+    }
+
+    /** 构造仅含 name 的 GithubRelease（mods 实体为 4 字段精简版）。 */
+    private fun releaseWithName(name: String) =
+        GithubRelease(
+            assets = emptyList(),
+            body = "",
+            draft = false,
+            name = name,
+        )
+
+    @Test
     fun `findApkAsset returns null for empty assets`() {
         val release = releaseWithAssets(emptyList())
 
