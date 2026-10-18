@@ -30,11 +30,11 @@ import android.os.Message
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.MainThread
-import androidx.core.graphics.withTranslation
 import com.badlogic.gdx.utils.Pool
 import com.kuaishou.akdanmaku.DanmakuConfig
 import com.kuaishou.akdanmaku.cache.DrawingCache
 import com.kuaishou.akdanmaku.data.DanmakuItem
+import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.data.ItemState
 import com.kuaishou.akdanmaku.ecs.DanmakuContext
 import com.kuaishou.akdanmaku.ecs.DanmakuEngine
@@ -125,6 +125,8 @@ internal class RenderSystem(
                     drawingCache = cache
                     transform.reset()
                     if (action != null) {
+                        // 动作驱动时位置由变换矩阵携带（矩阵含平移），bitmap 缓存未就绪的
+                        // 回退绘制路径也必须使用动作位置，否则会闪现在原点
                         position.set(action.position)
                         rect.setEmpty()
                         action.toTransformMatrix(transform)
@@ -132,15 +134,21 @@ internal class RenderSystem(
                         transform.postConcat(drawState.transform)
                     } else {
                         transform.set(drawState.transform)
+                        position.set(drawState.positionX, drawState.positionY)
+                        rect.set(drawState.rect)
                     }
-                    position.set(drawState.positionX, drawState.positionY)
-                    rect.set(drawState.rect)
                     if (item.isHolding) {
                         alpha = 1f
                         holding = true
                     }
                 }
             newRenderObjects.add(renderObject)
+        }
+
+        // 官方层级：弹幕视图不设层级偏移，绘制顺序 = 子视图插入顺序 ≈ 弹幕时间顺序，
+        // 高级弹幕不强制压在普通弹幕上层（按 position 稳定排序保持同刻先后）
+        newRenderObjects.sortBy { renderObject ->
+            renderObject.item.data.position
         }
 
         synchronized(this) {
@@ -276,9 +284,15 @@ internal class RenderSystem(
                 true
             } ?: false
         } else {
-            canvas.withTranslation(obj.position.x, obj.position.y) {
+            val saveCount = canvas.save()
+            try {
+                canvas.concat(obj.transform)
+                // Apply opacity once to the composed stroke + fill, just like a cached bitmap.
+                if (drawPaint.alpha < 255) canvas.saveLayerAlpha(null, drawPaint.alpha)
                 danmakuContext.renderer.updatePaint(obj.item, displayer, config)
                 danmakuContext.renderer.draw(obj.item, canvas, displayer, config)
+            } finally {
+                canvas.restoreToCount(saveCount)
             }
             false
         }

@@ -10,6 +10,7 @@ android {
 
     defaultConfig {
         minSdk = AppConfiguration.minSdk
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
 
@@ -47,4 +48,8 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation("junit:junit:4.13.2")
     testImplementation(libs.truth)
+
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.truth)
 }

@@ -45,8 +45,6 @@ class ActionComponent : DanmakuBaseComponent() {
 
     var alpha = 1f
 
-    var visibility = true
-
     fun toTransformMatrix(matrix: Matrix) {
         matrix.setScale(scale.x, scale.y)
         matrix.postRotate(rotation)

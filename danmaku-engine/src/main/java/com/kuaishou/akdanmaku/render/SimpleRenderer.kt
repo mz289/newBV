@@ -33,6 +33,7 @@ import com.kuaishou.akdanmaku.DanmakuConfig
 import com.kuaishou.akdanmaku.data.DanmakuItem
 import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.ui.DanmakuDisplayer
+import com.kuaishou.akdanmaku.utils.DisplayScaleFactor
 import com.kuaishou.akdanmaku.utils.Size
 import java.util.HashMap
 import kotlin.math.roundToInt
@@ -43,28 +44,28 @@ import kotlin.math.roundToInt
  * @author Xana
  */
 open class SimpleRenderer : DanmakuRenderer {
-    private val textPaint =
-        TextPaint().apply {
-            color = Color.WHITE
-            style = Paint.Style.FILL
-            isAntiAlias = true
-        }
-    private val strokePaint =
-        TextPaint().apply {
-            textSize = textPaint.textSize
-            color = Color.BLACK
-            strokeWidth = 3f
-            style = Paint.Style.FILL_AND_STROKE
-            isAntiAlias = true
-        }
-    private val debugPaint by lazy {
-        Paint().apply {
-            color = Color.RED
-            style = Paint.Style.STROKE
-            isAntiAlias = true
-            strokeWidth = 6f
-        }
+    private class ThreadPaints {
+        val textPaint =
+            TextPaint().apply {
+                color = Color.WHITE
+                style = Paint.Style.FILL
+                isAntiAlias = true
+            }
+        val strokePaint =
+            TextPaint().apply {
+                textSize = textPaint.textSize
+                color = Color.BLACK
+                strokeWidth = 3f
+                style = Paint.Style.FILL_AND_STROKE
+                isAntiAlias = true
+            }
     }
+
+    // 缓存线程与主线程会并发驱动同一渲染器，Paint 状态按线程隔离（DFM 同款双份策略）
+    private val threadPaints =
+        object : ThreadLocal<ThreadPaints>() {
+            override fun initialValue(): ThreadPaints = ThreadPaints()
+        }
     private val borderPaint =
         Paint().apply {
             color = Color.WHITE
@@ -73,21 +74,41 @@ open class SimpleRenderer : DanmakuRenderer {
             strokeWidth = 6f
         }
 
+    private fun refreshPaints(
+        item: DanmakuItem,
+        displayer: DanmakuDisplayer,
+        config: DanmakuConfig,
+    ): ThreadPaints {
+        val paints = threadPaints.get() ?: ThreadPaints().also { threadPaints.set(it) }
+        val danmakuItemData = item.data
+        // update textPaint
+        // 官方字号 = 载荷字号 × 可绘制区缩放因子 × 用户缩放（与高级弹幕同一缩放器）
+        val factor =
+            DisplayScaleFactor.suggestedFactor(
+                displayer.width.toFloat(),
+                displayer.height.toFloat(),
+                displayer.density,
+                DisplayScaleFactor.isTablet(displayer.width.toFloat(), displayer.height.toFloat(), displayer.density),
+            )
+        val textSize = clamp(danmakuItemData.textSize.toFloat(), 12f, 25f) * factor
+        paints.textPaint.color = danmakuItemData.textColor or Color.argb(255, 0, 0, 0)
+        paints.textPaint.textSize = textSize * config.textSizeScale
+        paints.textPaint.typeface = if (config.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        // update strokePaint
+        paints.strokePaint.textSize = paints.textPaint.textSize
+        paints.strokePaint.typeface = paints.textPaint.typeface
+        // 官方描边宽度同为「基准 2 × factor × 用户缩放」（模型 strokeWidth 默认 2）
+        paints.strokePaint.strokeWidth = STROKE_WIDTH_BASE * factor * config.textSizeScale
+        paints.strokePaint.color = if (paints.textPaint.color == DEFAULT_DARK_COLOR) Color.WHITE else Color.BLACK
+        return paints
+    }
+
     override fun updatePaint(
         item: DanmakuItem,
         displayer: DanmakuDisplayer,
         config: DanmakuConfig,
     ) {
-        val danmakuItemData = item.data
-        // update textPaint
-        val textSize = clamp(danmakuItemData.textSize.toFloat(), 12f, 25f) * (displayer.density - 0.6f)
-        textPaint.color = danmakuItemData.textColor or Color.argb(255, 0, 0, 0)
-        textPaint.textSize = textSize * config.textSizeScale
-        textPaint.typeface = if (config.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-        // update strokePaint
-        strokePaint.textSize = textPaint.textSize
-        strokePaint.typeface = textPaint.typeface
-        strokePaint.color = if (textPaint.color == DEFAULT_DARK_COLOR) Color.WHITE else Color.BLACK
+        refreshPaints(item, displayer, config)
     }
 
     override fun measure(
@@ -95,10 +116,10 @@ open class SimpleRenderer : DanmakuRenderer {
         displayer: DanmakuDisplayer,
         config: DanmakuConfig,
     ): Size {
-        updatePaint(item, displayer, config)
+        val paints = refreshPaints(item, displayer, config)
         val danmakuItemData = item.data
-        val textWidth = textPaint.measureText(danmakuItemData.content)
-        val textHeight = getCacheHeight(textPaint)
+        val textWidth = paints.textPaint.measureText(danmakuItemData.content)
+        val textHeight = getCacheHeight(paints.textPaint)
         return Size(textWidth.roundToInt() + CANVAS_PADDING, textHeight.roundToInt() + CANVAS_PADDING)
     }
 
@@ -108,18 +129,21 @@ open class SimpleRenderer : DanmakuRenderer {
         displayer: DanmakuDisplayer,
         config: DanmakuConfig,
     ) {
-        updatePaint(item, displayer, config)
+        val paints = refreshPaints(item, displayer, config)
         val danmakuItemData = item.data
         val x = CANVAS_PADDING * 0.5f
-        val y = CANVAS_PADDING * 0.5f - textPaint.ascent()
-        canvas.drawText(danmakuItemData.content, x, y, strokePaint)
-        canvas.drawText(danmakuItemData.content, x, y, textPaint)
+        val y = CANVAS_PADDING * 0.5f - paints.textPaint.ascent()
+        canvas.drawText(danmakuItemData.content, x, y, paints.strokePaint)
+        canvas.drawText(danmakuItemData.content, x, y, paints.textPaint)
         if (danmakuItemData.danmakuStyle == DanmakuItemData.DANMAKU_STYLE_SELF_SEND) {
             canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), borderPaint)
         }
     }
 
     companion object {
+        /** 官方模型默认描边宽度（`DanmakuModel.strokeWidth = 2`），实际值再乘缩放因子。 */
+        private const val STROKE_WIDTH_BASE = 2f
+
         private val DEFAULT_DARK_COLOR: Int = Color.argb(255, 0x22, 0x22, 0x22)
 
         private const val CANVAS_PADDING: Int = 6

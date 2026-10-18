@@ -244,4 +244,5 @@ private val DanmakuType.displayName: String
             DanmakuType.Top -> "顶部"
             DanmakuType.Rolling -> "滚动"
             DanmakuType.Bottom -> "底部"
+            DanmakuType.Advanced -> "高级"
         }

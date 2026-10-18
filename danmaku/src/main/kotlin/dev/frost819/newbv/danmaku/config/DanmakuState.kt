@@ -29,6 +29,7 @@ data class DanmakuState(
             DanmakuType.Rolling,
             DanmakuType.Top,
             DanmakuType.Bottom,
+            DanmakuType.Advanced,
         ),
     val blockEnabled: Boolean = false,
     /** 视频弹幕权重阈值：0 关闭，1–12 仅保留不低于此值的弹幕。 */

@@ -32,6 +32,7 @@ import com.kuaishou.akdanmaku.data.state.HoldState
 import com.kuaishou.akdanmaku.ecs.DanmakuContext.Companion.NONE_CONTEXT
 import com.kuaishou.akdanmaku.ecs.DanmakuEngine
 import com.kuaishou.akdanmaku.ecs.component.action.Action
+import com.kuaishou.akdanmaku.ecs.component.action.SpecialDanmakuAction
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 
 /**
@@ -66,7 +67,7 @@ open class DanmakuItem(
     val isLate: Boolean
         get() = timePosition > timer.currentTimeMs
     val isTimeout: Boolean
-        get() = timePosition < timer.currentTimeMs + duration
+        get() = timer.currentTimeMs - timePosition > duration
     val isOutside: Boolean
         get() = isLate || isTimeout
 
@@ -80,6 +81,10 @@ open class DanmakuItem(
         rect.setEmpty()
         holdState.reset()
         drawState.reset()
+        // 对象池复用：清掉上一条弹幕的动作、烘培代次与已展示代次，避免旧状态挂到新数据上
+        actions.clear()
+        specialBakedGeneration = -1
+        shownGeneration = -1
     }
 
     override fun compareTo(other: DanmakuItem): Int = data.compareTo(other.data)
@@ -99,6 +104,35 @@ open class DanmakuItem(
 
     fun addAction(vararg action: Action) {
         actions.addAll(*action)
+    }
+
+    /**
+     * mode 7 高级弹幕动作的最后烘培代次（跟随 config.measureGeneration），
+     * 显示尺寸或样式变化后据此重新烘培。
+     */
+    internal var specialBakedGeneration: Int = -1
+
+    /**
+     * 按当前显示尺寸把高级弹幕规格烘培为动作序列（可重复调用以覆盖）。
+     *
+     * 宽高为 0（View 未完成布局）时按官方舞台基准（861×572）处理，等尺寸变化后由
+     * DataSystem 依据代次重新烘培。
+     */
+    internal fun rebakeSpecialActions(
+        displayWidth: Int,
+        displayHeight: Int,
+        generation: Int,
+    ) {
+        val spec = data.special ?: return
+        actions.clear()
+        actions.add(
+            SpecialDanmakuAction(
+                spec,
+                displayWidth.takeIf { it > 0 }?.toFloat() ?: SpecialDanmakuSpec.STAGE_WIDTH,
+                displayHeight.takeIf { it > 0 }?.toFloat() ?: SpecialDanmakuSpec.STAGE_HEIGHT,
+            ),
+        )
+        specialBakedGeneration = generation
     }
 
     companion object {

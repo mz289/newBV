@@ -35,17 +35,20 @@ object DanmakuPreprocessor {
     ): List<DanmakuItemData> {
         val level = state.blockLevel.coerceIn(0, 12)
         val eligible = if (level == 0) items else items.filter { it.score >= level }
+        // mode 7 内容是动画载荷而非可读文本，跳过关键词屏蔽与合并，仅受权重和类型开关控制
+        val (specialEligible, normalEligible) =
+            eligible.partition { it.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL }
         val filtered =
             if (state.blockEnabled) {
                 val filter = blockFilter(state.blockRules)
-                eligible.filterNot { item ->
+                normalEligible.filterNot { item ->
                     val key = filter.matchedRuleKey(item.content, item.userId, item.textColor)
                     if (key != null) {
                         onBlockHit?.invoke(key)
                         onItemBlockHit?.invoke(item.danmakuId, key)
                     }
                     key != null
-                }
+                } + specialEligible
             } else {
                 eligible
             }
@@ -57,12 +60,15 @@ object DanmakuPreprocessor {
                 val modes = state.enabledTypes.map { it.modeValue }.toSet()
                 filtered.filter { it.mode in modes }
             }
+        // 先按原始类型过滤，避免被隐藏的簇首吞掉允许显示的其他类型。
         val merged =
             if (state.mergeMode == DanmakuMergeMode.Off) {
                 visible
             } else {
                 // 拼音同音匹配与跨类型归簇都是合并的内置行为（默认开启），不作为用户设置暴露
-                DanmakuMerger.mergeSimilar(visible)
+                val (specialVisible, normalVisible) =
+                    visible.partition { it.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL }
+                DanmakuMerger.mergeSimilar(normalVisible) + specialVisible
             }
         return merged
     }

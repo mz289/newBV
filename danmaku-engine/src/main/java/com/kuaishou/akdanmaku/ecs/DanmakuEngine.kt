@@ -85,6 +85,7 @@ class DanmakuEngine(
                 DanmakuItemData.DANMAKU_MODE_CENTER_TOP to TopCenterLayouter(),
                 DanmakuItemData.DANMAKU_MODE_ROLLING to TopRollingLayouter(),
                 DanmakuItemData.DANMAKU_MODE_CENTER_BOTTOM to BottomCenterLayouter(),
+                DanmakuItemData.DANMAKU_MODE_SPECIAL to SpecialDanmakuLayouter(),
             )
 
         // 以 Provider 的形式提供 Engine 示例

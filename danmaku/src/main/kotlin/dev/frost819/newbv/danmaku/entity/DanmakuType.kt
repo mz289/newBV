@@ -29,4 +29,11 @@ enum class DanmakuType(
      * 底部居中弹幕
      */
     Bottom(4),
+
+    /**
+     * 高级弹幕（mode 7，自定义位置与动画轨迹）
+     *
+     * 注意：追加在末尾，持久化按 ordinal 序号存储，插入中间会破坏已有用户设置
+     */
+    Advanced(7),
 }

@@ -331,7 +331,7 @@ object Prefs {
     /** 默认弹幕类型（多选，逗号分隔的序号字符串）。 */
     var defaultDanmakuTypes by pref(
         PrefKeys.defaultDanmakuTypes,
-        listOf(DanmakuType.All, DanmakuType.Rolling, DanmakuType.Top, DanmakuType.Bottom),
+        listOf(DanmakuType.All, DanmakuType.Rolling, DanmakuType.Top, DanmakuType.Bottom, DanmakuType.Advanced),
         save = { list -> list.joinToString(",") { it.ordinal.toString() } },
         restore = { str ->
             if (str.isEmpty()) {

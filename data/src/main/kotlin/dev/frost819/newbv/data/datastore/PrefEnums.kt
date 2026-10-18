@@ -141,6 +141,9 @@ enum class DanmakuType {
 
     /** 底部弹幕。 */
     Bottom,
+
+    /** 高级弹幕（mode 7）。追加在末尾，持久化按 ordinal 存储。 */
+    Advanced,
 }
 
 // ===== 播放器 - 界面 =====

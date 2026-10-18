@@ -69,9 +69,10 @@ internal class DataSystem(
     private var shouldSort = false
     private var startTimeMills = 0L
     private var endTimeMills = 0L
-    private var entityEntryTime = 0L
 
     private var forceUpdate = false
+    private var maxSpecialDurationMs = 0L
+
 
     private var holdingItem: DanmakuItem? = null
 
@@ -92,9 +93,28 @@ internal class DataSystem(
                     item.duration =
                         if (data.mode == DanmakuItemData.DANMAKU_MODE_ROLLING) {
                             config.rollingDurationMs
+                        } else if (data.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL) {
+                            // 高级弹幕在屏时长由载荷决定：官方动作序列总长为
+                            // max(displayDuration, animDelay + animDuration)（运动未走完不结束）
+                            data.special?.visibleDurationMs ?: data.lifeTime
                         } else {
                             config.durationMs
                         }
+                    if (data.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL &&
+                        data.special != null &&
+                        item.specialBakedGeneration != config.measureGeneration
+                    ) {
+                        // 显示尺寸 / 样式变化（measureGeneration 变更）后重新烘培动作
+                        item.rebakeSpecialActions(
+                            danmakuContext.displayer.width,
+                            danmakuContext.displayer.height,
+                            config.measureGeneration,
+                        )
+                        entity.action?.also { component ->
+                            component.actions.clear()
+                            item.actions.forEach { component.addAction(it) }
+                        }
+                    }
                     if (entity.isTimeout(currentTimeMs)) {
                         if (currentData.data.isNotEmpty()) {
                             currentData.data.remove(item)
@@ -135,10 +155,11 @@ internal class DataSystem(
         val durationMs = config.durationMs
         val rollingDurationMs = config.rollingDurationMs
         val maxDuration = max(durationMs, rollingDurationMs)
-        val startTime = currentTimeMs - maxDuration
-        val endTime = currentTimeMs + maxDuration
-        entityEntryTime = currentTimeMs + PRE_ENTRY_ENTITY_TIME_MS
         addPendingItems()
+        // 高级弹幕可持续超过普通弹幕窗口；seek / 重建后也要恢复仍存活的条目。
+        // 只扩大回看窗口，避免长生命周期把远期弹幕也提前创建出来。
+        val startTime = currentTimeMs - max(maxDuration, maxSpecialDurationMs)
+        val endTime = currentTimeMs + maxDuration
         withTrace("DataSystem_sort") {
             sort()
         }
@@ -215,8 +236,29 @@ internal class DataSystem(
     }
 
     private fun createItemEntity(item: DanmakuItem) {
+        if (item.data.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL) {
+            val special = item.data.special
+            if (special == null) {
+                // mode 7 但载荷解析失败（special 缺失）时没有可执行动作
+                return
+            }
+            // 官方视图创建窗口：n = 当前时间 - 弹幕时间，n > animDelay 即不再创建视图
+            // （跳转 / 中途载入时动画已跑过延迟的弹幕不会补显示）
+            if (currentTimeMs - item.data.position > special.animDelayMs) {
+                return
+            }
+        }
         if (idSet.contains(item.data.danmakuId)) {
             return
+        }
+
+        // 高级弹幕入场前按当前显示尺寸烘培动作（宽高为 0 时按官方舞台基准，尺寸变化后代次机制会重烘培）
+        if (item.data.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL && item.data.special != null) {
+            item.rebakeSpecialActions(
+                danmakuContext.displayer.width,
+                danmakuContext.displayer.height,
+                danmakuContext.config.measureGeneration,
+            )
         }
 
         val entity = engine.createEntity()
@@ -258,6 +300,19 @@ internal class DataSystem(
         sortedData.removeAll(updateItems)
         sortedData.addAll(updateItems)
         sortedData.addAll(pendingItems)
+        if (pendingItems.isNotEmpty() || updateItems.isNotEmpty()) {
+            val specialDuration = sortedData.maxOfOrNull {
+                if (it.data.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL) {
+                    (it.data.special?.visibleDurationMs ?: it.data.lifeTime).coerceAtLeast(0L)
+                } else {
+                    0L
+                }
+            } ?: 0L
+            if (specialDuration != maxSpecialDurationMs) {
+                maxSpecialDurationMs = specialDuration
+                forceUpdate = true
+            }
+        }
         val beforeStartCount = pendingItems.count { it.data.position < startTimeMills }
         val currentItems = pendingItems.filter { it.data.position in startTimeMills until endTimeMills }
         currentData.startIndex += beforeStartCount
@@ -315,8 +370,8 @@ internal class DataSystem(
             currentData = Danmakus(Collections.synchronizedList(TreeList()), 0L, 0L, -1, -1)
             startTimeMills = 0L
             endTimeMills = 0L
-            entityEntryTime = 0L
             shouldSort = false
+            maxSpecialDurationMs = 0L
             // 强制下一次 updateEntities 重新切片，避免沿用旧窗口索引
             forceUpdate = true
         }
@@ -349,16 +404,13 @@ internal class DataSystem(
         }
     }
 
-    companion object {
-        const val PRE_ENTRY_ENTITY_TIME_MS = 100L
-    }
-
     override fun onDataAdded(additionalItems: List<DanmakuItem>) {
         addItems(additionalItems)
     }
 
     override fun onDataRemoved(removalItems: List<DanmakuItem>) {
     }
+
 }
 
 internal class DanmakuItemComparator : Comparator<DanmakuItem> {

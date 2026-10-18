@@ -124,4 +124,32 @@ class DanmakuPreprocessorTest {
         assertThat(merged.mode).isEqualTo(1)
         assertThat(merged.mergedCount).isEqualTo(2)
     }
+
+    @Test
+    fun `高级弹幕不参与屏蔽与合并但受类型开关和权重控制`() {
+        val special = DanmakuItemData(1, 0, """["0","96","1-1",3,"载荷"]""", 7, 25, 0, score = 10)
+        val normal = item(2, "hide")
+        val state =
+            DanmakuState(
+                blockEnabled = true,
+                blockRules = listOf(DanmakuBlockRule(DanmakuBlockRuleType.Keyword, "hide")),
+                mergeMode = DanmakuMergeMode.Similar,
+            )
+        // 关键词不误伤载荷、载荷不并入普通弹幕合并簇
+        val result = DanmakuPreprocessor.process(listOf(special, normal, item(3, "hide")), state)
+        assertThat(result).containsExactly(special)
+
+        // 类型开关取消高级弹幕后不再显示
+        val hidden =
+            DanmakuPreprocessor.process(
+                listOf(special),
+                state.copy(enabledTypes = listOf(dev.frost819.newbv.danmaku.entity.DanmakuType.Rolling)),
+            )
+        assertThat(hidden).isEmpty()
+
+        // 权重阈值对所有类型生效
+        val filtered =
+            DanmakuPreprocessor.process(listOf(special, item(4, score = 12)), DanmakuState(blockLevel = 11))
+        assertThat(filtered.map { it.danmakuId }).containsExactly(4L)
+    }
 }

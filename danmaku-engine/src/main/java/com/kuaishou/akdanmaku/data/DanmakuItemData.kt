@@ -79,11 +79,21 @@ class DanmakuItemData(
     var userId: Long? = null,
     var mergedType: Int = MERGED_TYPE_NORMAL,
     val mergedCount: Int = 1,
+    /**
+     * 弹幕存活时长覆盖（毫秒），仅 mode 7 高级弹幕使用；
+     * <= 0 时回退到配置的默认时长。
+     */
+    val lifeTime: Long = 0,
+    /**
+     * mode 7 高级弹幕规格（载荷解析结果），其余模式为 null
+     */
+    val special: SpecialDanmakuSpec? = null,
 ) : Comparable<DanmakuItemData> {
     companion object {
         const val DANMAKU_MODE_ROLLING = 0x1 // 00000001(1)
         const val DANMAKU_MODE_CENTER_BOTTOM = 0x4 // 00000100(4)
         const val DANMAKU_MODE_CENTER_TOP = 0x5 // 00000101(5)
+        const val DANMAKU_MODE_SPECIAL = 0x7 // 00000111(7) 高级弹幕
 
         const val DANMAKU_STYLE_NONE = 0x1 // 00000001(1)
         const val DANMAKU_STYLE_ICON_UP = 0x2 // 00000010(2)

@@ -26,6 +26,11 @@ class DanmakuTypeTest {
     }
 
     @Test
+    fun `modeValue Advanced returns correct value`() {
+        assertThat(DanmakuType.Advanced.modeValue).isEqualTo(7)
+    }
+
+    @Test
     fun `modeValue All returns minus one`() {
         assertThat(DanmakuType.All.modeValue).isEqualTo(-1)
     }
@@ -36,5 +41,6 @@ class DanmakuTypeTest {
         assertThat(DanmakuType.Rolling.modeValue).isEqualTo(1)
         assertThat(DanmakuType.Top.modeValue).isEqualTo(5)
         assertThat(DanmakuType.Bottom.modeValue).isEqualTo(4)
+        assertThat(DanmakuType.Advanced.modeValue).isEqualTo(7)
     }
 }

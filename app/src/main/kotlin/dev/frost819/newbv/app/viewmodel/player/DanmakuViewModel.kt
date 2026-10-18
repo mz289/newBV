@@ -9,8 +9,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kuaishou.akdanmaku.DanmakuConfig
 import com.kuaishou.akdanmaku.data.DanmakuItemData
+import com.kuaishou.akdanmaku.data.SpecialDanmakuParser
 import com.kuaishou.akdanmaku.ecs.component.filter.TypeFilter
-import com.kuaishou.akdanmaku.render.SimpleRenderer
+import com.kuaishou.akdanmaku.render.ModeAwareRenderer
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
@@ -199,7 +200,7 @@ class DanmakuViewModel
 
         /** 初始化弹幕播放器。 */
         fun init() {
-            danmakuPlayer = DanmakuPlayer(SimpleRenderer())
+            danmakuPlayer = DanmakuPlayer(ModeAwareRenderer())
             initDanmakuConfig()
         }
 
@@ -491,7 +492,11 @@ class DanmakuViewModel
             val hits = mutableListOf<Pair<Long, String>>()
             val items =
                 withContext(preprocessingDispatcher) {
-                    val rawItems = segments.flatten().distinctBy { it.dmid }.map { it.toDanmakuItemData() }
+                    val rawItems =
+                        segments
+                            .flatten()
+                            .distinctBy { it.dmid }
+                            .mapNotNull { it.toDanmakuItemData() }
                     DanmakuPreprocessor.process(rawItems, state, onItemBlockHit = { id, key -> hits.add(id to key) })
                 }
             coroutineContext.ensureActive()
@@ -505,24 +510,61 @@ class DanmakuViewModel
             publishedRevision = revision
         }
 
-        /** 将接口层弹幕数据转换为 akdanmaku 渲染数据。 */
-        private fun DanmakuData.toDanmakuItemData(): DanmakuItemData =
-            DanmakuItemData(
+        /**
+         * 弹幕颜色换算：官方 `DmXmlModelFactory` 用 `p.color ? parse(p.color) : WHITE`，
+         * 即 color 为 0（未设置/发送端占位）时按白色渲染；`Color(int)` 会把 0xRRGGBB
+         * 当作 ARGB 使 alpha 归零，这里显式补上不透明通道。
+         */
+        private fun danmakuColor(color: Int): Int =
+            // 0xFFFFFF = 官方默认白；0xFF000000 补不透明通道
+            if (color == 0) 0xFFFFFF else color or -0x1000000
+
+        /**
+         * 将接口层弹幕数据转换为 akdanmaku 渲染数据。
+         *
+         * mode 7 高级弹幕的 content 是 JSON 动画载荷，解析为 [SpecialDanmakuSpec]，
+         * 解析失败（如新版对象弹幕）时返回 null 丢弃，避免 JSON 明文按滚动弹幕刷屏。
+         */
+        private fun DanmakuData.toDanmakuItemData(): DanmakuItemData? {
+            val mode =
+                when (type) {
+                    4 -> DanmakuItemData.DANMAKU_MODE_CENTER_BOTTOM
+                    5 -> DanmakuItemData.DANMAKU_MODE_CENTER_TOP
+                    7 -> DanmakuItemData.DANMAKU_MODE_SPECIAL
+                    else -> DanmakuItemData.DANMAKU_MODE_ROLLING
+                }
+            if (mode != DanmakuItemData.DANMAKU_MODE_SPECIAL) {
+                return DanmakuItemData(
+                    danmakuId = dmid,
+                    position = (time * 1000).toLong(),
+                    content = text,
+                    mode = mode,
+                    textSize = size,
+                    textColor = danmakuColor(color),
+                    score = level,
+                    // midHash 为 crc32 十六进制串，供按用户（发送者）屏蔽匹配
+                    userId = midHash.toLongOrNull(16),
+                )
+            }
+            val spec = SpecialDanmakuParser.parse(text)
+            if (spec == null) {
+                logger.debug { "Drop unparsable advanced danmaku dmid=$dmid" }
+                return null
+            }
+            return DanmakuItemData(
                 danmakuId = dmid,
                 position = (time * 1000).toLong(),
-                content = text,
-                mode =
-                    when (type) {
-                        4 -> DanmakuItemData.DANMAKU_MODE_CENTER_BOTTOM
-                        5 -> DanmakuItemData.DANMAKU_MODE_CENTER_TOP
-                        else -> DanmakuItemData.DANMAKU_MODE_ROLLING
-                    },
+                content = spec.text,
+                mode = mode,
                 textSize = size,
-                textColor = Color(color).toArgb(),
+                textColor = danmakuColor(color),
                 score = level,
-                // midHash 为 crc32 十六进制串，供按用户（发送者）屏蔽匹配
                 userId = midHash.toLongOrNull(16),
+                // 在屏时长 = 官方动作序列总长 max(displayDuration, animDelay + animDuration)
+                lifeTime = spec.visibleDurationMs,
+                special = spec,
             )
+        }
 
         /**
          * 加载弹幕防遮挡蒙版。

@@ -62,6 +62,13 @@ class DanmakuViewModelTest {
         every { android.util.Log.d(any(), any()) } returns 0
         every { android.util.Log.d(any(), any(), any()) } returns 0
         mockkObject(Prefs)
+        every { Prefs.danmakuBlockEnabled } returns false
+        every { Prefs.danmakuBlockEnabled = any() } answers {}
+        every { Prefs.danmakuBlockRules } returns "[]"
+        every { Prefs.danmakuBlockRules = any() } answers {}
+        every { Prefs.danmakuMergeMode } returns 0
+        every { Prefs.danmakuMergeMode = any() } answers {}
+        DanmakuBlockRuleStore.setBlockState(false, emptyList())
         every { Prefs.danmakuBlockLevel } returns 0
         every { Prefs.danmakuBlockLevel = any() } answers {}
         every { Prefs.defaultDanmakuScale } returns 1.75f
@@ -94,6 +101,35 @@ class DanmakuViewModelTest {
     fun tearDown() {
         unmockkAll()
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `P2 advanced payload reaches player when only advanced is enabled`() = runTest(testDispatcher) {
+        val player = mockk<DanmakuPlayer>(relaxed = true)
+        val outputs = mutableListOf<List<DanmakuItemData>>()
+        every { player.updateData(any()) } answers {
+            outputs.add(firstArg())
+            emptyList()
+        }
+        viewModel.danmakuPlayer = player
+        viewModel.updateDanmakuState(DanmakuSettingAction.SetEnabledTypes(listOf(DanmakuType.Advanced)))
+        coEvery { videoPlayRepository.getDanmakuMeta(39444L, 104184060L) } returns DanmakuMeta(360_000, 1, false, 2)
+        coEvery { videoPlayRepository.getDanmakuSegment(any(), any(), any(), any()) } returns listOf(
+            fakeDanmakuData(1, 350.517f).copy(
+                type = 7,
+                text = """[40,76,"1-0",0.3,"深く朱き润む瞳",10,0,40,76,500,0,0,"SimSun",true]""",
+            ),
+            fakeDanmakuData(2, 350.517f),
+        )
+        viewModel.loadDanmaku(39444L, 104184060L)
+        advanceUntilIdle()
+        val item = outputs.last().single()
+        assertThat(item.mode).isEqualTo(DanmakuItemData.DANMAKU_MODE_SPECIAL)
+        assertThat(item.special).isNotNull()
+        // 在屏时长 = max(display 0.3s, delay 0 + anim 0.5s) = 500ms
+        assertThat(item.lifeTime).isEqualTo(500L)
+        assertThat(item.content).isEqualTo("深く朱き润む瞳")
+        viewModel.clearDanmaku()
     }
 
     @Test

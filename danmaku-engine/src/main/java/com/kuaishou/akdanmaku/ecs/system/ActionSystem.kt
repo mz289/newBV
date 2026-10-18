@@ -47,12 +47,8 @@ internal class ActionSystem(
     ) {
         val item = entity.dataComponent?.item ?: return
         val actionComponent = entity.action ?: return
-        val timeMills = currentTimeMs
-        if (timeMills >= item.data.position) {
-            actionComponent.visibility = true
+        if (currentTimeMs >= item.data.position) {
             actionComponent.act(currentTimeMs - item.data.position)
-        } else {
-            actionComponent.visibility = false
         }
     }
 }
