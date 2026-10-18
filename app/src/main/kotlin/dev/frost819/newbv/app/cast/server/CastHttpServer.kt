@@ -35,8 +35,8 @@ import java.util.concurrent.CopyOnWriteArraySet
  * 1. **HTTP/SOAP**：UPnP 设备描述、SCPD、标准 DLNA 控制端点与 B 站私有
  *    NirvanaControl SOAP 端点（通用 DLNA 控制点与官方客户端 SOAP 流程）；
  * 2. **哔哩必连（NVA Socket）**：手机端以 HTTP `SETUP /projection` 请求升级，
- *    之后同一 TCP 连接走 NVA 二进制帧协议（协议细节源自社区对官方
- *    云视听小电视的逆向，见 [NvaSession]），是官方客户端的首选控制通道；
+ *    之后同一 TCP 连接走 NVA 二进制帧协议（协议细节与社区开源实现的
+ *    云视听小电视对接行为一致，见 [NvaSession]），是官方客户端的首选控制通道；
  * 3. **catch-all**：任意未匹配路径都尝试解析投屏内容并触发播放，兼容
  *    各类非标准投递姿势。
  *
@@ -348,7 +348,7 @@ class CastHttpServer(
     // ── 哔哩必连（NVA Socket） ─────────────────────────────────
 
     /**
-     * NVA 二进制帧协议（源自官方云视听小电视逆向）。
+     * NVA 二进制帧协议（对齐官方云视听小电视的线上行为）。
      *
      * 帧结构（客户端→服务端命令帧）：
      * `0xE0 | paramCount(1) | version(4, BE) | 0x01 | cmdLen(1) + cmd |

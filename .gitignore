@@ -63,6 +63,6 @@ logs/
 /bv/
 .playwright-mcp/
 
-# B 站 API 参考文档（第三方，不纳入版本控制）
+# 本地参考文档（B 站 API 参考资料与弹幕引擎对齐说明等，不纳入版本控制）
 /docs
 /.zcode

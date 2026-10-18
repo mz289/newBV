@@ -326,7 +326,7 @@ class CastSsdpServer(
         const val STARTUP_NOTIFY_BURSTS = 3
         const val STARTUP_NOTIFY_INTERVAL_MS = 1_000L
 
-        /** 官方电视端以 1s 间隔持续广播 alive（ATV-Bilibili-demo 逆向验证），手机端搜索窗口短，依赖高频 NOTIFY。 */
+        /** 官方电视端以 1s 间隔持续广播 alive（与 ATV-Bilibili-demo 行为一致），手机端搜索窗口短，依赖高频 NOTIFY。 */
         const val REGULAR_NOTIFY_INTERVAL_MS = 1_000L
         const val SEARCH_RESPONSE_REPEAT_DELAY_MS = 80L
         const val SEARCH_RESPONSE_JITTER_MS = 120L

@@ -3,7 +3,7 @@ package dev.frost819.newbv.app.cast.server
 /**
  * 投屏接收端常量。
  *
- * 端口与协议形态对齐官方云视听小电视（社区逆向实现 ATV-Bilibili-demo 验证）：
+ * 端口与协议形态对齐官方云视听小电视（参考社区开源实现 ATV-Bilibili-demo）：
  * - HTTP/必连通道同端口 9958：SSDP LOCATION 与设备描述指向它，
  *   手机端在 `SETUP /projection` 上完成 HTTP → NVA 二进制帧协议升级；
  * - `SERVER` 头伪装为 B 站电视端使用的 Platinum UPnP 栈，部分手机端

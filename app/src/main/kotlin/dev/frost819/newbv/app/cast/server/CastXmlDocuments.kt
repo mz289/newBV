@@ -41,7 +41,7 @@ object CastXmlDocuments {
             "http-get:*:image/png:*"
 
     /**
-     * 设备描述，字段形态对齐官方云视听小电视（社区逆向验证）：
+     * 设备描述，字段形态对齐官方云视听小电视（参考社区开源实现）：
      * - `X_brandName/hostVersion/ottVersion/channelName/capability` 为官方
      *   电视端特征字段，手机端「必连」会据此识别；
      * - 无 URLBase，服务地址为相对路径（相对 description.xml 的 URL 解析）；
