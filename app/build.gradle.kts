@@ -42,12 +42,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
+            // 不做 R8 混淆/收缩：混淆曾裁掉反射创建的弹幕组件构造器导致闪退，
+            // 且包内大量反射/序列化路径使收益有限
             signingConfig = signingConfigs.getByName("distribution")
         }
         debug {
