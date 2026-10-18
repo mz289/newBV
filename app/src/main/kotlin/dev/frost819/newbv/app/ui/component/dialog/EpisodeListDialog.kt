@@ -1,9 +1,13 @@
 package dev.frost819.newbv.app.ui.component.dialog
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -32,8 +39,6 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
-import androidx.tv.material3.Tab
-import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
@@ -145,6 +150,7 @@ fun <T> EpisodeListDialog(
 ) {
     val pageCount = (entries.size + pageSize - 1) / pageSize
     var selectedTab by remember { mutableStateOf(0) }
+    val tabScrollState = rememberScrollState()
     val dialogFocusRequester = remember { FocusRequester() }
     val tabFocusRequester = remember { FocusRequester() }
 
@@ -180,21 +186,24 @@ fun <T> EpisodeListDialog(
                     )
                 }
                 if (pageCount > 1) {
-                    TabRow(
+                    // 页数多于一屏时页签横向滚动（焦点移动会自动把聚焦的页签滚进可视区）；
+                    // 滚动视口外的水平内边距让首尾芯片不贴弹窗边缘，纵向内边距不贴窗口顶
+                    Row(
                         modifier =
                             Modifier
                                 .focusRestorer(tabFocusRequester)
-                                .fillMaxWidth(),
-                        selectedTabIndex = selectedTab,
-                        indicator = { _, _ -> },
+                                .fillMaxWidth()
+                                // 滚动视口外的内边距：首尾芯片不贴弹窗左右/顶部边缘
+                                .padding(start = 8.dp, end = 8.dp, top = 8.dp)
+                                .horizontalScroll(tabScrollState),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         repeat(pageCount) { index ->
                             val start = index * pageSize + 1
                             val end = minOf((index + 1) * pageSize, entries.size)
-                            Tab(
-                                selected = selectedTab == index,
-                                onFocus = { selectedTab = index },
-                                onClick = { selectedTab = index },
+                            // tv-material3 的 Tab 只能在 TabRowScope 里用，这里用自绘芯片：
+                            // clickable 自带可聚焦（遥控器 OK 键可点），聚焦即切换页签
+                            Box(
                                 modifier =
                                     (
                                         if (index == selectedTab) {
@@ -202,23 +211,25 @@ fun <T> EpisodeListDialog(
                                         } else {
                                             Modifier
                                         }
-                                    ).touchClickable(
-                                        onClick = { selectedTab = index },
-                                    ).padding(6.dp)
+                                    )
+                                        .onFocusChanged { if (it.isFocused) selectedTab = index }
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            onClick = { selectedTab = index },
+                                        )
                                         .background(
-                                            if (selectedTab ==
-                                                index
-                                            ) {
+                                            if (selectedTab == index) {
                                                 MaterialTheme.colorScheme.primaryContainer
                                             } else {
                                                 MaterialTheme.colorScheme.surfaceVariant
                                             },
-                                            androidx.compose.foundation.shape
-                                                .RoundedCornerShape(8.dp),
-                                        ),
+                                            RoundedCornerShape(8.dp),
+                                        )
+                                        // 内边距在背景之内，文字不贴芯片边框
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
                             ) {
                                 Text(
-                                    modifier = Modifier.padding(vertical = 8.dp),
                                     text = tabLabelOf(start, end),
                                     style = MaterialTheme.typography.labelMedium,
                                     color =
