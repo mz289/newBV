@@ -348,7 +348,8 @@ object Prefs {
     var defaultDanmakuScale by pref(PrefKeys.defaultDanmakuScale, 1.0f)
 
     /** 默认弹幕透明度。 */
-    var defaultDanmakuOpacity by pref(PrefKeys.defaultDanmakuOpacity, 0.7f)
+    // 官方弹幕透明度默认 0.8（Preference.danmakuConfig.info.transparency 默认值）
+    var defaultDanmakuOpacity by pref(PrefKeys.defaultDanmakuOpacity, 0.8f)
 
     /** 默认弹幕速度因子。 */
     var defaultDanmakuSpeedFactor by pref(PrefKeys.defaultDanmakuSpeedFactor, 1f)

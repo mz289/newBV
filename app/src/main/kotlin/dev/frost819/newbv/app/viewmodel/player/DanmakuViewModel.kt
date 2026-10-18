@@ -520,6 +520,13 @@ class DanmakuViewModel
             if (color == 0) 0xFFFFFF else color or -0x1000000
 
         /**
+         * 官方 attr 位转渲染样式：SELF_SENT（自己发送的弹幕，attr 位 262144）
+         * 在官方光栅化器里画「黑 30% 填充 + 白描边」的底框并增加额外内边距。
+         */
+        private fun danmakuStyleOf(attr: Int): Int =
+            if (attr and 0x40000 != 0) DanmakuItemData.DANMAKU_STYLE_SELF_SEND else DanmakuItemData.DANMAKU_STYLE_NONE
+
+        /**
          * 将接口层弹幕数据转换为 akdanmaku 渲染数据。
          *
          * mode 7 高级弹幕的 content 是 JSON 动画载荷，解析为 [SpecialDanmakuSpec]，
@@ -544,6 +551,7 @@ class DanmakuViewModel
                     score = level,
                     // midHash 为 crc32 十六进制串，供按用户（发送者）屏蔽匹配
                     userId = midHash.toLongOrNull(16),
+                    danmakuStyle = danmakuStyleOf(attr),
                 )
             }
             val spec = SpecialDanmakuParser.parse(text)
@@ -560,6 +568,7 @@ class DanmakuViewModel
                 textColor = danmakuColor(color),
                 score = level,
                 userId = midHash.toLongOrNull(16),
+                danmakuStyle = danmakuStyleOf(attr),
                 // 在屏时长 = 官方动作序列总长 max(displayDuration, animDelay + animDuration)
                 lifeTime = spec.visibleDurationMs,
                 special = spec,

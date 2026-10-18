@@ -39,6 +39,7 @@ import com.kuaishou.akdanmaku.layout.TopCenterLayouter
 import com.kuaishou.akdanmaku.layout.TopRollingLayouter
 import com.kuaishou.akdanmaku.render.DanmakuRenderer
 import com.kuaishou.akdanmaku.utils.DanmakuTimer
+import com.kuaishou.akdanmaku.utils.Families
 
 /**
  * 弹幕 ECS 架构的管理器
@@ -119,6 +120,15 @@ class DanmakuEngine(
             )
         }
         getSystem(LayoutSystem::class.java)?.layouter = layouter
+
+        // 预创建全部 Family：Ashley 在 addEntity 时会迭代 families，若此刻才懒创建
+        // Family（首个 mode 7 实体的 ItemData+Layout+Action 罕见组合入库），会触发
+        // ObjectMap「iterator cannot be used nested」异常导致播放中闪退。
+        // 引擎初始化（尚无任何实体）时先注册所有已知 Family 规避该竞争。
+        getEntitiesFor(Families.dataFamily)
+        getEntitiesFor(Families.layoutFamily)
+        getEntitiesFor(Families.actionFamily)
+        getEntitiesFor(Families.renderFamily)
     }
 
     internal fun step(deltaTimeSeconds: Float? = null) {

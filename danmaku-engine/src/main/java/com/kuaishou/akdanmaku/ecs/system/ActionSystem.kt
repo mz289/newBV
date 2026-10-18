@@ -31,6 +31,7 @@ import com.kuaishou.akdanmaku.ecs.component.action.ActionComponent
 import com.kuaishou.akdanmaku.ext.action
 import com.kuaishou.akdanmaku.ext.currentTimeMs
 import com.kuaishou.akdanmaku.ext.dataComponent
+import com.kuaishou.akdanmaku.utils.Families
 
 /**
  * 动画系统
@@ -40,7 +41,7 @@ import com.kuaishou.akdanmaku.ext.dataComponent
  */
 internal class ActionSystem(
     context: DanmakuContext,
-) : DanmakuSortedSystem(context, Family.one(ActionComponent::class.java).get()) {
+) : DanmakuSortedSystem(context, Families.actionFamily) {
     override fun processEntity(
         entity: Entity,
         deltaTime: Float,

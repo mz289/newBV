@@ -19,6 +19,7 @@ data class DanmakuData(
     val dmid: Long,
     val level: Int,
     val text: String,
+    val attr: Int = 0,
 ) {
     companion object {
         /**
@@ -40,6 +41,7 @@ data class DanmakuData(
                 dmid = elem.id,
                 level = elem.weight,
                 text = elem.content,
+                attr = elem.attr,
             )
     }
 }

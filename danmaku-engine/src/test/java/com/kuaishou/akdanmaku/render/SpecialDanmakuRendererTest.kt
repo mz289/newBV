@@ -1,5 +1,6 @@
 package com.kuaishou.akdanmaku.render
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.text.TextPaint
@@ -8,6 +9,7 @@ import com.kuaishou.akdanmaku.DanmakuConfig
 import com.kuaishou.akdanmaku.data.DanmakuItem
 import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.data.SpecialDanmakuParser
+import java.io.File
 import com.kuaishou.akdanmaku.ui.DanmakuDisplayer
 import com.kuaishou.akdanmaku.utils.DisplayScaleFactor
 import org.junit.Test
@@ -44,12 +46,15 @@ class SpecialDanmakuRendererTest {
         stroked: Boolean = true,
         color: Int = Color.WHITE,
         fontFamily: String = "SimHei",
+        style: Int = DanmakuItemData.DANMAKU_STYLE_NONE,
     ): DanmakuItem {
         val spec =
             SpecialDanmakuParser.parse(
                 """[0,0,"1-1",10,"$text",0,0,0,0,0,0,$stroked,"$fontFamily",false]""",
             )!!
-        return DanmakuItem(DanmakuItemData(1, 0, spec.text, 7, size, color, special = spec))
+        return DanmakuItem(
+            DanmakuItemData(1, 0, spec.text, 7, size, color, danmakuStyle = style, special = spec),
+        )
     }
 
     /** 官方字号 = 载荷字号 × 可绘制区缩放因子 × 用户缩放。 */
@@ -118,6 +123,32 @@ class SpecialDanmakuRendererTest {
         val stroke = 2f * factorFor(displayer)
         assertThat(size.height).isEqualTo(ceil(3 * lineAdvanceOf(18) + stroke).toInt())
         assertThat(size.width).isEqualTo(ceil(maxOf(paint.measureText("旋"), paint.measureText("律")) + stroke).toInt())
+    }
+
+    @Test
+    fun `self send style adds official box padding and paints the plate`() {
+        val stroke = 2f * factorFor(displayer)
+        val extra = 4f * factorFor(displayer) + 0.5f * stroke
+        val plain = renderer.measure(item("MMMM"), displayer, DanmakuConfig())
+        val self = renderer.measure(item("MMMM", style = DanmakuItemData.DANMAKU_STYLE_SELF_SEND), displayer, DanmakuConfig())
+        // 官方：各边加 SELF_SENT_PADDING(4) × factor + 0.5 × 描边宽
+        assertThat(self.width).isEqualTo(plain.width + (2 * extra).toInt())
+        assertThat(self.height).isEqualTo(plain.height + (2 * extra).toInt())
+
+        // 渲染：出现黑 30% 底（低alpha黑）与白描边像素
+        val bitmap = android.graphics.Bitmap.createBitmap(self.width, self.height, android.graphics.Bitmap.Config.ARGB_8888)
+        renderer.draw(item("MMMM", style = DanmakuItemData.DANMAKU_STYLE_SELF_SEND), android.graphics.Canvas(bitmap), displayer, DanmakuConfig())
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val plate = pixels.count { Color.alpha(it) in 1..127 && Color.red(it) == 0 }
+        val border = pixels.count { Color.alpha(it) > 200 && Color.red(it) > 200 && Color.green(it) > 200 && Color.blue(it) > 200 }
+        File("build/bv1qx-scene/selfsend.png")
+            .outputStream()
+            .use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File("build/bv1qx-scene/selfsend.txt").writeText("plate=$plate border=$border size=${self.width}x${self.height}")
+        assertThat(plate).isGreaterThan(0)
+        assertThat(border).isGreaterThan(0)
+        bitmap.recycle()
     }
 
     @Test

@@ -30,6 +30,7 @@ import android.graphics.Typeface
 import android.text.TextPaint
 import com.kuaishou.akdanmaku.DanmakuConfig
 import com.kuaishou.akdanmaku.data.DanmakuItem
+import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.ui.DanmakuDisplayer
 import com.kuaishou.akdanmaku.utils.DisplayScaleFactor
 import com.kuaishou.akdanmaku.utils.Size
@@ -70,8 +71,26 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
                 isAntiAlias = true
             }
 
+        /** 官方 self-send 底框：黑 30% 填充（DestinationOver 垫在文字下）。 */
+        val selfSendFillPaint =
+            Paint().apply {
+                style = Paint.Style.FILL
+                color = SELF_SEND_BOX_COLOR
+            }
+
+        /** 官方 self-send 底框的白色描边（宽度同描边）。 */
+        val selfSendBorderPaint =
+            Paint().apply {
+                style = Paint.Style.STROKE
+                color = Color.WHITE
+                isAntiAlias = true
+            }
+
         /** 当前生效的描边宽度（随可绘制区缩放因子缩放），用于盒尺寸与基线偏移。 */
         var strokeWidth: Float = STROKE_WIDTH
+
+        /** 最近一次刷新算得的官方缩放因子（self-send 额外内边距用）。 */
+        var suggestedFactor: Float = 1f
     }
 
     // 缓存线程与主线程会并发驱动同一渲染器（DFM 以 PAINT/PAINT_DUPLICATE 双份规避竞争）
@@ -109,8 +128,21 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
         paints.strokePaint.isFakeBoldText = true
         paints.strokePaint.strokeWidth = strokeWidth
         paints.strokePaint.color = strokeColorFor(paints.textPaint.color)
+        paints.selfSendBorderPaint.strokeWidth = strokeWidth
         paints.strokeWidth = strokeWidth
+        paints.suggestedFactor = factor
         return paints
+    }
+
+    /** 官方 self-send 弹幕的额外内边距：`SELF_SENT_PADDING(4) × factor × 缩放 + 0.5 × 描边宽`。 */
+    private fun selfSendExtra(
+        item: DanmakuItem,
+        paints: ThreadPaints,
+        scale: Float,
+    ): Float {
+        val isSelfSend = item.data.danmakuStyle and DanmakuItemData.DANMAKU_STYLE_SELF_SEND != 0
+        if (!isSelfSend) return 0f
+        return SELF_SEND_PADDING * paints.suggestedFactor * scale + 0.5f * paints.strokeWidth
     }
 
     /** 官方描边色规则：填充色任一通道 > 0.3 → 黑边，否则白边。 */
@@ -142,11 +174,12 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
         val lines = item.data.content.split('\n')
         var maxWidth = 0f
         lines.forEach { line -> maxWidth = maxOf(maxWidth, paints.textPaint.measureText(line)) }
-        // 官方盒尺寸：宽 = 最长行 advance + strokeWidth，高 = 行数 × 行距 + strokeWidth
-        //（盒四边各留 strokeWidth/2 容纳居中描边）
+        val extra = selfSendExtra(item, paints, config.textSizeScale)
+        // 官方盒尺寸：宽 = 最长行 advance + strokeWidth，高 = 行数 × 行距 + strokeWidth，
+        // self-send 弹幕再各边加额外内边距（盒四边各留 strokeWidth/2 容纳居中描边）
         return Size(
-            ceil(maxWidth + paints.strokeWidth).toInt(),
-            ceil(lineAdvance(paints.textPaint) * lines.size + paints.strokeWidth).toInt(),
+            ceil(maxWidth + paints.strokeWidth + 2 * extra).toInt(),
+            ceil(lineAdvance(paints.textPaint) * lines.size + paints.strokeWidth + 2 * extra).toInt(),
         )
     }
 
@@ -158,17 +191,29 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
     ) {
         val paints = refreshPaints(item, displayer, config)
         val advance = lineAdvance(paints.textPaint)
-        // 官方绘制：笔位 x = strokeWidth/2，首行基线 = -ascent + strokeWidth/2，
+        val extra = selfSendExtra(item, paints, config.textSizeScale)
+        // 官方绘制：笔位 x = strokeWidth/2 + 额外内边距，首行基线 = -ascent + strokeWidth/2 + 额外内边距，
         // 之后每行推进一个行距（descent − ascent）
-        val baseline = -paints.textPaint.fontMetrics.ascent + paints.strokeWidth / 2f
-        val x = paints.strokeWidth / 2f
+        val baseline = -paints.textPaint.fontMetrics.ascent + paints.strokeWidth / 2f + extra
+        val x = paints.strokeWidth / 2f + extra
         val stroked = item.data.special?.stroked != false
-        for ((index, line) in item.data.content.split('\n').withIndex()) {
+        val lines = item.data.content.split('\n')
+        val boxWidth =
+            ceil(lines.maxOf { paints.textPaint.measureText(it) } + paints.strokeWidth + 2 * extra)
+        val boxHeight = ceil(advance * lines.size + paints.strokeWidth + 2 * extra)
+        for ((index, line) in lines.withIndex()) {
             val y = baseline + advance * index
             if (stroked) {
                 canvas.drawText(line, x, y, paints.strokePaint)
             }
             canvas.drawText(line, x, y, paints.textPaint)
+        }
+        // 官方 self-send 底框：整盒黑 30% 填充 + 内缩 strokeWidth/2 的白描边，垫在文字之下
+        //（官方用 DestinationOver 垫底，这里先画框后画字，透明位图上等价）
+        if (extra > 0f) {
+            canvas.drawRect(0f, 0f, boxWidth, boxHeight, paints.selfSendFillPaint)
+            val half = paints.strokeWidth / 2f
+            canvas.drawRect(half, half, boxWidth - half, boxHeight - half, paints.selfSendBorderPaint)
         }
     }
 
@@ -187,6 +232,12 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
     companion object {
         /** 官方基准描边宽度（2），实际值再乘缩放因子。 */
         private const val STROKE_WIDTH = 2f
+
+        /** 官方 self-send 底框填充色：黑 30%（`Color(0, 0, 0, 0.3)`）。 */
+        private val SELF_SEND_BOX_COLOR = Color.argb((0.3f * 255).toInt(), 0, 0, 0)
+
+        /** 官方 self-send 底框的基准额外内边距（`SELF_SENT_PADDING = 4`）。 */
+        private const val SELF_SEND_PADDING = 4f
 
         /** 官方描边色阈值：填充通道归一化值大于 0.3 用黑边。 */
         private const val STROKE_CHANNEL_THRESHOLD = 0.3f

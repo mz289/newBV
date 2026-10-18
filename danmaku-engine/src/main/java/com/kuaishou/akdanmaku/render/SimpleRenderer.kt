@@ -59,19 +59,30 @@ open class SimpleRenderer : DanmakuRenderer {
                 style = Paint.Style.FILL_AND_STROKE
                 isAntiAlias = true
             }
+
+        /** 官方 self-send 底框：黑 30% 填充（垫在文字下）。 */
+        val selfSendFillPaint =
+            Paint().apply {
+                style = Paint.Style.FILL
+                color = SELF_SEND_BOX_COLOR
+            }
+
+        /** 官方 self-send 底框的白色描边（宽度同描边）。 */
+        val selfSendBorderPaint =
+            Paint().apply {
+                style = Paint.Style.STROKE
+                color = Color.WHITE
+                isAntiAlias = true
+            }
+
+        /** 最近一次刷新算得的官方缩放因子（self-send 额外内边距用）。 */
+        var suggestedFactor: Float = 1f
     }
 
     // 缓存线程与主线程会并发驱动同一渲染器，Paint 状态按线程隔离（DFM 同款双份策略）
     private val threadPaints =
         object : ThreadLocal<ThreadPaints>() {
             override fun initialValue(): ThreadPaints = ThreadPaints()
-        }
-    private val borderPaint =
-        Paint().apply {
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            isAntiAlias = true
-            strokeWidth = 6f
         }
 
     private fun refreshPaints(
@@ -100,7 +111,20 @@ open class SimpleRenderer : DanmakuRenderer {
         // 官方描边宽度同为「基准 2 × factor × 用户缩放」（模型 strokeWidth 默认 2）
         paints.strokePaint.strokeWidth = STROKE_WIDTH_BASE * factor * config.textSizeScale
         paints.strokePaint.color = if (paints.textPaint.color == DEFAULT_DARK_COLOR) Color.WHITE else Color.BLACK
+        paints.selfSendBorderPaint.strokeWidth = paints.strokePaint.strokeWidth
+        paints.suggestedFactor = factor
         return paints
+    }
+
+    /** 官方 self-send 弹幕的额外内边距：`SELF_SENT_PADDING(4) × factor × 缩放 + 0.5 × 描边宽`。 */
+    private fun selfSendExtra(
+        item: DanmakuItem,
+        paints: ThreadPaints,
+        scale: Float,
+    ): Float {
+        val isSelfSend = item.data.danmakuStyle and DanmakuItemData.DANMAKU_STYLE_SELF_SEND != 0
+        if (!isSelfSend) return 0f
+        return SELF_SEND_PADDING * paints.suggestedFactor * scale + 0.5f * paints.strokePaint.strokeWidth
     }
 
     override fun updatePaint(
@@ -120,7 +144,11 @@ open class SimpleRenderer : DanmakuRenderer {
         val danmakuItemData = item.data
         val textWidth = paints.textPaint.measureText(danmakuItemData.content)
         val textHeight = getCacheHeight(paints.textPaint)
-        return Size(textWidth.roundToInt() + CANVAS_PADDING, textHeight.roundToInt() + CANVAS_PADDING)
+        val extra = selfSendExtra(item, paints, config.textSizeScale)
+        return Size(
+            textWidth.roundToInt() + CANVAS_PADDING + (2 * extra).roundToInt(),
+            textHeight.roundToInt() + CANVAS_PADDING + (2 * extra).roundToInt(),
+        )
     }
 
     override fun draw(
@@ -131,18 +159,30 @@ open class SimpleRenderer : DanmakuRenderer {
     ) {
         val paints = refreshPaints(item, displayer, config)
         val danmakuItemData = item.data
-        val x = CANVAS_PADDING * 0.5f
-        val y = CANVAS_PADDING * 0.5f - paints.textPaint.ascent()
+        val extra = selfSendExtra(item, paints, config.textSizeScale)
+        val x = CANVAS_PADDING * 0.5f + extra
+        val y = CANVAS_PADDING * 0.5f - paints.textPaint.ascent() + extra
+        // 官方 self-send 底框：整盒黑 30% 填充 + 内缩描边宽/2 的白描边，垫在文字之下
+        if (extra > 0f) {
+            val w = (paints.textPaint.measureText(danmakuItemData.content).roundToInt() + CANVAS_PADDING + (2 * extra).roundToInt()).toFloat()
+            val h = (getCacheHeight(paints.textPaint).roundToInt() + CANVAS_PADDING + (2 * extra).roundToInt()).toFloat()
+            val half = paints.strokePaint.strokeWidth / 2f
+            canvas.drawRect(0f, 0f, w, h, paints.selfSendFillPaint)
+            canvas.drawRect(half, half, w - half, h - half, paints.selfSendBorderPaint)
+        }
         canvas.drawText(danmakuItemData.content, x, y, paints.strokePaint)
         canvas.drawText(danmakuItemData.content, x, y, paints.textPaint)
-        if (danmakuItemData.danmakuStyle == DanmakuItemData.DANMAKU_STYLE_SELF_SEND) {
-            canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), borderPaint)
-        }
     }
 
     companion object {
         /** 官方模型默认描边宽度（`DanmakuModel.strokeWidth = 2`），实际值再乘缩放因子。 */
         private const val STROKE_WIDTH_BASE = 2f
+
+        /** 官方 self-send 底框填充色：黑 30%（`Color(0, 0, 0, 0.3)`）。 */
+        private val SELF_SEND_BOX_COLOR = Color.argb((0.3f * 255).toInt(), 0, 0, 0)
+
+        /** 官方 self-send 底框的基准额外内边距（`SELF_SENT_PADDING = 4`）。 */
+        private const val SELF_SEND_PADDING = 4f
 
         private val DEFAULT_DARK_COLOR: Int = Color.argb(255, 0x22, 0x22, 0x22)
 

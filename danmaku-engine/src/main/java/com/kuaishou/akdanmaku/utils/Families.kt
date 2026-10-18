@@ -50,4 +50,8 @@ object Families {
                 LayoutComponent::class.java,
                 ActionComponent::class.java,
             ).get()
+
+    val layoutFamily: Family = Family.all(*layoutComponentTypes).get()
+
+    val actionFamily: Family = Family.one(ActionComponent::class.java).get()
 }

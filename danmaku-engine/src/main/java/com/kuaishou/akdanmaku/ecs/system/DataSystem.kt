@@ -184,8 +184,16 @@ internal class DataSystem(
             val endIndex: Int
             val newData: MutableList<DanmakuItem>
             synchronized(this) {
-                startIndex = sortedData.binarySearchAtLeast(startTimeMills) { it.timePosition }
-                endIndex = sortedData.binarySearchAtMost(endTimeMills) { it.timePosition }
+                // 二分与 subList 都是对 synchronizedList 的无锁读取，必须持锁，
+                // 否则与主线程 clearData() 竞争会抛异常或取到坏索引
+                startIndex =
+                    synchronized(sortedData) {
+                        sortedData.binarySearchAtLeast(startTimeMills) { it.timePosition }
+                    }
+                endIndex =
+                    synchronized(sortedData) {
+                        sortedData.binarySearchAtMost(endTimeMills) { it.timePosition }
+                    }
                 if (startIndex == -1 || endIndex == -1 || endIndex < startIndex) {
                     Log.w(
                         DanmakuEngine.TAG,
@@ -198,7 +206,10 @@ internal class DataSystem(
                     DanmakuEngine.TAG,
                     "[Data] update current slice [$startIndex, $endIndex] in time ($startTimeMills, $endTimeMills)",
                 )
-                newData = sortedData.subList(startIndex, endIndex + 1)
+                newData =
+                    synchronized(sortedData) {
+                        sortedData.subList(startIndex, endIndex + 1).toList()
+                    }.toMutableList()
                 endTrace()
             }
 
@@ -301,13 +312,18 @@ internal class DataSystem(
         sortedData.addAll(updateItems)
         sortedData.addAll(pendingItems)
         if (pendingItems.isNotEmpty() || updateItems.isNotEmpty()) {
-            val specialDuration = sortedData.maxOfOrNull {
-                if (it.data.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL) {
-                    (it.data.special?.visibleDurationMs ?: it.data.lifeTime).coerceAtLeast(0L)
-                } else {
-                    0L
-                }
-            } ?: 0L
+            // synchronizedList 的迭代必须持同一把锁，否则与主线程 clearData() 的
+            // sortedData.clear() 竞争会抛 ConcurrentModificationException
+            val specialDuration =
+                synchronized(sortedData) {
+                    sortedData.maxOfOrNull {
+                        if (it.data.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL) {
+                            (it.data.special?.visibleDurationMs ?: it.data.lifeTime).coerceAtLeast(0L)
+                        } else {
+                            0L
+                        }
+                    }
+                } ?: 0L
             if (specialDuration != maxSpecialDurationMs) {
                 maxSpecialDurationMs = specialDuration
                 forceUpdate = true
