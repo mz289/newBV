@@ -22,8 +22,11 @@
 -keepclasseswithmembers class * {
     public <init>(com.kuaishou.akdanmaku.ecs.DanmakuContext);
 }
--keepclasseswithmembers class com.kuaishou.akdanmaku.ecs.component.*
--keep class com.kuaishou.akdanmaku.ecs.component.* {
+# 单个 * 不匹配子包：ActionComponent 在 component.action 子包里，
+# 漏 keep 会导致 R8 裁掉其无参构造，播放 mode 7 高级弹幕时
+# ReflectionPool 反射创建组件失败直接闪退
+-keepclasseswithmembers class com.kuaishou.akdanmaku.ecs.component.**
+-keep class com.kuaishou.akdanmaku.ecs.component.** {
   <init>(...);
 }
 
