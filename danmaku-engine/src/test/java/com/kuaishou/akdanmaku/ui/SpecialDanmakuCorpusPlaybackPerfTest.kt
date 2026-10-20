@@ -228,4 +228,56 @@ class SpecialDanmakuCorpusPlaybackPerfTest {
         private const val DENSE_WINDOW_START_MS = 300_000L
         private const val DENSE_WINDOW_MS = 15_000L
     }
+
+    /** BV1u4HVzZEno（弹幕还原緋色月下，5450 条 mode 7，64 分钟）的回放压力。 */
+    @Test
+    fun `playback over bv1u4 corpus keeps frame cost bounded`() {
+        val corpus = loadCorpus("bv1u4_m7.json")
+        val data = corpus.mapNotNull(::toData)
+        val player = DanmakuPlayer(ModeAwareRenderer())
+        player.engine.context.displayer = fakeDisplayer()
+        val bitmap = android.graphics.Bitmap.createBitmap(1280, 720, android.graphics.Bitmap.Config.ARGB_8888)
+        try {
+            player.updateData(data)
+            player.engine.start()
+            // 全时间轴 1s/帧粗扫（3857s）
+            var coarseMax = 0L
+            while (player.engine.getCurrentTimeMs() < 3_860_000L) {
+                val start = System.nanoTime()
+                player.engine.step(1f)
+                player.engine.preAct()
+                player.engine.act()
+                coarseMax = maxOf(coarseMax, System.nanoTime() - start)
+            }
+            // 最密分钟（240s，2338 条）30fps 密集推进并真实绘制
+            player.engine.seekTo(239_000)
+            var denseMax = 0L
+            var maxEntities = 0
+            repeat((30_000 / FRAME_INTERVAL_MS).toInt()) {
+                player.engine.step(FRAME_INTERVAL_MS / 1000f)
+                player.engine.preAct()
+                player.engine.act()
+                val start = System.nanoTime()
+                player.engine.draw(android.graphics.Canvas(bitmap)) {}
+                denseMax = maxOf(denseMax, System.nanoTime() - start)
+                maxEntities = maxOf(maxEntities, player.engine.entities.size())
+            }
+            println(
+                String.format(
+                    Locale.US,
+                    "[Perf] bv1u4: entries=%d coarseMax=%d ms, denseMax=%.1f ms, maxEntities=%d",
+                    data.size,
+                    coarseMax / 1_000_000,
+                    denseMax / 1_000_000.0,
+                    maxEntities,
+                ),
+            )
+            // 5450 条中 5449 条过官方门槛（1 条 5 字段载荷双端一致丢弃）
+            assertThat(data.size).isEqualTo(5449)
+            assertThat(maxEntities).isGreaterThan(0)
+        } finally {
+            player.release()
+            bitmap.recycle()
+        }
+    }
 }
