@@ -47,6 +47,13 @@ class RenderObject(
     var alpha = 1f
     var holding = false
 
+    // Snapshot measured bounds with the transform; the cache worker may remeasure the item later.
+    var width = 0f
+    var height = 0f
+
+    // When true, position is the complete translation and transform is intentionally unused.
+    var translationOnly = false
+
     override fun reset() {
     }
 }

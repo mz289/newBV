@@ -27,6 +27,7 @@ import android.util.Log
 import com.badlogic.ashley.core.Entity
 import com.badlogic.ashley.core.Family
 import com.kuaishou.akdanmaku.data.DanmakuItem
+import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.data.ItemState
 import com.kuaishou.akdanmaku.ecs.DanmakuContext
 import com.kuaishou.akdanmaku.ecs.DanmakuEngine
@@ -89,15 +90,10 @@ internal class LayoutSystem(
         val currentTimeMills = currentTimeMs
         var needSync = false
 
-        getEntities()
-            .filter { entity ->
-                val filter = entity.filter ?: return@filter false
-                !filter.filtered // 过滤
-            }.onEach { entity ->
-                val item = entity.dataComponent?.item ?: return@onEach
-                if (item.state == ItemState.Measuring) {
-                    return@onEach
-                }
+        for (entity in getEntities()) {
+            if (entity.filter?.filtered != false) continue
+            val item = entity.dataComponent?.item ?: continue
+            if (item.state != ItemState.Measuring) {
                 val needRemeasure = !item.drawState.isMeasured(config.measureGeneration)
                 if (item.state < ItemState.Measuring || needRemeasure) {
                     if (needRemeasure && item.state >= ItemState.Measuring) {
@@ -107,20 +103,24 @@ internal class LayoutSystem(
                     cacheManager.requestMeasure(item, displayer, config)
                     needSync = true
                 }
-            }.filter { entity ->
-                val item = entity.dataComponent?.item ?: return@filter false
-                item.state >= ItemState.Measured
-            }.forEach { entity ->
-                val item = entity.dataComponent?.item ?: return@forEach
+            }
+            if (item.state >= ItemState.Measured) {
                 val drawState = item.drawState
                 val layout =
-                    entity.layout ?: createComponent(LayoutComponent::class.java, entity, item) ?: return@forEach
+                    entity.layout ?: createComponent(LayoutComponent::class.java, entity, item) ?: continue
                 val needRelayout = drawState.layoutGeneration != config.layoutGeneration
                 if (needRelayout) {
                     drawState.visibility = false
                     layout.visibility = layouter.preLayout(item, currentTimeMills, displayer, config)
                 }
-                if (layout.visibility) {
+                // Dense bursts must rasterize/upload before entry, while the cache worker
+                // has the preceding data window available. Visibility still follows the timeline.
+                // With overlap disabled, ordinary tracks can reject most items in a dense burst;
+                // defer their rasterization until layout accepts them to avoid unused textures.
+                val preCache =
+                    (config.allowOverlap || item.data.mode == DanmakuItemData.DANMAKU_MODE_SPECIAL) &&
+                        item.timePosition - currentTimeMills in 0L..maxOf(PRE_CACHE_TIME_MS, config.preCacheTimeMs)
+                if (layout.visibility || preCache) {
                     synchronized(item.state) {
                         if (item.state < ItemState.Rendering) {
                             needSync = true
@@ -128,11 +128,14 @@ internal class LayoutSystem(
                             cacheManager.requestBuildCache(item, displayer, config)
                         }
                     }
+                }
+                if (layout.visibility) {
                     layouter.layout(item, currentTimeMills, displayer, config)
                     drawState.layoutGeneration = config.layoutGeneration
                 }
                 layout.position.set(drawState.positionX, drawState.positionY)
             }
+        }
         if (isPaused) {
             if (needSync) {
                 cacheManager.requestBuildSign()
@@ -177,5 +180,9 @@ internal class LayoutSystem(
             lines: Int,
             willHit: Boolean,
         ): Boolean = false
+    }
+
+    companion object {
+        private const val PRE_CACHE_TIME_MS = 4_000L
     }
 }

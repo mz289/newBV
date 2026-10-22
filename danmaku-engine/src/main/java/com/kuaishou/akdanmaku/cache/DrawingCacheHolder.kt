@@ -26,6 +26,8 @@ package com.kuaishou.akdanmaku.cache
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Rect
+import android.os.Build
 import com.kuaishou.akdanmaku.ext.EMPTY_BITMAP
 import java.lang.Exception
 import kotlin.math.max
@@ -37,8 +39,26 @@ import kotlin.math.max
  * @since 2021-06-22
  */
 class DrawingCacheHolder {
+    internal class Image(
+        val bitmap: Bitmap,
+        val source: Rect? = null,
+    ) {
+        val hardware = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && bitmap.config == Bitmap.Config.HARDWARE
+    }
+
+    @Volatile
+    internal var image = Image(EMPTY_BITMAP)
+        private set
+
+    private var bitmapDensity = Bitmap.DENSITY_NONE
+
     var canvas: Canvas = Canvas()
-    var bitmap: Bitmap = EMPTY_BITMAP
+    var bitmap: Bitmap
+        get() = image.bitmap
+        set(value) {
+            bitmapDensity = value.density
+            image = Image(value)
+        }
     var width: Int = 0
     var height: Int = 0
 
@@ -51,7 +71,7 @@ class DrawingCacheHolder {
     ) {
         val reuse = if (checkSize) (w == width && h == height) else w <= width && h <= height
         if (bitmap != EMPTY_BITMAP && !bitmap.isRecycled) {
-            if (reuse) {
+            if (reuse && bitmap.isMutable) {
                 bitmap.eraseColor(Color.TRANSPARENT)
                 canvas.setBitmap(bitmap)
                 return
@@ -80,7 +100,38 @@ class DrawingCacheHolder {
 
     fun erase() {
         if (bitmap.isRecycled) return
-        bitmap.eraseColor(Color.TRANSPARENT)
+        if (bitmap.isMutable) {
+            bitmap.eraseColor(Color.TRANSPARENT)
+        } else {
+            // A GPU cache is immutable. Recycled pool entries need a fresh writable staging bitmap.
+            val density = bitmapDensity
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply { this.density = density }
+            canvas.setBitmap(bitmap)
+        }
+    }
+
+    /** Upload once on the cache worker and release the CPU staging canvas. */
+    internal fun prepareForHardwareRendering(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || bitmap == EMPTY_BITMAP || bitmap.isRecycled) return false
+        if (bitmap.config == Bitmap.Config.HARDWARE) return true
+        return try {
+            val uploaded = bitmap.copy(Bitmap.Config.HARDWARE, false) ?: return false
+            canvas.setBitmap(null)
+            bitmap = uploaded
+            true
+        } catch (_: RuntimeException) {
+            false
+        } catch (_: OutOfMemoryError) {
+            false
+        }
+    }
+
+    internal fun useHardwareAtlas(
+        atlas: Bitmap,
+        source: Rect,
+    ) {
+        canvas.setBitmap(null)
+        image = Image(atlas, source)
     }
 
     fun recycle() {

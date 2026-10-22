@@ -27,6 +27,9 @@ import android.graphics.Matrix
 import android.graphics.PointF
 import com.badlogic.gdx.utils.Array
 import com.kuaishou.akdanmaku.ecs.base.DanmakuBaseComponent
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * 持有 Action，计算 Action 以及计算后结果的 Component
@@ -45,10 +48,45 @@ class ActionComponent : DanmakuBaseComponent() {
 
     var alpha = 1f
 
+    private val matrixValues = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
+    private var matrixRotation = Float.NaN
+    private var matrixScaleX = Float.NaN
+    private var matrixScaleY = Float.NaN
+
     fun toTransformMatrix(matrix: Matrix) {
-        matrix.setScale(scale.x, scale.y)
-        matrix.postRotate(rotation)
-        matrix.postTranslate(position.x, position.y)
+        if (rotation == 0f && scale.x == 1f && scale.y == 1f) {
+            matrix.setTranslate(position.x, position.y)
+            return
+        }
+        if (rotation != matrixRotation || scale.x != matrixScaleX || scale.y != matrixScaleY) {
+            matrixRotation = rotation
+            matrixScaleX = scale.x
+            matrixScaleY = scale.y
+            val angle = (rotation % 360f + 360f) % 360f
+            // Keep right-angle rotations exact, as Matrix.setRotate does.
+            val cosine =
+                when (angle) {
+                    0f -> 1f
+                    90f, 270f -> 0f
+                    180f -> -1f
+                    else -> cos(angle * PI / 180.0).toFloat()
+                }
+            val sine =
+                when (angle) {
+                    0f, 180f -> 0f
+                    90f -> 1f
+                    270f -> -1f
+                    else -> sin(angle * PI / 180.0).toFloat()
+                }
+            matrixValues[Matrix.MSCALE_X] = scale.x * cosine
+            matrixValues[Matrix.MSKEW_X] = -scale.y * sine
+            matrixValues[Matrix.MSKEW_Y] = scale.x * sine
+            matrixValues[Matrix.MSCALE_Y] = scale.y * cosine
+        }
+        matrixValues[Matrix.MTRANS_X] = position.x
+        matrixValues[Matrix.MTRANS_Y] = position.y
+        // One JNI call per moving sprite, rather than scale + rotation + translation calls.
+        matrix.setValues(matrixValues)
     }
 
     fun addAction(action: Action) {

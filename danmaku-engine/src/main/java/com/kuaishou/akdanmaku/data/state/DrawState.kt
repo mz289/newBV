@@ -26,7 +26,7 @@ package com.kuaishou.akdanmaku.data.state
 import android.graphics.Matrix
 import android.graphics.RectF
 import com.kuaishou.akdanmaku.cache.DrawingCache
-import com.kuaishou.akdanmaku.utils.onChange
+import kotlin.reflect.KProperty
 
 /**
  * 绘图状态
@@ -49,27 +49,36 @@ internal class DrawState : State() {
             return field
         }
 
-    private val generationMap = mutableMapOf<String, Int>().withDefault { -1 }
+    var layoutGeneration: Int = -1
+    var measureGeneration: Int = -1
+    var cacheGeneration: Int = -1
+    override var generation: Int = -1
 
-    var layoutGeneration: Int by generationMap
-    var measureGeneration: Int by generationMap
-    var cacheGeneration: Int by generationMap
-    override var generation: Int by generationMap
+    val hasTransform: Boolean
+        get() =
+            scaleX != 1f ||
+                scaleY != 1f ||
+                rotation != 0f ||
+                positionX + translateX != 0f ||
+                positionY + translateY != 0f
 
-    private val marker = { _: Float -> markDirty() }
+    val translationOnly: Boolean
+        get() = scaleX == 1f && scaleY == 1f && rotation == 0f
+
+    private val marker = { markDirty() }
     var drawingCache: DrawingCache = DrawingCache.EMPTY_DRAWING_CACHE
     var visibility: Boolean = false
     var alpha: Float = 1f
-    var positionX: Float by onChange(0f, marker)
-    var positionY: Float by onChange(0f, marker)
-    var width: Float by onChange(0f, marker)
-    var height: Float by onChange(0f, marker)
+    var positionX: Float by FloatProperty(0f, marker)
+    var positionY: Float by FloatProperty(0f, marker)
+    var width: Float by FloatProperty(0f, marker)
+    var height: Float by FloatProperty(0f, marker)
 
-    var translateX: Float by onChange(0f, marker)
-    var translateY: Float by onChange(0f, marker)
-    var scaleX: Float by onChange(1f, marker)
-    var scaleY: Float by onChange(1f, marker)
-    var rotation: Float by onChange(0f, marker)
+    var translateX: Float by FloatProperty(0f, marker)
+    var translateY: Float by FloatProperty(0f, marker)
+    var scaleX: Float by FloatProperty(1f, marker)
+    var scaleY: Float by FloatProperty(1f, marker)
+    var rotation: Float by FloatProperty(0f, marker)
 
     fun isMeasured(measureGeneration: Int): Boolean =
         width > 0f &&
@@ -122,7 +131,10 @@ internal class DrawState : State() {
 
     private fun updateMatrix(matrix: Matrix) {
         transformDirty = false
-        matrix.reset()
+        if (translationOnly) {
+            matrix.setTranslate(positionX + translateX, positionY + translateY)
+            return
+        }
         matrix.setScale(scaleX, scaleY)
         matrix.postRotate(rotation)
         matrix.postTranslate(positionX + translateX, positionY + translateY)
@@ -134,4 +146,26 @@ internal class DrawState : State() {
     }
 
     override fun toString(): String = "DrawState[measure: $measureGeneration, layout: $layoutGeneration]"
+}
+
+/** Primitive accessors avoid boxing every unchanged action reset into a new Float. */
+private class FloatProperty(
+    private var value: Float,
+    private val onChange: () -> Unit,
+) {
+    operator fun getValue(
+        thisRef: Any,
+        property: KProperty<*>,
+    ): Float = value
+
+    operator fun setValue(
+        thisRef: Any,
+        property: KProperty<*>,
+        newValue: Float,
+    ) {
+        if (value != newValue) {
+            value = newValue
+            onChange()
+        }
+    }
 }

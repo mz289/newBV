@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "${AppConfiguration.appId}.danmaku.engine"
     compileSdk = AppConfiguration.compileSdk
+    testBuildType = providers.gradleProperty("danmakuTestBuildType").orElse("debug").get()
 
     defaultConfig {
         minSdk = AppConfiguration.minSdk

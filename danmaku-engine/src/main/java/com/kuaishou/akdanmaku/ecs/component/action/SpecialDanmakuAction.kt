@@ -23,6 +23,7 @@
 
 package com.kuaishou.akdanmaku.ecs.component.action
 
+import android.graphics.PointF
 import com.kuaishou.akdanmaku.data.SpecialDanmakuSpec
 
 /**
@@ -69,8 +70,7 @@ class SpecialDanmakuAction(
         val time = timeMills.coerceAtLeast(0L)
 
         target.alpha = alphaAt(time).coerceIn(0f, 1f)
-        val position = positionAt(time)
-        target.position.set(position[0], position[1])
+        updatePosition(time, target.position)
         // 官方 rotateToAngle(-deg)：正向角度在画面上顺时针，等价于 Android 画布正角度旋转
         target.rotation = spec.rotateZ
         return time >= spec.animDelayMs + spec.animDurationMs
@@ -88,20 +88,28 @@ class SpecialDanmakuAction(
     }
 
     /** 关键帧折线插值：等分时长、段内缓动、越界停在首末帧。 */
-    private fun positionAt(time: Long): FloatArray {
+    private fun updatePosition(
+        time: Long,
+        position: PointF,
+    ) {
         val first = points.first()
-        if (time <= spec.animDelayMs) return first
+        if (time <= spec.animDelayMs) {
+            position.set(first[0], first[1])
+            return
+        }
         val last = points.last()
-        if (points.size <= 1 || spec.animDurationMs <= 0L) return last
         val elapsed = time - spec.animDelayMs
-        if (elapsed >= spec.animDurationMs) return last
+        if (points.size <= 1 || spec.animDurationMs <= 0L || elapsed >= spec.animDurationMs) {
+            position.set(last[0], last[1])
+            return
+        }
 
         val index = (elapsed / segmentDurationMs).toInt().coerceIn(0, points.size - 2)
         val from = points[index]
         val to = points[index + 1]
         var progress = (elapsed - index * segmentDurationMs) / segmentDurationMs
         if (spec.easeInOut) progress = easeInOut(progress)
-        return floatArrayOf(
+        position.set(
             from[0] + (to[0] - from[0]) * progress,
             from[1] + (to[1] - from[1]) * progress,
         )

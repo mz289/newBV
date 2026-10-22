@@ -9,7 +9,6 @@ import com.kuaishou.akdanmaku.DanmakuConfig
 import com.kuaishou.akdanmaku.data.DanmakuItem
 import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.data.SpecialDanmakuParser
-import java.io.File
 import com.kuaishou.akdanmaku.ui.DanmakuDisplayer
 import com.kuaishou.akdanmaku.utils.DisplayScaleFactor
 import org.junit.Test
@@ -17,6 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 import kotlin.math.ceil
 
 /**
@@ -72,7 +72,8 @@ class SpecialDanmakuRendererTest {
         val paint =
             TextPaint().apply {
                 textSize = fontSize * factor
-                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                typeface =
+                    android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             }
         val metrics = paint.fontMetrics
         return metrics.descent - metrics.ascent
@@ -82,7 +83,8 @@ class SpecialDanmakuRendererTest {
     private fun measurePaint(fontSize: Int): TextPaint =
         TextPaint().apply {
             textSize = fontSize * factorFor(displayer)
-            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            typeface =
+                android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
         }
 
     @Test
@@ -126,26 +128,88 @@ class SpecialDanmakuRendererTest {
     }
 
     @Test
+    fun `empty and trailing lines retain their measured height`() {
+        val config = DanmakuConfig()
+        val stroke = 2f * factorFor(displayer)
+        for ((text, lineCount) in listOf("" to 1, "\n" to 2, "M\n\n" to 3, "\nM\n" to 3)) {
+            val size = renderer.measure(item(text), displayer, config)
+            assertThat(size.height).isEqualTo(ceil(lineCount * lineAdvanceOf(18) + stroke).toInt())
+            val expectedWidth = if ('M' in text) measurePaint(18).measureText("M") else 0f
+            assertThat(size.width).isEqualTo(ceil(expectedWidth + stroke).toInt())
+        }
+    }
+
+    @Test
+    fun `reused paints follow display resize user scale and font size changes`() {
+        val text = item("M\nTest", size = 36, color = Color.DKGRAY)
+        val config = DanmakuConfig()
+        for ((width, scale) in listOf(1216 to 1f, 960 to 0.75f, 1920 to 1.5f, 1216 to 1f)) {
+            displayer.width = width
+            config.textSizeScale = scale
+            // Interleave another font size and color, as happens with mixed dense frames.
+            renderer.measure(item("small", size = 5), displayer, config)
+            val fresh = SpecialDanmakuRenderer()
+            val expectedSize = fresh.measure(text, displayer, config)
+            val actualSize = renderer.measure(text, displayer, config)
+            assertThat(actualSize.width).isEqualTo(expectedSize.width)
+            assertThat(actualSize.height).isEqualTo(expectedSize.height)
+            val expected = Bitmap.createBitmap(expectedSize.width, expectedSize.height, Bitmap.Config.ARGB_8888)
+            val actual = Bitmap.createBitmap(expectedSize.width, expectedSize.height, Bitmap.Config.ARGB_8888)
+            try {
+                fresh.draw(text, Canvas(expected), displayer, config)
+                renderer.draw(text, Canvas(actual), displayer, config)
+                assertThat(actual.sameAs(expected)).isTrue()
+            } finally {
+                expected.recycle()
+                actual.recycle()
+            }
+        }
+    }
+
+    @Test
     fun `self send style adds official box padding and paints the plate`() {
         val stroke = 2f * factorFor(displayer)
         val extra = 4f * factorFor(displayer) + 0.5f * stroke
         val plain = renderer.measure(item("MMMM"), displayer, DanmakuConfig())
-        val self = renderer.measure(item("MMMM", style = DanmakuItemData.DANMAKU_STYLE_SELF_SEND), displayer, DanmakuConfig())
+        val self =
+            renderer.measure(
+                item("MMMM", style = DanmakuItemData.DANMAKU_STYLE_SELF_SEND),
+                displayer,
+                DanmakuConfig(),
+            )
         // 官方：各边加 SELF_SENT_PADDING(4) × factor + 0.5 × 描边宽
         assertThat(self.width).isEqualTo(plain.width + (2 * extra).toInt())
         assertThat(self.height).isEqualTo(plain.height + (2 * extra).toInt())
 
         // 渲染：出现黑 30% 底（低alpha黑）与白描边像素
-        val bitmap = android.graphics.Bitmap.createBitmap(self.width, self.height, android.graphics.Bitmap.Config.ARGB_8888)
-        renderer.draw(item("MMMM", style = DanmakuItemData.DANMAKU_STYLE_SELF_SEND), android.graphics.Canvas(bitmap), displayer, DanmakuConfig())
+        val bitmap =
+            android.graphics.Bitmap.createBitmap(
+                self.width,
+                self.height,
+                android.graphics.Bitmap.Config.ARGB_8888,
+            )
+        renderer.draw(
+            item("MMMM", style = DanmakuItemData.DANMAKU_STYLE_SELF_SEND),
+            android.graphics.Canvas(bitmap),
+            displayer,
+            DanmakuConfig(),
+        )
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
         val plate = pixels.count { Color.alpha(it) in 1..127 && Color.red(it) == 0 }
-        val border = pixels.count { Color.alpha(it) > 200 && Color.red(it) > 200 && Color.green(it) > 200 && Color.blue(it) > 200 }
+        val border =
+            pixels.count {
+                Color.alpha(it) > 200 &&
+                    Color.red(it) > 200 &&
+                    Color.green(it) > 200 &&
+                    Color.blue(it) > 200
+            }
         File("build/bv1qx-scene/selfsend.png")
             .outputStream()
             .use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        File("build/bv1qx-scene/selfsend.txt").writeText("plate=$plate border=$border size=${self.width}x${self.height}")
+        File(
+            "build/bv1qx-scene/selfsend.txt",
+        ).writeText("plate=$plate border=$border size=${self.width}x${self.height}")
         assertThat(plate).isGreaterThan(0)
         assertThat(border).isGreaterThan(0)
         bitmap.recycle()
@@ -161,7 +225,13 @@ class SpecialDanmakuRendererTest {
     fun `stroke draws around the glyph in the official color`() {
         // 白字 → 黑边：出现近黑像素；深灰字（各通道 ≤ 0.3）→ 白边
         val white = renderInk(item("M", stroked = true), isProbe = { r, g, b -> r < 64 && g < 64 && b < 64 })
-        val dark = renderInk(item("M", stroked = true, color = Color.rgb(0x40, 0x40, 0x40)), isProbe = { r, g, b -> r > 200 && g > 200 && b > 200 })
+        val dark =
+            renderInk(item("M", stroked = true, color = Color.rgb(0x40, 0x40, 0x40)), isProbe = { r, g, b ->
+                r >
+                    200 &&
+                    g > 200 &&
+                    b > 200
+            })
         assertThat(white).isGreaterThan(0)
         assertThat(dark).isGreaterThan(0)
     }

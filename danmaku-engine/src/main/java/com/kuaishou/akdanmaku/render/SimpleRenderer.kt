@@ -35,7 +35,6 @@ import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.ui.DanmakuDisplayer
 import com.kuaishou.akdanmaku.utils.DisplayScaleFactor
 import com.kuaishou.akdanmaku.utils.Size
-import java.util.HashMap
 import kotlin.math.roundToInt
 
 /**
@@ -77,6 +76,14 @@ open class SimpleRenderer : DanmakuRenderer {
 
         /** 最近一次刷新算得的官方缩放因子（self-send 额外内边距用）。 */
         var suggestedFactor: Float = 1f
+
+        var displayWidth = -1
+        var displayHeight = -1
+        var density = Float.NaN
+        var textSize = Float.NaN
+        var bold: Boolean? = null
+        val fontMetrics = Paint.FontMetrics()
+        var textHeight = 0f
     }
 
     // 缓存线程与主线程会并发驱动同一渲染器，Paint 状态按线程隔离（DFM 同款双份策略）
@@ -94,20 +101,39 @@ open class SimpleRenderer : DanmakuRenderer {
         val danmakuItemData = item.data
         // update textPaint
         // 官方字号 = 载荷字号 × 可绘制区缩放因子 × 用户缩放（与高级弹幕同一缩放器）
-        val factor =
-            DisplayScaleFactor.suggestedFactor(
-                displayer.width.toFloat(),
-                displayer.height.toFloat(),
-                displayer.density,
-                DisplayScaleFactor.isTablet(displayer.width.toFloat(), displayer.height.toFloat(), displayer.density),
-            )
-        val textSize = clamp(danmakuItemData.textSize.toFloat(), 12f, 25f) * factor
+        if (paints.displayWidth != displayer.width ||
+            paints.displayHeight != displayer.height ||
+            paints.density != displayer.density
+        ) {
+            paints.displayWidth = displayer.width
+            paints.displayHeight = displayer.height
+            paints.density = displayer.density
+            paints.suggestedFactor =
+                DisplayScaleFactor.suggestedFactor(
+                    displayer.width.toFloat(),
+                    displayer.height.toFloat(),
+                    displayer.density,
+                    DisplayScaleFactor.isTablet(
+                        displayer.width.toFloat(),
+                        displayer.height.toFloat(),
+                        displayer.density,
+                    ),
+                )
+        }
+        val factor = paints.suggestedFactor
+        val textSize = clamp(danmakuItemData.textSize.toFloat(), 12f, 25f) * factor * config.textSizeScale
+        if (paints.textSize != textSize || paints.bold != config.bold) {
+            paints.textSize = textSize
+            paints.bold = config.bold
+            paints.textPaint.textSize = textSize
+            paints.strokePaint.textSize = textSize
+            paints.textPaint.typeface = if (config.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            paints.strokePaint.typeface = paints.textPaint.typeface
+            paints.textPaint.getFontMetrics(paints.fontMetrics)
+            paints.textHeight = paints.fontMetrics.descent - paints.fontMetrics.ascent + paints.fontMetrics.leading
+        }
         paints.textPaint.color = danmakuItemData.textColor or Color.argb(255, 0, 0, 0)
-        paints.textPaint.textSize = textSize * config.textSizeScale
-        paints.textPaint.typeface = if (config.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         // update strokePaint
-        paints.strokePaint.textSize = paints.textPaint.textSize
-        paints.strokePaint.typeface = paints.textPaint.typeface
         // 官方描边宽度同为「基准 2 × factor × 用户缩放」（模型 strokeWidth 默认 2）
         paints.strokePaint.strokeWidth = STROKE_WIDTH_BASE * factor * config.textSizeScale
         paints.strokePaint.color = if (paints.textPaint.color == DEFAULT_DARK_COLOR) Color.WHITE else Color.BLACK
@@ -143,7 +169,7 @@ open class SimpleRenderer : DanmakuRenderer {
         val paints = refreshPaints(item, displayer, config)
         val danmakuItemData = item.data
         val textWidth = paints.textPaint.measureText(danmakuItemData.content)
-        val textHeight = getCacheHeight(paints.textPaint)
+        val textHeight = paints.textHeight
         val extra = selfSendExtra(item, paints, config.textSizeScale)
         return Size(
             textWidth.roundToInt() + CANVAS_PADDING + (2 * extra).roundToInt(),
@@ -161,11 +187,15 @@ open class SimpleRenderer : DanmakuRenderer {
         val danmakuItemData = item.data
         val extra = selfSendExtra(item, paints, config.textSizeScale)
         val x = CANVAS_PADDING * 0.5f + extra
-        val y = CANVAS_PADDING * 0.5f - paints.textPaint.ascent() + extra
+        val y = CANVAS_PADDING * 0.5f - paints.fontMetrics.ascent + extra
         // 官方 self-send 底框：整盒黑 30% 填充 + 内缩描边宽/2 的白描边，垫在文字之下
         if (extra > 0f) {
-            val w = (paints.textPaint.measureText(danmakuItemData.content).roundToInt() + CANVAS_PADDING + (2 * extra).roundToInt()).toFloat()
-            val h = (getCacheHeight(paints.textPaint).roundToInt() + CANVAS_PADDING + (2 * extra).roundToInt()).toFloat()
+            val w =
+                (
+                    paints.textPaint.measureText(danmakuItemData.content).roundToInt() + CANVAS_PADDING +
+                        (2 * extra).roundToInt()
+                ).toFloat()
+            val h = (paints.textHeight.roundToInt() + CANVAS_PADDING + (2 * extra).roundToInt()).toFloat()
             val half = paints.strokePaint.strokeWidth / 2f
             canvas.drawRect(0f, 0f, w, h, paints.selfSendFillPaint)
             canvas.drawRect(half, half, w - half, h - half, paints.selfSendBorderPaint)
@@ -187,17 +217,5 @@ open class SimpleRenderer : DanmakuRenderer {
         private val DEFAULT_DARK_COLOR: Int = Color.argb(255, 0x22, 0x22, 0x22)
 
         private const val CANVAS_PADDING: Int = 6
-
-        private val sTextHeightCache: MutableMap<Float, Float> = HashMap()
-
-        private fun getCacheHeight(paint: Paint): Float {
-            val textSize = paint.textSize
-            return sTextHeightCache[textSize] ?: let {
-                val fontMetrics = paint.fontMetrics
-                val textHeight = fontMetrics.descent - fontMetrics.ascent + fontMetrics.leading
-                sTextHeightCache[textSize] = textHeight
-                textHeight
-            }
-        }
     }
 }

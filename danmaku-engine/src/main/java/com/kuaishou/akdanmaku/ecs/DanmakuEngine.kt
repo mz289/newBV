@@ -187,9 +187,11 @@ class DanmakuEngine(
 
     internal fun release() {
         timer.paused = true
-        systems.forEach { system ->
-            removeSystem(system)
+        removeAllEntities()
+        while (systems.size() > 0) {
+            removeSystem(systems[0])
         }
+        context.cacheManager.release()
     }
 
     internal fun seekTo(positionMs: Long) {

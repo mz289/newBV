@@ -34,7 +34,6 @@ import com.badlogic.gdx.utils.Pool
 import com.kuaishou.akdanmaku.DanmakuConfig
 import com.kuaishou.akdanmaku.cache.DrawingCache
 import com.kuaishou.akdanmaku.data.DanmakuItem
-import com.kuaishou.akdanmaku.data.DanmakuItemData
 import com.kuaishou.akdanmaku.data.ItemState
 import com.kuaishou.akdanmaku.ecs.DanmakuContext
 import com.kuaishou.akdanmaku.ecs.DanmakuEngine
@@ -74,6 +73,7 @@ internal class RenderSystem(
         Paint().apply {
             isAntiAlias = true
         }
+    private val drawBounds = RectF()
     private val callbackHandler = Handler(requireNotNull(Looper.myLooper()), this)
     private var resultGeneration = 0
 
@@ -120,22 +120,39 @@ internal class RenderSystem(
 
             val renderObject =
                 renderObjectPool.obtain().apply {
-                    cache.increaseReference()
+                    if (cache != DrawingCache.EMPTY_DRAWING_CACHE) cache.increaseReference()
                     this.item = item
                     drawingCache = cache
-                    transform.reset()
+                    width = drawState.width
+                    height = drawState.height
                     if (action != null) {
-                        // 动作驱动时位置由变换矩阵携带（矩阵含平移），bitmap 缓存未就绪的
-                        // 回退绘制路径也必须使用动作位置，否则会闪现在原点
+                        // The translation-only path snapshots position directly; complex transforms
+                        // use the matrix. Both cached and fallback drawing follow the same snapshot.
                         position.set(action.position)
                         rect.setEmpty()
-                        action.toTransformMatrix(transform)
                         alpha = action.alpha
-                        transform.postConcat(drawState.transform)
+                        translationOnly =
+                            action.rotation == 0f &&
+                            action.scale.x == 1f &&
+                            action.scale.y == 1f &&
+                            drawState.translationOnly
+                        if (translationOnly) {
+                            position.offset(
+                                drawState.positionX + drawState.translateX,
+                                drawState.positionY + drawState.translateY,
+                            )
+                        } else {
+                            action.toTransformMatrix(transform)
+                            if (drawState.hasTransform) transform.postConcat(drawState.transform)
+                        }
                     } else {
-                        transform.set(drawState.transform)
-                        position.set(drawState.positionX, drawState.positionY)
+                        position.set(
+                            drawState.positionX + drawState.translateX,
+                            drawState.positionY + drawState.translateY,
+                        )
                         rect.set(drawState.rect)
+                        translationOnly = drawState.translationOnly
+                        if (!translationOnly) transform.set(drawState.transform)
                     }
                     if (item.isHolding) {
                         alpha = 1f
@@ -147,9 +164,7 @@ internal class RenderSystem(
 
         // 官方层级：弹幕视图不设层级偏移，绘制顺序 = 子视图插入顺序 ≈ 弹幕时间顺序，
         // 高级弹幕不强制压在普通弹幕上层（按 position 稳定排序保持同刻先后）
-        newRenderObjects.sortBy { renderObject ->
-            renderObject.item.data.position
-        }
+        newRenderObjects.sortWith(RENDER_ORDER)
 
         synchronized(this) {
             renderResult?.let {
@@ -195,6 +210,7 @@ internal class RenderSystem(
         canvas: Canvas,
         onRenderReady: () -> Unit,
     ) {
+        danmakuContext.cacheManager.useHardwareBitmaps = canvas.isHardwareAccelerated
         val startTime = SystemClock.elapsedRealtime()
         val interval = startTime - lastDrawTime
         // 调用 renderSystem 的 draw 方法完成 renderObjectList 遍历 draw
@@ -238,12 +254,17 @@ internal class RenderSystem(
         try {
             var holdingObj: RenderObject? = null
             val displayer = danmakuDisplayer
+            var paintAlpha = drawPaint.alpha
             renderResult.renderObjects.forEach { renderObj ->
                 if (renderObj.holding) {
                     holdingObj = renderObj
                     return@forEach
                 }
-                drawPaint.alpha = (config.alpha * renderObj.alpha * 255).toInt()
+                val alpha = (config.alpha * renderObj.alpha * 255).toInt().coerceIn(0, 255)
+                if (paintAlpha != alpha) {
+                    drawPaint.alpha = alpha
+                    paintAlpha = alpha
+                }
                 if (drawRenderObject(canvas, renderObj, displayer, config)) {
                     cacheHitCount++
                 }
@@ -273,22 +294,75 @@ internal class RenderSystem(
         displayer: DanmakuDisplayer,
         config: DanmakuConfig,
     ): Boolean {
-        return if (obj.drawingCache != DrawingCache.EMPTY_DRAWING_CACHE &&
-            obj.drawingCache.get() != null &&
-            obj.item.drawState.cacheGeneration == config.cacheGeneration &&
-            obj.item.state >= ItemState.Rendered
-        ) {
-            obj.drawingCache.get()?.bitmap?.let {
-                if (it.isRecycled) return false
-                canvas.drawBitmap(it, obj.transform, drawPaint)
-                true
-            } ?: false
+        val image = obj.drawingCache.get()?.image
+        val bitmap = image?.bitmap
+        val cacheReady =
+            obj.drawingCache != DrawingCache.EMPTY_DRAWING_CACHE &&
+                image != null &&
+                bitmap != null &&
+                !bitmap.isRecycled &&
+                (!image.hardware || canvas.isHardwareAccelerated) &&
+                obj.item.drawState.cacheGeneration == config.cacheGeneration &&
+                obj.item.state >= ItemState.Rendered
+        // A fully transparent item still advances its animation and keeps its cache references.
+        if (drawPaint.alpha == 0) return cacheReady
+
+        val bounded = obj.width > 0f && obj.height > 0f
+        // HWUI already culls bitmap commands against the current clip. Avoid two JNI calls
+        // per sprite on that path; early rejection is useful for expensive software/fallback draws.
+        if (bounded && !(cacheReady && canvas.isHardwareAccelerated)) {
+            val width = if (cacheReady) (image.source?.width() ?: bitmap.width).toFloat() else obj.width
+            val height = if (cacheReady) (image.source?.height() ?: bitmap.height).toFloat() else obj.height
+            drawBounds.set(0f, 0f, width, height)
+            if (obj.translationOnly) {
+                drawBounds.offset(obj.position.x, obj.position.y)
+            } else {
+                obj.transform.mapRect(drawBounds)
+            }
+            // Test the transformed box so a rotated item whose anchor is offscreen still draws.
+            @Suppress("DEPRECATION")
+            if (canvas.quickReject(drawBounds, Canvas.EdgeType.AA)) return cacheReady
+        }
+
+        return if (cacheReady) {
+            val source = image.source
+            if (obj.translationOnly) {
+                drawBounds.set(
+                    obj.position.x,
+                    obj.position.y,
+                    obj.position.x + (source?.width() ?: bitmap.width),
+                    obj.position.y + (source?.height() ?: bitmap.height),
+                )
+                canvas.drawBitmap(bitmap, source, drawBounds, drawPaint)
+            } else if (source == null) {
+                canvas.drawBitmap(bitmap, obj.transform, drawPaint)
+            } else {
+                val saved = canvas.save()
+                try {
+                    canvas.concat(obj.transform)
+                    drawBounds.set(0f, 0f, source.width().toFloat(), source.height().toFloat())
+                    canvas.drawBitmap(bitmap, source, drawBounds, drawPaint)
+                } finally {
+                    canvas.restoreToCount(saved)
+                }
+            }
+            true
         } else {
             val saveCount = canvas.save()
             try {
-                canvas.concat(obj.transform)
+                if (obj.translationOnly) {
+                    canvas.translate(obj.position.x, obj.position.y)
+                } else {
+                    canvas.concat(obj.transform)
+                }
                 // Apply opacity once to the composed stroke + fill, just like a cached bitmap.
-                if (drawPaint.alpha < 255) canvas.saveLayerAlpha(null, drawPaint.alpha)
+                if (drawPaint.alpha < 255) {
+                    if (bounded) {
+                        canvas.saveLayerAlpha(0f, 0f, obj.width, obj.height, drawPaint.alpha)
+                    } else {
+                        canvas.saveLayerAlpha(null, drawPaint.alpha)
+                    }
+                }
                 danmakuContext.renderer.updatePaint(obj.item, displayer, config)
                 danmakuContext.renderer.draw(obj.item, canvas, displayer, config)
             } finally {
@@ -321,9 +395,11 @@ internal class RenderSystem(
                 drawingCache = DrawingCache.EMPTY_DRAWING_CACHE
                 rect.setEmpty()
                 position.set(0f, 0f)
-                transform.reset()
                 alpha = 1f
                 holding = false
+                width = 0f
+                height = 0f
+                translationOnly = false
             }
         }
     }
@@ -344,7 +420,15 @@ internal class RenderSystem(
     )
 
     companion object {
-        private const val MAX_RENDER_OBJECT_POOL_SIZE = 500
+        // Reuse the comparator and compare primitive longs without boxing each timestamp.
+        private val RENDER_ORDER =
+            Comparator<RenderObject> { left, right ->
+                left.item.data.position
+                    .compareTo(right.item.data.position)
+            }
+
+        // Keep an entire retired 2,000-item frame, so dense playback reuses both frame buffers.
+        private const val MAX_RENDER_OBJECT_POOL_SIZE = 2_048
         private const val INITIAL_POOL_SIZE = 200
 
         private const val OVERLOAD_INTERVAL = 20

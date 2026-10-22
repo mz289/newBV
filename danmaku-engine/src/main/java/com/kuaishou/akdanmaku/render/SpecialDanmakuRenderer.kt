@@ -60,6 +60,8 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
                 color = Color.WHITE
                 style = Paint.Style.FILL
                 isAntiAlias = true
+                typeface = OFFICIAL_TYPEFACE
+                isFakeBoldText = true
             }
         val strokePaint =
             TextPaint().apply {
@@ -69,6 +71,8 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
                 // 官方先描边（仅轮廓）再填充，两遍绘制
                 style = Paint.Style.STROKE
                 isAntiAlias = true
+                typeface = OFFICIAL_TYPEFACE
+                isFakeBoldText = true
             }
 
         /** 官方 self-send 底框：黑 30% 填充（DestinationOver 垫在文字下）。 */
@@ -91,6 +95,13 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
 
         /** 最近一次刷新算得的官方缩放因子（self-send 额外内边距用）。 */
         var suggestedFactor: Float = 1f
+
+        var displayWidth = -1
+        var displayHeight = -1
+        var density = Float.NaN
+        var textSize = Float.NaN
+        val fontMetrics = Paint.FontMetrics()
+        var lineAdvance = 0f
     }
 
     // 缓存线程与主线程会并发驱动同一渲染器（DFM 以 PAINT/PAINT_DUPLICATE 双份规避竞争）
@@ -108,29 +119,42 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
         val data = item.data
         // 官方字号 = 载荷字号 × 可绘制区缩放因子 × 用户缩放；
         // 描边宽度同倍率缩放
-        val factor =
-            DisplayScaleFactor.suggestedFactor(
-                displayer.width.toFloat(),
-                displayer.height.toFloat(),
-                displayer.density,
-                DisplayScaleFactor.isTablet(displayer.width.toFloat(), displayer.height.toFloat(), displayer.density),
-            )
+        if (paints.displayWidth != displayer.width ||
+            paints.displayHeight != displayer.height ||
+            paints.density != displayer.density
+        ) {
+            paints.displayWidth = displayer.width
+            paints.displayHeight = displayer.height
+            paints.density = displayer.density
+            paints.suggestedFactor =
+                DisplayScaleFactor.suggestedFactor(
+                    displayer.width.toFloat(),
+                    displayer.height.toFloat(),
+                    displayer.density,
+                    DisplayScaleFactor.isTablet(
+                        displayer.width.toFloat(),
+                        displayer.height.toFloat(),
+                        displayer.density,
+                    ),
+                )
+        }
+        val factor = paints.suggestedFactor
         val textSize = (data.textSize * factor * config.textSizeScale).coerceAtLeast(1f)
         val strokeWidth = STROKE_WIDTH * factor * config.textSizeScale
         // 官方弹幕字体恒为系统粗体并叠加仿粗，载荷第 13 项字体名不使用，
         // 因此这里固定粗体 + fakeBold
-        paints.textPaint.textSize = textSize
+        if (paints.textSize != textSize) {
+            paints.textSize = textSize
+            paints.textPaint.textSize = textSize
+            paints.strokePaint.textSize = textSize
+            paints.textPaint.getFontMetrics(paints.fontMetrics)
+            paints.lineAdvance = paints.fontMetrics.descent - paints.fontMetrics.ascent
+        }
         paints.textPaint.color = data.textColor or Color.argb(255, 0, 0, 0)
-        paints.textPaint.typeface = OFFICIAL_TYPEFACE
-        paints.textPaint.isFakeBoldText = true
-        paints.strokePaint.textSize = textSize
-        paints.strokePaint.typeface = OFFICIAL_TYPEFACE
-        paints.strokePaint.isFakeBoldText = true
         paints.strokePaint.strokeWidth = strokeWidth
         paints.strokePaint.color = strokeColorFor(paints.textPaint.color)
         paints.selfSendBorderPaint.strokeWidth = strokeWidth
         paints.strokeWidth = strokeWidth
-        paints.suggestedFactor = factor
         return paints
     }
 
@@ -150,7 +174,10 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
         val red = Color.red(fillColor) / 255f
         val green = Color.green(fillColor) / 255f
         val blue = Color.blue(fillColor) / 255f
-        return if (red > STROKE_CHANNEL_THRESHOLD || green > STROKE_CHANNEL_THRESHOLD || blue > STROKE_CHANNEL_THRESHOLD) {
+        return if (red > STROKE_CHANNEL_THRESHOLD ||
+            green > STROKE_CHANNEL_THRESHOLD ||
+            blue > STROKE_CHANNEL_THRESHOLD
+        ) {
             Color.BLACK
         } else {
             Color.WHITE
@@ -171,15 +198,19 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
         config: DanmakuConfig,
     ): Size {
         val paints = refreshPaints(item, displayer, config)
-        val lines = item.data.content.split('\n')
+        val content = item.data.content
         var maxWidth = 0f
-        lines.forEach { line -> maxWidth = maxOf(maxWidth, paints.textPaint.measureText(line)) }
+        var lineCount = 0
+        forEachLine(content) { start, end, index ->
+            maxWidth = maxOf(maxWidth, paints.textPaint.measureText(content, start, end))
+            lineCount = index + 1
+        }
         val extra = selfSendExtra(item, paints, config.textSizeScale)
         // 官方盒尺寸：宽 = 最长行 advance + strokeWidth，高 = 行数 × 行距 + strokeWidth，
         // self-send 弹幕再各边加额外内边距（盒四边各留 strokeWidth/2 容纳居中描边）
         return Size(
             ceil(maxWidth + paints.strokeWidth + 2 * extra).toInt(),
-            ceil(lineAdvance(paints.textPaint) * lines.size + paints.strokeWidth + 2 * extra).toInt(),
+            ceil(paints.lineAdvance * lineCount + paints.strokeWidth + 2 * extra).toInt(),
         )
     }
 
@@ -190,43 +221,54 @@ open class SpecialDanmakuRenderer : DanmakuRenderer {
         config: DanmakuConfig,
     ) {
         val paints = refreshPaints(item, displayer, config)
-        val advance = lineAdvance(paints.textPaint)
+        val advance = paints.lineAdvance
         val extra = selfSendExtra(item, paints, config.textSizeScale)
         // 官方绘制：笔位 x = strokeWidth/2 + 额外内边距，首行基线 = -ascent + strokeWidth/2 + 额外内边距，
         // 之后每行推进一个行距（descent − ascent）
-        val baseline = -paints.textPaint.fontMetrics.ascent + paints.strokeWidth / 2f + extra
+        val baseline = -paints.fontMetrics.ascent + paints.strokeWidth / 2f + extra
         val x = paints.strokeWidth / 2f + extra
         val stroked = item.data.special?.stroked != false
-        val lines = item.data.content.split('\n')
-        val boxWidth =
-            ceil(lines.maxOf { paints.textPaint.measureText(it) } + paints.strokeWidth + 2 * extra)
-        val boxHeight = ceil(advance * lines.size + paints.strokeWidth + 2 * extra)
-        for ((index, line) in lines.withIndex()) {
+        val content = item.data.content
+        var maxWidth = 0f
+        var lineCount = 0
+        forEachLine(content) { start, end, index ->
             val y = baseline + advance * index
             if (stroked) {
-                canvas.drawText(line, x, y, paints.strokePaint)
+                canvas.drawText(content, start, end, x, y, paints.strokePaint)
             }
-            canvas.drawText(line, x, y, paints.textPaint)
+            canvas.drawText(content, start, end, x, y, paints.textPaint)
+            // Only self-send items need box dimensions during drawing. Normal items were measured
+            // by the cache worker already; reshaping every line here stalls dense fallback frames.
+            if (extra > 0f) {
+                maxWidth = maxOf(maxWidth, paints.textPaint.measureText(content, start, end))
+                lineCount = index + 1
+            }
         }
         // 官方 self-send 底框：整盒黑 30% 填充 + 内缩 strokeWidth/2 的白描边，垫在文字之下
-        //（官方用 DestinationOver 垫底，这里先画框后画字，透明位图上等价）
+        // （官方用 DestinationOver 垫底，这里先画框后画字，透明位图上等价）
         if (extra > 0f) {
+            val boxWidth = ceil(maxWidth + paints.strokeWidth + 2 * extra)
+            val boxHeight = ceil(advance * lineCount + paints.strokeWidth + 2 * extra)
             canvas.drawRect(0f, 0f, boxWidth, boxHeight, paints.selfSendFillPaint)
             val half = paints.strokeWidth / 2f
             canvas.drawRect(half, half, boxWidth - half, boxHeight - half, paints.selfSendBorderPaint)
         }
     }
 
-    /**
-     * 行距 = 字体度量高（`descent − ascent`）。
-     *
-     * 官方多行文本由 cron 原生画布按字体度量逐行布局（`measureText().height` 即度量高，
-     * 盒高 = 行数 × 度量高 + 描边宽只加一次），与 DFM `SimpleTextCacheStuffer` 的
-     * `lines.length × (descent − ascent + leading)` 同款约定。
-     */
-    private fun lineAdvance(textPaint: TextPaint): Float {
-        val metrics = textPaint.fontMetrics
-        return metrics.descent - metrics.ascent
+    /** Iterate string ranges without allocating substrings, preserving empty and trailing lines. */
+    private inline fun forEachLine(
+        content: String,
+        block: (start: Int, end: Int, index: Int) -> Unit,
+    ) {
+        var start = 0
+        var index = 0
+        while (true) {
+            val newline = content.indexOf('\n', start)
+            val end = if (newline < 0) content.length else newline
+            block(start, end, index++)
+            if (newline < 0) return
+            start = newline + 1
+        }
     }
 
     companion object {

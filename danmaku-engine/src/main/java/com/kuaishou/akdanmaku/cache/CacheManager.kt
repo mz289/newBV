@@ -59,10 +59,19 @@ class CacheManager(
     }
     private val cacheHandler by lazy { CacheHandler(cacheThread.looper) }
     private var cancelFlag = false
+    private var releaseRequested = false
+
+    @Volatile
+    internal var useHardwareBitmaps = false
+    private val hardwareBitmapBatch by lazy {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) HardwareBitmapBatch() else null
+    }
 
     private val measureSizeCache = Collections.synchronizedMap(mutableMapOf<Long, Size>())
 
     val cachePool = DrawingCachePool(CACHE_POOL_MAX_MEMORY_SIZE)
+
+    @Volatile
     var isReleased: Boolean = false
         private set
 
@@ -100,12 +109,12 @@ class CacheManager(
 
     fun cancelAllRequests() {
         cacheHandler.removeCallbacksAndMessages(null)
+        cacheHandler.sendEmptyMessage(WORKER_MSG_FLUSH_HARDWARE)
         cancelFlag = true
     }
 
     fun requestRelease() {
-        cancelAllRequests()
-        cacheHandler.sendEmptyMessage(WORKER_MSG_RELEASE)
+        release()
     }
 
     fun destroyCache(cache: DrawingCache) {
@@ -128,13 +137,17 @@ class CacheManager(
         }
 
     fun release() {
+        if (releaseRequested) return
+        releaseRequested = true
         if (available) {
             cancelAllRequests()
             try {
-                cacheThread.quitSafely()
+                cacheHandler.sendEmptyMessage(WORKER_MSG_RELEASE)
             } catch (e: Exception) {
                 Log.w(DanmakuEngine.TAG, "CacheManager release failed", e)
             }
+        } else {
+            isReleased = true
         }
         available = false
     }
@@ -199,7 +212,6 @@ class CacheManager(
                                     info.displayer.densityDpi,
                                     checkSize = true,
                                 )
-                        drawState.drawingCache.erase()
                         drawState.drawingCache.increaseReference()
                         drawState.drawingCache.cacheManager = this@CacheManager
                     }
@@ -216,7 +228,13 @@ class CacheManager(
                     // draw cache
                     synchronized(drawState) {
                         try {
+                            drawState.drawingCache.erase()
                             renderer.draw(item, holder.canvas, info.displayer, config)
+                            if (useHardwareBitmaps && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                hardwareBitmapBatch?.add(drawState.drawingCache)
+                                removeMessages(WORKER_MSG_FLUSH_HARDWARE)
+                                sendEmptyMessageDelayed(WORKER_MSG_FLUSH_HARDWARE, 4L)
+                            }
                             item.state = ItemState.Rendered
                             item.drawState.cacheGeneration = config.cacheGeneration
                         } catch (e: Exception) {
@@ -240,7 +258,10 @@ class CacheManager(
                     (msg.obj as? DrawingCache)?.destroy()
                 }
                 WORKER_MSG_RELEASE_ITEM -> {
-                    (msg.obj as? DrawingCache)?.let { if (!cachePool.release(it)) it.destroy() }
+                    (msg.obj as? DrawingCache)?.let { if (isReleased || !cachePool.release(it)) it.destroy() }
+                }
+                WORKER_MSG_FLUSH_HARDWARE -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) hardwareBitmapBatch?.flush()
                 }
                 WORKER_MSG_RENDER_SIGN -> {
                     callbackHandler.sendEmptyMessage(MSG_CACHE_RENDER)
@@ -272,6 +293,7 @@ class CacheManager(
         private const val WORKER_MSG_CLEAR_CACHE = 3
         private const val WORKER_MSG_DESTROY = 4
         private const val WORKER_MSG_RELEASE_ITEM = 5
+        private const val WORKER_MSG_FLUSH_HARDWARE = 6
 
         const val MSG_CACHE_RENDER = -1
         const val MSG_CACHE_MEASURED = 0
