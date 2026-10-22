@@ -830,6 +830,18 @@ class PlayerViewModelTest {
             assertThat(viewModel.videoPlayer).isNull()
         }
 
+    // ── session flag test ─────────────────────────────────────
+
+    @Test
+    fun `markSessionStarted flips isSessionStarted from false to true`() =
+        runTest(testDispatcher) {
+            assertThat(viewModel.isSessionStarted).isFalse()
+
+            viewModel.markSessionStarted()
+
+            assertThat(viewModel.isSessionStarted).isTrue()
+        }
+
     // ── trySendHeartbeat test ─────────────────────────────────
 
     @Test

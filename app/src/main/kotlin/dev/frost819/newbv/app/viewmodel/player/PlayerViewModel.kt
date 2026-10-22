@@ -57,6 +57,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -126,6 +127,20 @@ class PlayerViewModel
         /** 视频播放器实例，供 Compose `AndroidView` 绑定。 */
         var videoPlayer: ExoMediaPlayer? by mutableStateOf(null)
             private set
+
+        /**
+         * 本播放会话是否已完成首次加载（视频详情、弹幕、播放地址）。
+         *
+         * 播放页被详情/UP 主空间覆盖后再返回时，页面会重新组合，但 ViewModel 与播放器仍然存活，
+         * 据此跳过重复加载，避免从头播放。
+         */
+        var isSessionStarted: Boolean = false
+            private set
+
+        /** 标记播放会话已完成首次加载，见 [isSessionStarted]。 */
+        fun markSessionStarted() {
+            isSessionStarted = true
+        }
 
         private var playData: PlayData? = null
 
@@ -680,6 +695,7 @@ class PlayerViewModel
          * 创建 ExoPlayer 并绑定事件监听器。
          */
         fun initVideoPlayer(context: Context) {
+            if (videoPlayer != null) return
             val apiType = Prefs.apiType
             // 外部直链：B 站 CDN 链接需要 B 站 Referer 防盗链，其余用通用 UA
             val userAgent =
@@ -1814,7 +1830,9 @@ class PlayerViewModel
         )
 
         override fun onCleared() {
+            // 退出页面时才真正释放播放器（进入详情等覆盖页面不会走到这里）
+            detachPlayer()
             super.onCleared()
-            detachedWorkScope.cancel()
+            // 不取消 detachedWorkScope：退出前的最后一次进度上报需要在 VM 清理后继续完成，由超时兜底
         }
     }
