@@ -24,8 +24,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.upstream.ParsingLoadable
-import dev.frost819.newbv.player.AbstractVideoPlayer
 import dev.frost819.newbv.player.OkHttpUtil
+import dev.frost819.newbv.player.VideoPlayerListener
 import dev.frost819.newbv.player.VideoPlayerOptions
 import dev.frost819.newbv.player.formatMinSec
 import java.io.ByteArrayInputStream
@@ -48,20 +48,20 @@ import java.util.Locale
 class ExoMediaPlayer(
     private val context: Context,
     private val options: VideoPlayerOptions,
-) : AbstractVideoPlayer(),
-    Player.Listener {
+) : Player.Listener {
     companion object {
         private const val BEHIND_LIVE_WINDOW_RECOVER_WINDOW_MS = 15_000L
         private const val BEHIND_LIVE_WINDOW_RECOVER_MIN_INTERVAL_MS = 1_200L
         private const val BEHIND_LIVE_WINDOW_MAX_RECOVERS = 2
     }
 
-    /** ExoPlayer 实例，在 [initPlayer] 中创建 */
-    var mPlayer: ExoPlayer? = null
-        private set
+    private var playerEventListener: VideoPlayerListener? = null
+
+    /** 播放器与包装对象具有相同生命周期，只创建一次。 */
+    val mPlayer: ExoPlayer
 
     /** 当前 MediaSource，在 [playUrl] 中创建 */
-    protected var mMediaSource: MediaSource? = null
+    private var mMediaSource: MediaSource? = null
 
     /** 当前播放的流协议（"FLV" / "HLS" / "DASH" / "Unknown"），在 [playUrl] 中赋值 */
     var streamProtocol: String = "Unknown"
@@ -82,10 +82,14 @@ class ExoMediaPlayer(
     private val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 
     init {
-        initPlayer()
+        mPlayer = createPlayer()
     }
 
-    override fun initPlayer() {
+    fun setPlayerEventListener(listener: VideoPlayerListener?) {
+        playerEventListener = listener
+    }
+
+    private fun createPlayer(): ExoPlayer {
         val renderersFactory =
             DefaultRenderersFactory(context).apply {
                 setExtensionRendererMode(
@@ -114,18 +118,16 @@ class ExoMediaPlayer(
                     setMediaCodecSelector(MediaCodecSelector.DEFAULT)
                 }
             }
-        mPlayer =
-            ExoPlayer
-                .Builder(context)
-                .setRenderersFactory(renderersFactory)
-                .build()
-
-        mPlayer?.addListener(this)
+        return ExoPlayer
+            .Builder(context)
+            .setRenderersFactory(renderersFactory)
+            .build()
+            .also { it.addListener(this) }
     }
 
-    override fun playUrl(
-        videoUrl: String?,
-        audioUrl: String?,
+    fun playUrl(
+        videoUrl: String? = null,
+        audioUrl: String? = null,
     ) {
         streamProtocol = resolveStreamProtocol(videoUrl, audioUrl)
         val videoMediaSource = videoUrl?.let { createMediaSource(it) }
@@ -189,81 +191,77 @@ class ExoMediaPlayer(
         }
     }
 
-    override fun prepare() {
+    fun prepare() {
         mMediaSource?.let {
-            mPlayer?.setMediaSource(it)
-            mPlayer?.prepare()
+            mPlayer.setMediaSource(it)
+            mPlayer.prepare()
         }
     }
 
-    override fun start() {
-        mPlayer?.play()
+    fun start() {
+        mPlayer.play()
     }
 
-    override fun pause() {
-        mPlayer?.pause()
+    fun pause() {
+        mPlayer.pause()
     }
 
-    override fun stop() {
-        mPlayer?.stop()
+    fun stop() {
+        mPlayer.stop()
     }
 
-    override val isPlaying: Boolean
-        get() = mPlayer?.isPlaying == true
+    val isPlaying: Boolean
+        get() = mPlayer.isPlaying
 
-    override fun seekTo(time: Long) {
-        mPlayer?.seekTo(time)
+    fun seekTo(time: Long) {
+        mPlayer.seekTo(time)
     }
 
-    override fun release() {
-        mPlayer?.release()
+    fun release() {
+        mPlayer.release()
     }
 
-    override val currentPosition: Long
-        get() = mPlayer?.currentPosition ?: 0
-    override val duration: Long
-        get() = mPlayer?.duration ?: 0
-    override val bufferedPercentage: Int
-        get() = mPlayer?.bufferedPercentage ?: 0
+    val currentPosition: Long
+        get() = mPlayer.currentPosition
+    val duration: Long
+        get() = mPlayer.duration
+    val bufferedPercentage: Int
+        get() = mPlayer.bufferedPercentage
 
-    override fun setOptions() {
-        mPlayer?.playWhenReady = true
-    }
-
-    override var speed: Float
-        get() = mPlayer?.playbackParameters?.speed ?: 1f
+    var speed: Float
+        get() = mPlayer.playbackParameters.speed
         set(value) {
-            mPlayer?.setPlaybackSpeed(value)
+            mPlayer.setPlaybackSpeed(value)
         }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
         when (playbackState) {
             Player.STATE_IDLE -> {}
-            Player.STATE_BUFFERING -> mPlayerEventListener?.onBuffering()
-            Player.STATE_READY -> mPlayerEventListener?.onReady()
-            Player.STATE_ENDED -> mPlayerEventListener?.onEnd()
+            Player.STATE_BUFFERING -> playerEventListener?.onBuffering()
+            Player.STATE_READY -> playerEventListener?.onReady()
+            Player.STATE_ENDED -> playerEventListener?.onEnd()
         }
     }
 
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         if (isPlaying) {
-            mPlayerEventListener?.onPlay()
+            playerEventListener?.onPlay()
         } else {
-            mPlayerEventListener?.onPause()
+            playerEventListener?.onPause()
         }
     }
 
-    override val debugInfo: String
+    val debugInfo: String
         get() {
             return """
                 player: ${androidx.media3.common.MediaLibraryInfo.VERSION_SLASHY}
                 time: ${currentPosition.formatMinSec()} / ${duration.formatMinSec()}
                 speed: ${speed}x
                 buffered: $bufferedPercentage%
-                resolution: ${mPlayer?.videoSize?.width} x ${mPlayer?.videoSize?.height}
-                audio: ${mPlayer?.audioFormat?.bitrate ?: 0} kbps
-                video codec: ${mPlayer?.videoFormat?.sampleMimeType ?: "null"}
-                audio codec: ${mPlayer?.audioFormat?.sampleMimeType ?: "null"} ($audioRendererName)
+                resolution: ${mPlayer.videoSize.width} x ${mPlayer.videoSize.height}
+                audio: ${mPlayer.audioFormat?.bitrate ?: 0} kbps
+                video codec: ${mPlayer.videoFormat?.sampleMimeType ?: "null"}
+                audio codec: ${mPlayer.audioFormat?.sampleMimeType ?: "null"} ($audioRendererName)
                 """.trimIndent()
         }
 
@@ -272,9 +270,9 @@ class ExoMediaPlayer(
         get() = findAudioRendererName()
 
     private fun findAudioRendererName(): String {
-        val rendererCount = mPlayer?.rendererCount ?: return "UnknownRenderer"
+        val rendererCount = mPlayer.rendererCount
         for (i in 0 until rendererCount) {
-            val renderer = mPlayer!!.getRenderer(i)
+            val renderer = mPlayer.getRenderer(i)
             if (renderer.trackType == C.TRACK_TYPE_AUDIO && renderer.state == Renderer.STATE_STARTED) {
                 return renderer.name
             }
@@ -282,10 +280,10 @@ class ExoMediaPlayer(
         return "UnknownRenderer"
     }
 
-    override val videoWidth: Int
-        get() = mPlayer?.videoSize?.width ?: 0
-    override val videoHeight: Int
-        get() = mPlayer?.videoSize?.height ?: 0
+    val videoWidth: Int
+        get() = mPlayer.videoSize.width
+    val videoHeight: Int
+        get() = mPlayer.videoSize.height
 
     override fun onPlayerError(error: PlaybackException) {
         if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
@@ -294,10 +292,10 @@ class ExoMediaPlayer(
         }
         // 解码器无法处理当前格式：上报专用信号，交由上层尝试回退编码/画质
         if (isVideoDecodeError(error.errorCode)) {
-            mPlayerEventListener?.onVideoDecodeUnsupported()
+            playerEventListener?.onVideoDecodeUnsupported()
             return
         }
-        mPlayerEventListener?.onError(error)
+        playerEventListener?.onError(error)
     }
 
     /**
@@ -310,11 +308,7 @@ class ExoMediaPlayer(
      * 频率限制：15 秒滑动窗口内最多 2 次，最小间隔 1.2 秒。
      */
     private fun tryRecoverBehindLiveWindow(error: PlaybackException) {
-        val player =
-            mPlayer ?: run {
-                mPlayerEventListener?.onError(error)
-                return
-            }
+        val player = mPlayer
         val nowMs = android.os.SystemClock.elapsedRealtime()
 
         // 重置窗口（超过 15 秒或首次）
@@ -332,7 +326,7 @@ class ExoMediaPlayer(
 
         // 超过最大恢复次数，上报 error
         if (behindLiveWindowRecoverCount >= BEHIND_LIVE_WINDOW_MAX_RECOVERS) {
-            mPlayerEventListener?.onError(error)
+            playerEventListener?.onError(error)
             return
         }
 
@@ -353,7 +347,7 @@ class ExoMediaPlayer(
                 player.playWhenReady = true
             } ?: run {
                 // 无 MediaSource 可重建，直接上报
-                mPlayerEventListener?.onError(error)
+                playerEventListener?.onError(error)
             }
         }
     }

@@ -6,7 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.biliapi.repositories.LivePlayInfo
 import dev.frost819.newbv.biliapi.repositories.LivePlayLine
 import dev.frost819.newbv.biliapi.repositories.LiveRepository
-import dev.frost819.newbv.player.AbstractVideoPlayer
+import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -41,7 +41,7 @@ class LivePlayerViewModelTest {
     private lateinit var liveRepository: LiveRepository
     private lateinit var exoPlayerFactory: ExoPlayerFactory
     private lateinit var viewModel: LivePlayerViewModel
-    private lateinit var mockPlayer: AbstractVideoPlayer
+    private lateinit var mockPlayer: ExoMediaPlayer
 
     @BeforeEach
     fun setUp() {
@@ -153,41 +153,47 @@ class LivePlayerViewModelTest {
     // ── Helpers ──────────────────────────────────────────────
 
     @Test
-    fun `latest quality selection wins when old response is late`() = runTest(testDispatcher) {
-        updateUiState { it.copy(realRoomId = 123) }
-        val old = CompletableDeferred<LivePlayInfo>()
-        coEvery { liveRepository.getLivePlayInfo(123, 400) } coAnswers { withContext(NonCancellable) { old.await() } }
-        coEvery { liveRepository.getLivePlayInfo(123, 10000) } returns LivePlayInfo(currentQn = 10000, qualities = emptyList(), lines = listOf(LivePlayLine(1, "new")))
-        viewModel.changeQuality(400)
-        runCurrent()
-        viewModel.changeQuality(10000)
-        runCurrent()
-        old.complete(LivePlayInfo(currentQn = 400, qualities = emptyList(), lines = listOf(LivePlayLine(1, "old"))))
-        advanceUntilIdle()
-        assertThat(viewModel.uiState.value.currentQuality).isEqualTo(10000)
-        verify(exactly = 1) { mockPlayer.playUrl("new") }
-        verify(exactly = 0) { mockPlayer.playUrl("old") }
-    }
+    fun `latest quality selection wins when old response is late`() =
+        runTest(testDispatcher) {
+            updateUiState { it.copy(realRoomId = 123) }
+            val old = CompletableDeferred<LivePlayInfo>()
+            coEvery { liveRepository.getLivePlayInfo(123, 400) } coAnswers
+                { withContext(NonCancellable) { old.await() } }
+            coEvery { liveRepository.getLivePlayInfo(123, 10000) } returns
+                LivePlayInfo(currentQn = 10000, qualities = emptyList(), lines = listOf(LivePlayLine(1, "new")))
+            viewModel.changeQuality(400)
+            runCurrent()
+            viewModel.changeQuality(10000)
+            runCurrent()
+            old.complete(LivePlayInfo(currentQn = 400, qualities = emptyList(), lines = listOf(LivePlayLine(1, "old"))))
+            advanceUntilIdle()
+            assertThat(viewModel.uiState.value.currentQuality).isEqualTo(10000)
+            verify(exactly = 1) { mockPlayer.playUrl("new") }
+            verify(exactly = 0) { mockPlayer.playUrl("old") }
+        }
 
     @Test
-    fun `detaching player cancels pending stream reload`() = runTest(testDispatcher) {
-        updateUiState { it.copy(realRoomId = 123) }
-        val pending = CompletableDeferred<LivePlayInfo>()
-        coEvery { liveRepository.getLivePlayInfo(any(), any()) } coAnswers { pending.await() }
-        viewModel.changeQuality(400)
-        runCurrent()
-        viewModel.detachPlayer()
-        pending.complete(LivePlayInfo(currentQn = 400, qualities = emptyList(), lines = listOf(LivePlayLine(1, "late"))))
-        advanceUntilIdle()
-        verify(exactly = 0) { mockPlayer.playUrl(any()) }
-        assertThat(viewModel.uiState.value.availableLines).isEmpty()
-    }
+    fun `detaching player cancels pending stream reload`() =
+        runTest(testDispatcher) {
+            updateUiState { it.copy(realRoomId = 123) }
+            val pending = CompletableDeferred<LivePlayInfo>()
+            coEvery { liveRepository.getLivePlayInfo(any(), any()) } coAnswers { pending.await() }
+            viewModel.changeQuality(400)
+            runCurrent()
+            viewModel.detachPlayer()
+            pending.complete(
+                LivePlayInfo(currentQn = 400, qualities = emptyList(), lines = listOf(LivePlayLine(1, "late"))),
+            )
+            advanceUntilIdle()
+            verify(exactly = 0) { mockPlayer.playUrl(any()) }
+            assertThat(viewModel.uiState.value.availableLines).isEmpty()
+        }
 
-    private fun setVideoPlayer(player: AbstractVideoPlayer?) {
+    private fun setVideoPlayer(player: ExoMediaPlayer?) {
         val field = LivePlayerViewModel::class.java.getDeclaredField("videoPlayer${'$'}delegate")
         field.isAccessible = true
         @Suppress("UNCHECKED_CAST")
-        val delegate = field.get(viewModel) as MutableState<AbstractVideoPlayer?>
+        val delegate = field.get(viewModel) as MutableState<ExoMediaPlayer?>
         delegate.value = player
     }
 

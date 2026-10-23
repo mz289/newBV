@@ -35,7 +35,6 @@ class LiveControllerInfoTest {
                         title = title,
                         areaName = areaName,
                         onlineCount = onlineCount,
-                        clock = Pair(20, 30),
                         isPlaying = true,
                         danmakuEnabled = true,
                         onPlayPause = {},

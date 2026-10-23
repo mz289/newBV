@@ -2,8 +2,11 @@ package dev.frost819.newbv.data.datastore
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.preferencesOf
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.biliapi.entity.ApiType
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
+import dev.frost819.newbv.core.theme.AccentColor
 import dev.frost819.newbv.core.theme.ThemeMode
 import dev.frost819.newbv.data.testutil.InMemoryPreferencesDataStore
 import kotlinx.coroutines.delay
@@ -11,24 +14,18 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.io.File
 
 /**
  * [Prefs] 的单元测试。
  *
  * 验证偏好设置的读写持久化、枚举映射、buvid 自动生成。
- * 使用临时文件创建真实 DataStore，不依赖 Android 环境。
+ * 使用内存 DataStore 验证持久化边界，不依赖 Android 环境。
  */
 class PrefsTest {
     private lateinit var dataStore: DataStore<Preferences>
-    private lateinit var tempDir: File
 
     @BeforeEach
     fun setUp() {
-        tempDir =
-            kotlin.io.path
-                .createTempDirectory(prefix = "prefs_test")
-                .toFile()
         dataStore = InMemoryPreferencesDataStore()
         Prefs.resetForTesting()
         Prefs.init(dataStore)
@@ -37,7 +34,6 @@ class PrefsTest {
     @AfterEach
     fun tearDown() {
         Prefs.resetForTesting()
-        tempDir.deleteRecursively()
     }
 
     // ===== 读写测试 =====
@@ -89,14 +85,14 @@ class PrefsTest {
         }
 
     @Test
-    fun `write and read date type`() =
+    fun `write and read token expiry timestamp`() =
         runBlocking {
-            val testDate = java.util.Date(1700000000000L)
+            val testDate = 1700000000000L
             Prefs.tokenExpiredDate = testDate
 
             awaitAsyncWrite()
 
-            assertThat(Prefs.tokenExpiredDate.time).isEqualTo(1700000000000L)
+            assertThat(Prefs.tokenExpiredDate).isEqualTo(1700000000000L)
         }
 
     @Test
@@ -126,6 +122,58 @@ class PrefsTest {
         }
 
     // ===== buvid 自动生成测试 =====
+
+    @Test
+    fun `flows expose saved values immediately after init`() {
+        Prefs.resetForTesting()
+        Prefs.init(
+            InMemoryPreferencesDataStore(
+                preferencesOf(
+                    PrefKeys.themeMode to ThemeMode.Dark.ordinal,
+                    PrefKeys.accentColor to AccentColor.SkyBlue.name,
+                    PrefKeys.density to 3f,
+                    PrefKeys.incognitoMode to true,
+                    PrefKeys.videoCardWidth to 240,
+                ),
+            ),
+        )
+
+        assertThat(Prefs.themeModeFlow.value).isEqualTo(ThemeMode.Dark)
+        assertThat(Prefs.accentColorFlow.value).isEqualTo(AccentColor.SkyBlue)
+        assertThat(Prefs.accentColorFlow.value).isEqualTo(Prefs.accentColor)
+        assertThat(Prefs.densityFlow.value).isEqualTo(3f)
+        assertThat(Prefs.incognitoModeFlow.value).isTrue()
+        assertThat(Prefs.videoCardWidthFlow.value).isEqualTo(240)
+    }
+
+    @Test
+    fun `card width has the same bounded value in property and flow`() {
+        Prefs.videoCardWidth = 1
+        assertThat(Prefs.videoCardWidth).isEqualTo(Prefs.VIDEO_CARD_WIDTH_MIN)
+        assertThat(Prefs.videoCardWidthFlow.value).isEqualTo(Prefs.videoCardWidth)
+        Prefs.videoCardWidth = 1000
+        assertThat(Prefs.videoCardWidth).isEqualTo(Prefs.VIDEO_CARD_WIDTH_MAX)
+        assertThat(Prefs.videoCardWidthFlow.value).isEqualTo(Prefs.videoCardWidth)
+    }
+
+    @Test
+    fun `saved danmaku type codes preserve their meaning and ignore invalid input`() {
+        Prefs.resetForTesting()
+        Prefs.init(
+            InMemoryPreferencesDataStore(
+                preferencesOf(PrefKeys.defaultDanmakuTypes to "0,1,2,3,4,invalid,-1,999"),
+            ),
+        )
+
+        assertThat(Prefs.defaultDanmakuTypes)
+            .containsExactly(
+                DanmakuType.All,
+                DanmakuType.Top,
+                DanmakuType.Rolling,
+                DanmakuType.Bottom,
+                DanmakuType.Advanced,
+            ).inOrder()
+    }
 
     @Test
     fun `buvid is auto generated when missing`() {

@@ -1,98 +1,19 @@
-@file:Suppress("UNCHECKED_CAST")
-
 package dev.frost819.newbv.data.datastore
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import dev.frost819.newbv.biliapi.entity.ApiType
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 import dev.frost819.newbv.core.theme.AccentColor
 import dev.frost819.newbv.core.theme.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.util.Date
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.properties.ReadWriteProperty
-import kotlin.reflect.KProperty
-
-/**
- * 偏好设置委托。
- *
- * 提供三级读写机制，兼顾性能与持久化：
- * 1. 内存缓存：[flow]（[MutableStateFlow]），读操作直接命中内存，同步无锁。
- * 2. 写：立即更新内存（UI 瞬间响应），再异步写 DataStore（不阻塞 UI）。
- * 3. 初始化：[Prefs.init] 阻塞读取 DataStore 首帧数据填充内存，之后长连接 collect 同步。
- *
- * 支持两种委托工厂：
- * - 基本类型（String/Int/Boolean/Float/Long）：直接存储。
- * - 对象类型（Enum/Date/列表等）：通过 [save]/[restore] 映射到基本类型。
- *
- * @param T 业务层类型（如枚举、Date）。
- * @param P DataStore 持久化类型（String/Int/Boolean/Float/Long）。
- * @param key DataStore 键。
- * @param defaultValue 默认值（业务类型）。
- * @param save 业务类型 → 持久化类型 转换函数，默认直接强转。
- * @param restore 持久化类型 → 业务类型 转换函数，默认直接强转。
- */
-class PrefDelegate<T, P>(
-    private val key: Preferences.Key<P>,
-    private val defaultValue: T,
-    private val save: (T) -> P = { it as P },
-    private val restore: (P) -> T = { it as T },
-) : ReadWriteProperty<Any?, T> {
-    /** 内存缓存流，初始值为默认值的持久化形式。 */
-    internal val flow: MutableStateFlow<Any?> = MutableStateFlow(save(defaultValue))
-
-    /**
-     * 读取当前值：直接读内存缓存（初始值恒为默认值的持久化形式，永不为 null）。
-     *
-     * 未初始化时内存缓存只有编码默认值，读取会静默拿到与磁盘不符的数据，
-     * 因此未初始化的读取立即失败（见 [Prefs.checkInitialized]）。
-     */
-    override fun getValue(
-        thisRef: Any?,
-        property: KProperty<*>,
-    ): T {
-        Prefs.checkInitialized()
-        return restore(flow.value as P)
-    }
-
-    /**
-     * 写入新值。
-     *
-     * 1. 立即更新内存缓存，UI 瞬间响应。
-     * 2. 异步写入 DataStore，不阻塞调用方。
-     *
-     * 未初始化时写入会被随后的首帧磁盘加载覆盖，因此同样立即失败。
-     */
-    override fun setValue(
-        thisRef: Any?,
-        property: KProperty<*>,
-        value: T,
-    ) {
-        Prefs.checkInitialized()
-        val persistValue = save(value)
-        flow.value = persistValue
-        val dataStore = Prefs.dataStore
-        Prefs.launchPersist {
-            dataStore.edit { prefs -> prefs[key] = persistValue }
-        }
-    }
-
-    /** 重置内存缓存为默认值的持久化形式（用于 [Prefs.clear]）。 */
-    internal fun resetToDefault() {
-        flow.value = save(defaultValue)
-    }
-}
 
 /**
  * 偏好设置管理器。
@@ -101,17 +22,12 @@ class PrefDelegate<T, P>(
  * 由依赖图（`DatabaseModule.providePrefs`）调用 [init] 完成内存缓存初始化。
  *
  * 设计要点：
- * - [dataStore] 由 Hilt 注入（见 di 模块的 DataStoreModule）。
+ * - [dataStore] 由 Hilt 注入（见 DatabaseModule.providePrefs）。
  * - 读操作同步无锁（命中内存），写操作异步持久化。
  * - [init] 由依赖图（`DatabaseModule.providePrefs`）在创建 DataStore 时调用：
  *   阻塞读取首帧数据填充内存缓存，保证任何消费者构造前完成初始化；
  *   未初始化的读写经 [checkInitialized] 立即失败。
  * - [init] 自动检查并生成 buvid / buvid3（若缺失）。
- *
- * 已删除（相对原版 BV）的偏好项：
- * - 代理相关：`enableProxy`、`proxyHttpServer`、`proxyGRPCServer`、`preferOfficialCdn`
- * - 播放器类型：`playerType`（仅 Media3，无需选择）
- * - FPS 显示：`showFps`（调试用，非用户功能）
  *
  * 使用示例：
  * ```
@@ -127,8 +43,8 @@ object Prefs {
     /** 持久化写入的协程作用域，使用 IO 调度器 + SupervisorJob（单次失败不影响后续）。 */
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    /** 所有委托的内存缓存流映射表，由 [registerDelegate] 填充。 */
-    private val delegateMap = ConcurrentHashMap<Preferences.Key<*>, PrefDelegate<*, *>>()
+    /** 委托仅在对象构造时注册，初始化时各自读取自己的 DataStore 键。 */
+    private val delegates = mutableListOf<PrefDelegate<*, *>>()
 
     /** DataStore 实例，由 [init] 注入。 */
     @Volatile
@@ -154,7 +70,7 @@ object Prefs {
     private fun <T> pref(
         key: Preferences.Key<T>,
         default: T,
-    ): PrefDelegate<T, T> = PrefDelegate(key, default).also { registerDelegate(key, it) }
+    ): PrefDelegate<T, T> = pref(key, default, save = { it }, restore = { it })
 
     /**
      * 创建对象映射委托。
@@ -171,15 +87,7 @@ object Prefs {
         default: T,
         save: (T) -> P,
         restore: (P) -> T,
-    ): PrefDelegate<T, P> = PrefDelegate(key, default, save, restore).also { registerDelegate(key, it) }
-
-    /** 注册委托到映射表，供 [init] 同步内存缓存使用。 */
-    private fun <T, P> registerDelegate(
-        key: Preferences.Key<P>,
-        delegate: PrefDelegate<T, P>,
-    ) {
-        delegateMap[key] = delegate
-    }
+    ): PrefDelegate<T, P> = PrefDelegate(key, default, save, restore).also { delegates += it }
 
     // ===== 偏好项定义 =====
 
@@ -203,13 +111,8 @@ object Prefs {
     /** uid_ck_md5（登录校验值）。 */
     var uidCkMd5 by pref(PrefKeys.uidCkMd5, "")
 
-    /** Token 过期时间。 */
-    var tokenExpiredDate by pref(
-        PrefKeys.tokenExpiredDate,
-        Date(0),
-        save = { it.time },
-        restore = { Date(it) },
-    )
+    /** Token 过期时间（Unix 毫秒）。 */
+    var tokenExpiredDate by pref(PrefKeys.tokenExpiredDate, 0L)
 
     /** Access Token。 */
     var accessToken by pref(PrefKeys.accessToken, "")
@@ -230,7 +133,8 @@ object Prefs {
     var deviceCookies by pref(PrefKeys.deviceCookies, "")
 
     /** 无痕模式（不记录历史）。 */
-    var incognitoMode by pref(PrefKeys.incognitoMode, false)
+    private val incognitoModePref = pref(PrefKeys.incognitoMode, false)
+    var incognitoMode by incognitoModePref
 
     /**
      * 双账号解析账号 UID。
@@ -333,22 +237,13 @@ object Prefs {
         PrefKeys.defaultDanmakuTypes,
         listOf(DanmakuType.All, DanmakuType.Rolling, DanmakuType.Top, DanmakuType.Bottom, DanmakuType.Advanced),
         save = { list -> list.joinToString(",") { it.ordinal.toString() } },
-        restore = { str ->
-            if (str.isEmpty()) {
-                emptyList()
-            } else {
-                str
-                    .split(",")
-                    .mapNotNull { runCatching { DanmakuType.entries[it.toInt()] }.getOrNull() }
-            }
-        },
+        restore = { str -> str.split(",").mapNotNull { it.toIntOrNull()?.let(DanmakuType.entries::getOrNull) } },
     )
 
     /** 默认弹幕大小（100%）。 */
     var defaultDanmakuScale by pref(PrefKeys.defaultDanmakuScale, 1.0f)
 
-    /** 默认弹幕透明度。 */
-    // 官方弹幕透明度默认 0.8（Preference.danmakuConfig.info.transparency 默认值）
+    /** 默认弹幕透明度，与官方客户端一致（0.8）。 */
     var defaultDanmakuOpacity by pref(PrefKeys.defaultDanmakuOpacity, 0.8f)
 
     /** 默认弹幕速度因子。 */
@@ -428,7 +323,8 @@ object Prefs {
     // --- 应用界面（PRD 7.2） ---
 
     /** 界面缩放密度（默认 2f，app 层 init 时按屏幕宽度重新计算）。 */
-    var density by pref(PrefKeys.density, 2f)
+    private val densityPref = pref(PrefKeys.density, 2f)
+    var density by densityPref
 
     /** 视频卡片宽度可调下限（dp，默认 TV 布局下约 7 列）。 */
     const val VIDEO_CARD_WIDTH_MIN = 110
@@ -449,7 +345,14 @@ object Prefs {
      * 列数 = ceil(可用宽度 / (卡宽上限 + 间距))，卡片实际宽度不超过该值（对齐余量最多少量超出），
      * 屏幕越宽加列而非拉宽卡片，卡片本身的大小与观感保持稳定。
      */
-    var videoCardWidth by pref(PrefKeys.videoCardWidth, VIDEO_CARD_WIDTH_DEFAULT)
+    private val videoCardWidthPref =
+        pref(
+            PrefKeys.videoCardWidth,
+            VIDEO_CARD_WIDTH_DEFAULT,
+            save = { it },
+            restore = { it.coerceIn(VIDEO_CARD_WIDTH_MIN, VIDEO_CARD_WIDTH_MAX) },
+        )
+    var videoCardWidth by videoCardWidthPref
 
     /** 启动页（左侧导航项）。 */
     var homeLeftNavItem by pref(
@@ -479,20 +382,24 @@ object Prefs {
     var showHotword by pref(PrefKeys.showHotword, true)
 
     /** 主题模式（跟随系统/深色/浅色）。 */
-    var themeMode by pref(
-        PrefKeys.themeMode,
-        ThemeMode.FollowSystem,
-        save = { it.ordinal },
-        restore = { ThemeMode.entries.getOrElse(it) { ThemeMode.FollowSystem } },
-    )
+    private val themeModePref =
+        pref(
+            PrefKeys.themeMode,
+            ThemeMode.FollowSystem,
+            save = { it.ordinal },
+            restore = { ThemeMode.entries.getOrElse(it) { ThemeMode.FollowSystem } },
+        )
+    var themeMode by themeModePref
 
     /** 强调色预设（默认 B 站粉）。 */
-    var accentColor by pref(
-        PrefKeys.accentColor,
-        AccentColor.BiliPink,
-        save = { it.name },
-        restore = { AccentColor.fromName(it) },
-    )
+    private val accentColorPref =
+        pref(
+            PrefKeys.accentColor,
+            AccentColor.BiliPink,
+            save = { it.name },
+            restore = { AccentColor.fromName(it) },
+        )
+    var accentColor by accentColorPref
 
     // --- 存储设置（PRD 7.6） ---
 
@@ -503,52 +410,12 @@ object Prefs {
     var cacheAutoClean by pref(PrefKeys.cacheAutoClean, true)
 
     // ===== Flow 属性（用于 Compose collectAsState 实时观察） =====
-    // 均为懒加载单例：stateIn(Eagerly) 订阅永不取消，不能在 getter 里每次新建。
-
-    /** 主题模式 Flow（实时响应设置变更）。 */
-    val themeModeFlow: StateFlow<ThemeMode> by lazy {
-        @Suppress("UNCHECKED_CAST")
-        val delegate = delegateMap[PrefKeys.themeMode] as PrefDelegate<ThemeMode, Int>
-        delegate.flow
-            .map { ThemeMode.fromOrdinal(it as? Int ?: 0) }
-            .stateIn(scope, SharingStarted.Eagerly, ThemeMode.FollowSystem)
-    }
-
-    /** 强调色 Flow（实时响应设置变更）。 */
-    val accentColorFlow: StateFlow<AccentColor> by lazy {
-        @Suppress("UNCHECKED_CAST")
-        val delegate = delegateMap[PrefKeys.accentColor] as PrefDelegate<AccentColor, String>
-        delegate.flow
-            .map { AccentColor.fromName(it as? String) }
-            .stateIn(scope, SharingStarted.Eagerly, AccentColor.BiliPink)
-    }
-
-    /** Density Flow（实时响应设置变更）。 */
-    val densityFlow: StateFlow<Float> by lazy {
-        @Suppress("UNCHECKED_CAST")
-        val delegate = delegateMap[PrefKeys.density] as PrefDelegate<Float, Float>
-        delegate.flow
-            .map { it as? Float ?: 2f }
-            .stateIn(scope, SharingStarted.Eagerly, 2f)
-    }
-
-    /** 无痕模式 Flow（实时响应设置变更）。 */
-    val incognitoModeFlow: StateFlow<Boolean> by lazy {
-        @Suppress("UNCHECKED_CAST")
-        val delegate = delegateMap[PrefKeys.incognitoMode] as PrefDelegate<Boolean, Boolean>
-        delegate.flow
-            .map { it as? Boolean ?: false }
-            .stateIn(scope, SharingStarted.Eagerly, false)
-    }
-
-    /** 视频卡片宽度 Flow（实时响应设置变更）。 */
-    val videoCardWidthFlow: StateFlow<Int> by lazy {
-        @Suppress("UNCHECKED_CAST")
-        val delegate = delegateMap[PrefKeys.videoCardWidth] as PrefDelegate<Int, Int>
-        delegate.flow
-            .map { (it as? Int ?: VIDEO_CARD_WIDTH_DEFAULT).coerceIn(VIDEO_CARD_WIDTH_MIN, VIDEO_CARD_WIDTH_MAX) }
-            .stateIn(scope, SharingStarted.Eagerly, VIDEO_CARD_WIDTH_DEFAULT)
-    }
+    // 属性读取和 Flow 观察共享同一份业务值，无需二次订阅或解码。
+    val themeModeFlow: StateFlow<ThemeMode> get() = themeModePref.flow
+    val accentColorFlow: StateFlow<AccentColor> get() = accentColorPref.flow
+    val densityFlow: StateFlow<Float> get() = densityPref.flow
+    val incognitoModeFlow: StateFlow<Boolean> get() = incognitoModePref.flow
+    val videoCardWidthFlow: StateFlow<Int> get() = videoCardWidthPref.flow
 
     // ===== 初始化 =====
 
@@ -571,13 +438,8 @@ object Prefs {
         // 阻塞加载磁盘数据，加载完成后才置位 initialized：
         // 消除"已置位但未加载"窗口（期间读到默认值、写入被首帧覆盖）。
         val initialPrefs = runBlocking { dataStore.data.first() }
+        delegates.forEach { it.load(initialPrefs) }
         initialized = true
-
-        delegateMap.forEach { (key, delegate) ->
-            if (initialPrefs.contains(key)) {
-                (delegate as PrefDelegate<Any?, Any?>).flow.value = initialPrefs[key]
-            }
-        }
         migrateVideoColumnsToCardWidth(initialPrefs)
         migrateDanmakuMergeMode(initialPrefs)
         checkAndInitBuvid(initialPrefs)
@@ -640,7 +502,7 @@ object Prefs {
     suspend fun clear() {
         check(initialized) { "Prefs 未初始化，无法 clear" }
         dataStore.edit { it.clear() }
-        delegateMap.forEach { (_, delegate) -> delegate.resetToDefault() }
+        delegates.forEach { it.resetToDefault() }
     }
 
     // ===== 测试辅助 =====
@@ -651,7 +513,7 @@ object Prefs {
      * 允许在单元测试中重复 [init]：
      * 1. 重置初始化标志与 DataStore 引用。
      * 2. 将所有委托的内存缓存重置为默认值。
-     * 3. 保留 [delegateMap] 不清空（委托本身在 object 加载时创建，无法重建）。
+     * 3. 保留 [delegates] 不清空（委托本身在 object 加载时创建，无法重建）。
      *
      * 生产代码禁止调用。
      */
@@ -659,6 +521,6 @@ object Prefs {
     fun resetForTesting() {
         initialized = false
         dataStoreRef = null
-        delegateMap.forEach { (_, delegate) -> delegate.resetToDefault() }
+        delegates.forEach { it.resetToDefault() }
     }
 }

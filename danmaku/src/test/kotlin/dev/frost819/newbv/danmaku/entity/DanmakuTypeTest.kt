@@ -1,6 +1,7 @@
 package dev.frost819.newbv.danmaku.entity
 
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 import org.junit.jupiter.api.Test
 
 /**

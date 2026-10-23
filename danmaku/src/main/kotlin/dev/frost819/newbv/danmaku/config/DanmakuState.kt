@@ -1,6 +1,6 @@
 package dev.frost819.newbv.danmaku.config
 
-import dev.frost819.newbv.danmaku.entity.DanmakuType
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 
 /**
  * 弹幕状态数据类。

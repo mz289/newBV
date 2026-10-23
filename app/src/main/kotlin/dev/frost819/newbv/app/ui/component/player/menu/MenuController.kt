@@ -28,7 +28,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
-import dev.frost819.newbv.app.data.toDataDanmakuTypes
 import dev.frost819.newbv.app.entity.player.VideoAspectRatio
 import dev.frost819.newbv.app.ui.state.player.LocalMenuFocusStateData
 import dev.frost819.newbv.app.ui.state.player.MenuFocusState
@@ -36,6 +35,7 @@ import dev.frost819.newbv.app.ui.state.player.MenuFocusStateData
 import dev.frost819.newbv.app.ui.state.player.PlayerOverlayState
 import dev.frost819.newbv.app.ui.state.player.PlayerUiState
 import dev.frost819.newbv.app.ui.state.player.VideoPlayerMenuNavItem
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 import dev.frost819.newbv.biliapi.entity.video.Subtitle
 import dev.frost819.newbv.biliapi.entity.video.SubtitleAiStatus
 import dev.frost819.newbv.biliapi.entity.video.SubtitleAiType
@@ -43,7 +43,6 @@ import dev.frost819.newbv.biliapi.entity.video.SubtitleType
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.data.datastore.Audio
-import dev.frost819.newbv.data.datastore.DanmakuType
 import dev.frost819.newbv.data.datastore.PlaySpeed
 import dev.frost819.newbv.data.datastore.VideoCodec
 
@@ -297,9 +296,8 @@ private fun MenuList(
                 )
 
             VideoPlayerMenuNavItem.Danmaku -> {
-                val dataTypes = overlayState.danmakuState.enabledTypes.toDataDanmakuTypes()
                 DanmakuMenuList(
-                    currentEnabledTypes = dataTypes,
+                    currentEnabledTypes = overlayState.danmakuState.enabledTypes,
                     currentScale = overlayState.danmakuState.scale,
                     currentOpacity = overlayState.danmakuState.opacity,
                     currentSpeedFactor = overlayState.danmakuState.speedFactor,

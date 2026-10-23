@@ -22,9 +22,9 @@ import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
 @Composable
 fun BvVideoPlayer(
     modifier: Modifier = Modifier,
-    videoPlayer: AbstractVideoPlayer?,
+    videoPlayer: ExoMediaPlayer?,
 ) {
-    if (videoPlayer is ExoMediaPlayer) {
+    if (videoPlayer != null) {
         AndroidView(
             modifier = modifier.fillMaxSize(),
             factory = { ctx ->

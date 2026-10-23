@@ -8,12 +8,12 @@ import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMeta
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRuleType
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
-import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -38,7 +38,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
 import kotlin.coroutines.CoroutineContext
-import dev.frost819.newbv.data.datastore.DanmakuType as DataDanmakuType
 
 /**
  * [DanmakuViewModel] 的单元测试。
@@ -79,10 +78,10 @@ class DanmakuViewModelTest {
         every { Prefs.defaultDanmakuEnabled } returns true
         every { Prefs.defaultDanmakuTypes } returns
             listOf(
-                DataDanmakuType.All,
-                DataDanmakuType.Rolling,
-                DataDanmakuType.Top,
-                DataDanmakuType.Bottom,
+                DanmakuType.All,
+                DanmakuType.Rolling,
+                DanmakuType.Top,
+                DanmakuType.Bottom,
             )
         every { Prefs.defaultDanmakuScale = any() } answers {}
         every { Prefs.defaultDanmakuOpacity = any() } answers {}
@@ -356,16 +355,26 @@ class DanmakuViewModelTest {
         }
 
     @Test
-    fun `legacy empty persisted types migrates to disabled master switch with all types`() =
+    fun `empty type selection is preserved independently of the enabled master switch`() =
         runTest(testDispatcher) {
-            // 旧版本把总开关关闭持久化为空类型列表；升级后应还原类型勾选而不是丢失
             every { Prefs.defaultDanmakuTypes } returns emptyList()
             every { Prefs.defaultDanmakuEnabled } returns true
-            val migrated = DanmakuViewModel(videoPlayRepository)
+            val vm = DanmakuViewModel(videoPlayRepository)
 
-            val state = migrated.danmakuState.value
-            assertThat(state.enabled).isFalse()
-            assertThat(state.enabledTypes).containsExactlyElementsIn(DanmakuType.entries)
+            val state = vm.danmakuState.value
+            assertThat(state.enabled).isTrue()
+            assertThat(state.enabledTypes).isEmpty()
+        }
+
+    @Test
+    fun `disabled master switch restores the saved type selection`() =
+        runTest(testDispatcher) {
+            every { Prefs.defaultDanmakuEnabled } returns false
+            every { Prefs.defaultDanmakuTypes } returns listOf(DanmakuType.Top, DanmakuType.Advanced)
+            val vm = DanmakuViewModel(videoPlayRepository)
+
+            assertThat(vm.danmakuState.value.enabled).isFalse()
+            assertThat(vm.danmakuState.value.enabledTypes).containsExactly(DanmakuType.Top, DanmakuType.Advanced)
         }
 
     // === 分段加载 ===

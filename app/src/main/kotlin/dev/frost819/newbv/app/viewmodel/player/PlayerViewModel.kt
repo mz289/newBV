@@ -47,10 +47,10 @@ import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.datastore.Resolution
 import dev.frost819.newbv.data.datastore.SkipPolicy
 import dev.frost819.newbv.data.datastore.VideoCodec
-import dev.frost819.newbv.player.AbstractVideoPlayer
 import dev.frost819.newbv.player.CdnSelector
 import dev.frost819.newbv.player.VideoPlayerListener
 import dev.frost819.newbv.player.VideoPlayerOptions
+import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -124,7 +124,7 @@ class PlayerViewModel
         private val logger = Loggers.get("PlayerViewModel")
 
         /** 视频播放器实例，供 Compose `AndroidView` 绑定。 */
-        var videoPlayer: AbstractVideoPlayer? by mutableStateOf(null)
+        var videoPlayer: ExoMediaPlayer? by mutableStateOf(null)
             private set
 
         private var playData: PlayData? = null

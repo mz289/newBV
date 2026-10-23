@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.core.theme.ThemeMode
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.io.File
 
 /**
  * [PrefDelegate] 与 [Prefs] 辅助方法的单元测试。
@@ -25,16 +25,11 @@ import java.io.File
  */
 class PrefDelegateTest {
     private lateinit var dataStore: DataStore<Preferences>
-    private lateinit var tempDir: File
 
     private val dummy: String = ""
 
     @BeforeEach
     fun setUp() {
-        tempDir =
-            kotlin.io.path
-                .createTempDirectory(prefix = "delegate_test")
-                .toFile()
         dataStore = InMemoryPreferencesDataStore()
         Prefs.resetForTesting()
         Prefs.init(dataStore)
@@ -43,7 +38,6 @@ class PrefDelegateTest {
     @AfterEach
     fun tearDown() {
         Prefs.resetForTesting()
-        tempDir.deleteRecursively()
     }
 
     // ===== PrefDelegate getValue / setValue =====
@@ -93,19 +87,19 @@ class PrefDelegateTest {
             )
         delegate.setValue(null, ::dummy, ThemeMode.Dark)
         assertThat(delegate.getValue(null, ::dummy)).isEqualTo(ThemeMode.Dark)
-        assertThat(delegate.flow.value).isEqualTo(1)
+        assertThat(delegate.flow.value).isEqualTo(ThemeMode.Dark)
     }
 
     @Test
     fun `custom save and restore with boolean type`() {
         val key = booleanPreferencesKey("test_bool_delegate")
-        val delegate = PrefDelegate<Boolean, Boolean>(key, false)
+        val delegate = PrefDelegate(key, false)
         delegate.setValue(null, ::dummy, true)
         assertThat(delegate.getValue(null, ::dummy)).isTrue()
     }
 
     @Test
-    fun `resetToDefault with custom save restores default persisted form`() {
+    fun `resetToDefault restores the typed default value`() {
         val key = intPreferencesKey("test_reset_custom")
         val delegate =
             PrefDelegate<ThemeMode, Int>(
@@ -116,7 +110,7 @@ class PrefDelegateTest {
             )
         delegate.setValue(null, ::dummy, ThemeMode.Dark)
         delegate.resetToDefault()
-        assertThat(delegate.flow.value).isEqualTo(2)
+        assertThat(delegate.flow.value).isEqualTo(ThemeMode.Light)
         assertThat(delegate.getValue(null, ::dummy)).isEqualTo(ThemeMode.Light)
     }
 
@@ -129,16 +123,12 @@ class PrefDelegateTest {
     }
 
     @Test
-    fun `themeModeFlow reflects changes`() =
-        runBlocking {
-            val flow = Prefs.themeModeFlow
-            assertThat(flow.value).isEqualTo(ThemeMode.FollowSystem)
-
-            Prefs.themeMode = ThemeMode.Dark
-            delay(200)
-
-            assertThat(flow.value).isEqualTo(ThemeMode.Dark)
-        }
+    fun `themeModeFlow reflects changes synchronously`() {
+        val flow = Prefs.themeModeFlow
+        Prefs.themeMode = ThemeMode.Dark
+        assertThat(flow.value).isEqualTo(Prefs.themeMode)
+        assertThat(flow.value).isEqualTo(ThemeMode.Dark)
+    }
 
     @Test
     fun `densityFlow returns StateFlow with default value`() {
@@ -147,16 +137,11 @@ class PrefDelegateTest {
     }
 
     @Test
-    fun `densityFlow reflects changes`() =
-        runBlocking {
-            val flow = Prefs.densityFlow
-            assertThat(flow.value).isEqualTo(2f)
-
-            Prefs.density = 3.5f
-            delay(200)
-
-            assertThat(flow.value).isEqualTo(3.5f)
-        }
+    fun `densityFlow reflects changes synchronously`() {
+        val flow = Prefs.densityFlow
+        Prefs.density = 3.5f
+        assertThat(flow.value).isEqualTo(3.5f)
+    }
 
     // ===== Prefs 错误处理 =====
 
@@ -244,10 +229,10 @@ class PrefDelegateTest {
     // ===== PrefDelegate 缓存读取 =====
 
     @Test
-    fun `getValue restores the cached persisted value`() {
+    fun `load decodes persisted values into the typed cache`() {
         val key = stringPreferencesKey("test_cache_read")
         val delegate = PrefDelegate(key, "default")
-        delegate.flow.value = "stored"
+        delegate.load(preferencesOf(key to "stored"))
         assertThat(delegate.getValue(null, ::dummy)).isEqualTo("stored")
     }
 }

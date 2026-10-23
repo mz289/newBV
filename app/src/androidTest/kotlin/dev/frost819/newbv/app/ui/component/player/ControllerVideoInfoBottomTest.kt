@@ -32,6 +32,7 @@ class ControllerVideoInfoBottomTest {
                         isSeeking = false,
                         goTime = 0L,
                         seekerState = SeekerState(totalDuration = 600_000L, currentTime = 120_000L),
+                        sponsorBlockMarks = emptyList(),
                         videoShot = null,
                         videoShotCache = VideoShotImageCache(),
                         isPgc = isPgc,

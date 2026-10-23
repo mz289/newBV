@@ -9,9 +9,9 @@ import dev.frost819.newbv.app.ui.component.player.menu.component.RadioMenuList
 import dev.frost819.newbv.app.ui.component.player.menu.component.StepLessMenuItem
 import dev.frost819.newbv.app.ui.state.player.MenuFocusState
 import dev.frost819.newbv.app.ui.state.player.VideoPlayerDanmakuMenuItem
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
-import dev.frost819.newbv.data.datastore.DanmakuType
 import java.text.NumberFormat
 
 /**

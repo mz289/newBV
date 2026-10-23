@@ -119,6 +119,6 @@ class AuthDataTest {
         assertThat(Prefs.sessData).isEqualTo("mysess")
         assertThat(Prefs.accessToken).isEqualTo("mytoken")
         assertThat(Prefs.refreshToken).isEqualTo("myrefresh")
-        assertThat(Prefs.tokenExpiredDate.time).isEqualTo(1700000000000L)
+        assertThat(Prefs.tokenExpiredDate).isEqualTo(1700000000000L)
     }
 }

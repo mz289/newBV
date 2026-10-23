@@ -1,11 +1,11 @@
-package dev.frost819.newbv.danmaku.entity
+package dev.frost819.newbv.biliapi.entity.danmaku
 
 /**
  * 弹幕显示类型。
  *
- * 用于播放器设置中过滤弹幕显示模式。
+ * 持久化、设置菜单和渲染过滤共用此模型。枚举顺序用于保存用户选择，不可重排。
  *
- * @property modeValue 对应的 akdanmaku [com.kuaishou.akdanmaku.data.DanmakuItemData] mode 值
+ * @property modeValue 对应的弹幕协议 mode 值，-1 表示显示全部。
  */
 enum class DanmakuType(
     val modeValue: Int,

@@ -33,14 +33,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -295,28 +289,3 @@ private data class LiveControllerIcon(
     val description: String,
     val action: () -> Unit,
 )
-
-/**
- * 时钟组件。
- */
-@Composable
-private fun Clock(
-    modifier: Modifier = Modifier,
-    hour: Int,
-    minute: Int,
-) {
-    Text(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.onSurface,
-        fontWeight = FontWeight.Bold,
-        style = TextStyle(shadow = Shadow(color = Color.Black, blurRadius = 1f)),
-        text =
-            buildAnnotatedString {
-                withStyle(SpanStyle(fontSize = 32.sp)) {
-                    append("$hour".padStart(2, '0'))
-                    append(":")
-                    append("$minute".padStart(2, '0'))
-                }
-            },
-    )
-}

@@ -29,9 +29,9 @@ import dev.frost819.newbv.data.datastore.PlaySpeed
 import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.datastore.Resolution
 import dev.frost819.newbv.data.datastore.VideoCodec
-import dev.frost819.newbv.player.AbstractVideoPlayer
 import dev.frost819.newbv.player.CdnSelector
 import dev.frost819.newbv.player.VideoPlayerListener
+import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -78,7 +78,7 @@ class PlayerViewModelTest {
     private lateinit var sponsorBlockApi: SponsorBlockApi
     private lateinit var cdnSelector: CdnSelector
     private lateinit var viewModel: PlayerViewModel
-    private lateinit var mockPlayer: AbstractVideoPlayer
+    private lateinit var mockPlayer: ExoMediaPlayer
 
     @BeforeEach
     fun setUp() {
@@ -142,11 +142,11 @@ class PlayerViewModelTest {
      * videoPlayer is `var by mutableStateOf(null) private set`,
      * so we access the Compose delegate field and set its value directly.
      */
-    private fun setVideoPlayer(player: AbstractVideoPlayer?) {
+    private fun setVideoPlayer(player: ExoMediaPlayer?) {
         val field = PlayerViewModel::class.java.getDeclaredField("videoPlayer${'$'}delegate")
         field.isAccessible = true
         @Suppress("UNCHECKED_CAST")
-        val delegate = field.get(viewModel) as MutableState<AbstractVideoPlayer?>
+        val delegate = field.get(viewModel) as MutableState<ExoMediaPlayer?>
         delegate.value = player
     }
 

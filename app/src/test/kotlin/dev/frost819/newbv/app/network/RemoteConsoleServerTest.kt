@@ -9,7 +9,9 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
+import java.net.BindException
 import java.net.HttpURLConnection
+import java.net.ServerSocket
 import java.net.URL
 
 /**
@@ -18,14 +20,13 @@ import java.net.URL
  * 验证统一远程控制台的页面按注册功能拼装、动作分发透传 body、
  * 未注册功能/未知动作的明确报错，以及注册注销的标签可见性。
  *
- * 服务器固定端口段内启停（生产为常驻），CIO 关闭异步释放端口有延迟，
- * 类内逐用例快速启停会因端口未释放产生 BindException 未捕获异常并
- * 污染同 JVM 后续测试——因此整个类只启停一次。
+ * 路由用例复用同一个服务实例；占用整个固定端口段，覆盖随机端口启动。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RemoteConsoleServerTest {
     private lateinit var context: Context
     private lateinit var url: String
+    private val occupiedPorts = mutableListOf<ServerSocket>()
 
     @BeforeAll
     fun setUp() {
@@ -41,6 +42,14 @@ class RemoteConsoleServerTest {
                         every { open(any()) } answers { template.byteInputStream() }
                     }
             }
+        // 固定端口全部占用，验证随机端口分支以及失败引擎的清理。
+        for (port in RemoteConsoleServer.PORT_MIN..RemoteConsoleServer.PORT_MAX) {
+            try {
+                occupiedPorts += ServerSocket(port)
+            } catch (_: BindException) {
+                // 已有进程占用该端口，同样满足测试前提。
+            }
+        }
         RemoteConsoleServer.start(context)
         RemoteConsoleServer.register(echoFeature())
         url = checkNotNull(RemoteConsoleServer.getUrl())
@@ -49,6 +58,14 @@ class RemoteConsoleServerTest {
     @AfterAll
     fun tearDown() {
         RemoteConsoleServer.stop()
+        occupiedPorts.forEach { it.close() }
+    }
+
+    @Test
+    fun `occupied fixed ports use the resolved random port`() {
+        val port = URL(url).port
+        assertThat(port).isGreaterThan(0)
+        assertThat(port in RemoteConsoleServer.PORT_MIN..RemoteConsoleServer.PORT_MAX).isFalse()
     }
 
     private fun echoFeature() =

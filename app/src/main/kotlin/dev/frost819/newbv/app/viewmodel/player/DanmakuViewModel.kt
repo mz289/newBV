@@ -3,8 +3,6 @@ package dev.frost819.newbv.app.viewmodel.player
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kuaishou.akdanmaku.DanmakuConfig
@@ -16,13 +14,12 @@ import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.frost819.newbv.app.data.DanmakuBlockHitStats
 import dev.frost819.newbv.app.data.DanmakuBlockRuleStore
-import dev.frost819.newbv.app.data.toDanmakuEntity
-import dev.frost819.newbv.app.data.toDataDanmakuType
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
 import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
 import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMask
 import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuMeta
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 import dev.frost819.newbv.biliapi.http.entity.danmaku.DanmakuData
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.core.log.Loggers
@@ -50,7 +47,6 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import kotlin.coroutines.coroutineContext
 import kotlin.math.abs
-import dev.frost819.newbv.danmaku.entity.DanmakuType as DanmakuEntityDanmakuType
 
 /**
  * 弹幕 ViewModel。
@@ -98,36 +94,22 @@ class DanmakuViewModel
         private val danmakuTypeFilter = TypeFilter()
         internal var preprocessingDispatcher: CoroutineDispatcher = Dispatchers.Default
 
-        /**
-         * 从 Prefs 构建初始弹幕状态。
-         *
-         * 兼容旧版本数据：旧版把「总开关关闭」实现为清空类型列表并持久化，
-         * 检测到类型列表为空且总开关为开时，视为旧版的关闭状态——
-         * 总开关置为关闭，类型勾选还原为全选，避免用户已保存的类型设置丢失。
-         */
-        private fun initialDanmakuState(): DanmakuState {
-            val savedTypes = Prefs.defaultDanmakuTypes
-            val legacyOff = savedTypes.isEmpty() && Prefs.defaultDanmakuEnabled
-            return DanmakuState(
-                enabled = !legacyOff,
+        /** 总开关与类型选择独立，直接恢复用户保存的设置。 */
+        private fun initialDanmakuState(): DanmakuState =
+            DanmakuState(
+                enabled = Prefs.defaultDanmakuEnabled,
                 scale = Prefs.defaultDanmakuScale,
                 opacity = Prefs.defaultDanmakuOpacity,
                 area = Prefs.defaultDanmakuArea,
                 speedFactor = Prefs.defaultDanmakuSpeedFactor,
                 maskEnabled = Prefs.defaultDanmakuMask,
-                enabledTypes =
-                    if (legacyOff) {
-                        DanmakuEntityDanmakuType.entries.toList()
-                    } else {
-                        savedTypes.map { it.toDanmakuEntity() }
-                    },
+                enabledTypes = Prefs.defaultDanmakuTypes,
                 blockEnabled = DanmakuBlockRuleStore.state.value.enabled,
                 blockLevel = Prefs.danmakuBlockLevel.coerceIn(0, 12),
                 blockRules = DanmakuBlockRuleStore.state.value.rules,
                 mergeMode =
                     DanmakuMergeMode.fromPreference(Prefs.danmakuMergeMode),
             )
-        }
 
         private val _danmakuState = MutableStateFlow(initialDanmakuState())
         val danmakuState = _danmakuState.asStateFlow()
@@ -664,7 +646,7 @@ class DanmakuViewModel
                 reloadDanmakuSegments()
                 // 投屏等临时开关不写入默认设置
                 if (action is DanmakuSettingAction.SetEnabledTypes && !action.persist) return
-                Prefs.defaultDanmakuTypes = new.enabledTypes.map { it.toDataDanmakuType() }
+                Prefs.defaultDanmakuTypes = new.enabledTypes
             }
             if (new.scale != old.scale) {
                 updateDanmakuScale(new.scale)
@@ -707,15 +689,15 @@ class DanmakuViewModel
         /**
          * 用勾选的显示类型重建类型过滤器。
          *
-         * 含 [DanmakuEntityDanmakuType.All] 表示不过滤；否则屏蔽未勾选的类型
-         * （直接使用 [dev.frost819.newbv.danmaku.entity.DanmakuType.modeValue]）。
+         * 含 [DanmakuType.All] 表示不过滤；否则屏蔽未勾选的类型
+         * （直接使用 [dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType.modeValue]）。
          */
-        private fun rebuildTypeFilter(enabledTypes: List<DanmakuEntityDanmakuType>) {
+        private fun rebuildTypeFilter(enabledTypes: List<DanmakuType>) {
             danmakuTypeFilter.clear()
-            if (!enabledTypes.contains(DanmakuEntityDanmakuType.All)) {
+            if (!enabledTypes.contains(DanmakuType.All)) {
                 val blocked =
-                    DanmakuEntityDanmakuType.entries.toSet() -
-                        DanmakuEntityDanmakuType.All -
+                    DanmakuType.entries.toSet() -
+                        DanmakuType.All -
                         enabledTypes.toSet()
                 blocked.forEach { danmakuTypeFilter.addFilterItem(it.modeValue) }
             }
@@ -736,7 +718,7 @@ class DanmakuViewModel
             danmakuPlayer?.updateConfig(danmakuConfig)
         }
 
-        private fun updateDanmakuConfigTypeFilter(enabledTypes: List<DanmakuEntityDanmakuType>) {
+        private fun updateDanmakuConfigTypeFilter(enabledTypes: List<DanmakuType>) {
             rebuildTypeFilter(enabledTypes)
             danmakuConfig.updateFilter()
             danmakuPlayer?.updateConfig(danmakuConfig)

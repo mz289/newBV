@@ -375,7 +375,7 @@ class AccountRepositoryImpl
                 uidCkMd5 = ""
                 accessToken = ""
                 refreshToken = ""
-                tokenExpiredDate = java.util.Date(0)
+                tokenExpiredDate = 0L
             }
             authRepository.apply {
                 mid = null

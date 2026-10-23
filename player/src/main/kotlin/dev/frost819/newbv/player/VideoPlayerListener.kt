@@ -3,7 +3,7 @@ package dev.frost819.newbv.player
 /**
  * 播放器事件回调接口。
  *
- * 由 [AbstractVideoPlayer] 的使用者实现，接收播放器状态变化通知。
+ * 由播放器的使用者实现，接收播放器状态变化通知。
  */
 interface VideoPlayerListener {
     /** 播放器发生异常 */

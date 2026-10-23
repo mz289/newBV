@@ -167,8 +167,8 @@ class ExoMediaPlayerTest {
 
     @Test
     fun setOptions_enablesPlayWhenReady() {
-        runOnMainVoid { player.setOptions() }
-        val playWhenReady = runOnMain { player.mPlayer?.playWhenReady }
+        runOnMainVoid { player.start() }
+        val playWhenReady = runOnMain { player.mPlayer.playWhenReady }
         assertThat(playWhenReady).isTrue()
     }
 

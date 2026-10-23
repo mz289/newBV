@@ -5,7 +5,6 @@ import dev.frost819.newbv.core.log.Loggers
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.withCharset
-import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.cio.CIO
@@ -20,7 +19,12 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import java.net.BindException
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.concurrent.ConcurrentHashMap
@@ -33,9 +37,7 @@ import java.util.concurrent.ConcurrentHashMap
  * 控制台页按已注册功能动态组装标签；手机页面统一 `POST /action?do=<功能id>:<动作>`
  * 提交，服务端分发到对应处理器并把结果回传页面——提交即生效，无需电视端确认。
  *
- * 生命周期采用引用计数：每个使用方
- * start(context)/register(...) 与 unregister(...)/stop() 配对，
- * 引用归零时服务真正停止。
+ * 应用启动时启动一次，随进程常驻；页面只负责注册和注销功能。
  *
  * 路由：
  * - `GET /` — 控制台页（assets/remote_console_ui/index.html 模板按注册功能拼装）
@@ -49,6 +51,16 @@ object RemoteConsoleServer {
     const val PORT_MAX = 8788
     private val logger = Loggers.get("RemoteConsoleServer")
 
+    // CIO 的绑定失败既从 start 抛出，也会结束引擎协程；由服务器作用域接管，
+    // 避免已经在启动边界处理的端口冲突再次成为全局未捕获异常。
+    private val serverScope =
+        CoroutineScope(
+            Dispatchers.IO + SupervisorJob() +
+                CoroutineExceptionHandler { _, error ->
+                    logger.warn { "Remote console engine stopped: ${error.message}" }
+                },
+        )
+
     @Volatile
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
 
@@ -58,7 +70,7 @@ object RemoteConsoleServer {
     @Volatile
     private var assetProvider: (String) -> ByteArray? = { null }
 
-    /** 已注册功能（key = feature.id），保序便于页面标签稳定。 */
+    /** 已注册功能（key = feature.id），供页面注册与 HTTP 请求并发访问。 */
     private val features = ConcurrentHashMap<String, RemoteConsoleFeature>()
 
     /** 注册功能（已存在时覆盖）。注册即出现在控制台页标签中。 */
@@ -89,50 +101,44 @@ object RemoteConsoleServer {
                 appContext.assets.open(path).use { it.readBytes() }
             }.getOrNull()
         }
-        // 固定端口段优先：地址稳定便于手机保存/重访；全被占时回落随机端口保证可用
-        var candidate: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
-        var boundPort = 0
-        for (port in PORT_MIN..PORT_MAX) {
-            candidate =
-                runCatching {
-                    embeddedServer(CIO, port = port) {
-                        routing {
-                            consoleRoute()
-                            actionRoute()
-                        }
-                    }.also { it.start(wait = false) }
-                }.getOrNull()
-            if (candidate != null) {
-                boundPort = port
-                break
+        val ports = (PORT_MIN..PORT_MAX).asSequence() + sequenceOf(0)
+        val running =
+            ports.firstNotNullOf { port ->
+                try {
+                    startOnPort(port)
+                } catch (error: BindException) {
+                    if (port == 0) throw error
+                    null
+                }
             }
-        }
-        server =
-            candidate
-                ?: embeddedServer(CIO, port = 0) {
-                    routing {
-                        consoleRoute()
-                        actionRoute()
-                    }
-                }.also { it.start(wait = false) }
         resolvedPort =
             runBlocking {
-                server
-                    ?.engine
-                    ?.resolvedConnectors()
-                    ?.firstOrNull()
-                    ?.port
-                    ?.takeIf { it != 0 }
-            } ?: boundPort
-        resolvedPort =
-            runBlocking {
-                server
-                    ?.engine
-                    ?.resolvedConnectors()
-                    ?.firstOrNull()
-                    ?.port
+                running.engine
+                    .resolvedConnectors()
+                    .single()
+                    .port
             }
+        server = running
         logger.info { "RemoteConsoleServer started on port $resolvedPort" }
+    }
+
+    private fun startOnPort(port: Int): EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration> {
+        val candidate =
+            serverScope.embeddedServer(CIO, port = port) {
+                routing {
+                    consoleRoute()
+                    actionRoute()
+                }
+            }
+        try {
+            return candidate.start(wait = false)
+        } catch (error: Exception) {
+            candidate.stop(gracePeriodMillis = 0, timeoutMillis = 2000)
+            // CIO 的子协程绑定失败可能由 JobCancellationException 包装。
+            throw generateSequence<Throwable>(error) { it.cause }
+                .filterIsInstance<BindException>()
+                .firstOrNull() ?: error
+        }
     }
 
     /**

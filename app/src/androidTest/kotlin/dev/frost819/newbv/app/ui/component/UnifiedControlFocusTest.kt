@@ -119,18 +119,14 @@ class UnifiedControlFocusTest {
     fun top_navigation_uses_remote_focus_and_activation() {
         var selected = ""
         var activated = ""
-        val tabs =
-            listOf("推荐", "热门", "动态").map { label ->
-                object : TopNavItem {
-                    override val displayName = label
-                }
-            }
+        val tabs = listOf("推荐", "热门", "动态")
         show {
             TopNav(
                 items = tabs,
+                displayName = { it },
                 isLargePadding = false,
-                onSelectedChanged = { selected = it.displayName },
-                onClick = { activated = it.displayName },
+                onSelectedChanged = { selected = it },
+                onClick = { activated = it },
             )
         }
         focus(rule.onNodeWithText("推荐"))

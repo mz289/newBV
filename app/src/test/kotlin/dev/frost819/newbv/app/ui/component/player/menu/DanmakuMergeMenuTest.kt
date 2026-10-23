@@ -6,8 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.tv.material3.MaterialTheme
@@ -15,8 +15,8 @@ import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.app.ui.state.player.LocalMenuFocusStateData
 import dev.frost819.newbv.app.ui.state.player.MenuFocusState
 import dev.frost819.newbv.app.ui.state.player.MenuFocusStateData
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
-import dev.frost819.newbv.data.datastore.DanmakuType
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

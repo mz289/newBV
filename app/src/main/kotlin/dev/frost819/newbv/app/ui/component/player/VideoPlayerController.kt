@@ -30,7 +30,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import dev.frost819.newbv.app.data.toDanmakuEntities
 import dev.frost819.newbv.app.entity.player.VideoAspectRatio
 import dev.frost819.newbv.app.entity.player.VideoListItem
 import dev.frost819.newbv.app.entity.player.shortcut.PlayerCustomShortcutAction
@@ -718,7 +717,7 @@ fun VideoPlayerController(
                 onPlaySpeedChange = onPlaySpeedChange,
                 onAudioChange = { onMediaProfileSettingChange(MediaProfileSettingAction.SetAudio(it)) },
                 onDanmakuSwitchChange = { types ->
-                    onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(types.toDanmakuEntities()))
+                    onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(types))
                 },
                 onDanmakuSizeChange = { onDanmakuSettingChange(DanmakuSettingAction.SetScale(it)) },
                 onDanmakuOpacityChange = { onDanmakuSettingChange(DanmakuSettingAction.SetOpacity(it)) },

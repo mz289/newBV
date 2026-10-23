@@ -31,8 +31,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
-import dev.frost819.newbv.app.data.toDanmakuEntities
-import dev.frost819.newbv.app.data.toDataDanmakuTypes
 import dev.frost819.newbv.app.ui.action.player.DanmakuSettingAction
 import dev.frost819.newbv.app.ui.component.player.menu.component.PlayerTwoLevelMenu
 import dev.frost819.newbv.app.ui.state.player.LocalMenuFocusStateData
@@ -234,9 +232,8 @@ private fun LiveMenuList(
                 )
 
             LivePlayerMenuNavItem.Danmaku -> {
-                val dataTypes = danmakuState.enabledTypes.toDataDanmakuTypes()
                 DanmakuMenuList(
-                    currentEnabledTypes = dataTypes,
+                    currentEnabledTypes = danmakuState.enabledTypes,
                     currentScale = danmakuState.scale,
                     currentOpacity = danmakuState.opacity,
                     currentSpeedFactor = danmakuState.speedFactor,
@@ -247,7 +244,7 @@ private fun LiveMenuList(
                     currentMergeMode = danmakuState.mergeMode,
                     showBlockLevel = false,
                     onDanmakuSwitchChange = { types ->
-                        onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(types.toDanmakuEntities()))
+                        onDanmakuSettingChange(DanmakuSettingAction.SetEnabledTypes(types))
                     },
                     onDanmakuSizeChange = { onDanmakuSettingChange(DanmakuSettingAction.SetScale(it)) },
                     onDanmakuOpacityChange = { onDanmakuSettingChange(DanmakuSettingAction.SetOpacity(it)) },

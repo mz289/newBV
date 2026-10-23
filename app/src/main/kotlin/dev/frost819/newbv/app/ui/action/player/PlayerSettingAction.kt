@@ -1,8 +1,8 @@
 package dev.frost819.newbv.app.ui.action.player
 
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
-import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.data.datastore.Audio
 import dev.frost819.newbv.data.datastore.VideoCodec
 

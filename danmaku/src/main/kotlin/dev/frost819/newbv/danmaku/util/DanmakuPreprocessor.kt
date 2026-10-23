@@ -1,15 +1,14 @@
 package dev.frost819.newbv.danmaku.util
 
 import com.kuaishou.akdanmaku.data.DanmakuItemData
+import dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType
 import dev.frost819.newbv.danmaku.config.DanmakuBlockRule
 import dev.frost819.newbv.danmaku.config.DanmakuMergeMode
 import dev.frost819.newbv.danmaku.config.DanmakuState
-import dev.frost819.newbv.danmaku.entity.DanmakuType
 import dev.frost819.newbv.danmaku.filter.DanmakuBlockFilter
 
 /** 权重屏蔽 → 屏蔽原始内容 → 过滤显示类型 → 相似合并。每次处理使用同一份状态快照。 */
 object DanmakuPreprocessor {
-
     /** 已编译屏蔽规则的缓存：规则未变时复用，避免分段重建时反复编译正则。 */
     private var cachedRules: List<DanmakuBlockRule>? = null
     private var cachedFilter: DanmakuBlockFilter? = null

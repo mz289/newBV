@@ -22,7 +22,6 @@ import dev.frost819.newbv.biliapi.repositories.LiveRepository
 import dev.frost819.newbv.biliapi.websocket.LiveDataWebSocket
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
-import dev.frost819.newbv.player.AbstractVideoPlayer
 import dev.frost819.newbv.player.VideoPlayerListener
 import dev.frost819.newbv.player.VideoPlayerOptions
 import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
@@ -96,7 +95,7 @@ class LivePlayerViewModel
         /** 直播防盗链 Referer。 */
         private val liveReferer = "https://live.bilibili.com"
 
-        var videoPlayer: AbstractVideoPlayer? by mutableStateOf(null)
+        var videoPlayer: ExoMediaPlayer? by mutableStateOf(null)
             private set
 
         private var danmakuPlayer: DanmakuPlayer? = null
@@ -182,8 +181,7 @@ class LivePlayerViewModel
                     }
                 },
             )
-            videoPlayer?.initPlayer()
-            videoPlayer?.setOptions()
+            videoPlayer?.start()
         }
 
         /**
@@ -322,7 +320,7 @@ class LivePlayerViewModel
             debugInfoJob =
                 viewModelScope.launch(Dispatchers.Main) {
                     while (isActive) {
-                        val player = videoPlayer as? ExoMediaPlayer ?: break
+                        val player = videoPlayer ?: break
                         val state = _uiState.value
                         _debugInfo.value =
                             buildString {
@@ -338,8 +336,8 @@ class LivePlayerViewModel
                                 appendLine("roomId: ${state.realRoomId}")
                                 appendLine("resolution: ${player.videoWidth} x ${player.videoHeight}")
                                 appendLine("buffered: ${player.bufferedPercentage}%")
-                                appendLine("video: ${player.mPlayer?.videoFormat?.sampleMimeType ?: "null"}")
-                                val audioCodec = player.mPlayer?.audioFormat?.sampleMimeType ?: "null"
+                                appendLine("video: ${player.mPlayer.videoFormat?.sampleMimeType ?: "null"}")
+                                val audioCodec = player.mPlayer.audioFormat?.sampleMimeType ?: "null"
                                 appendLine("audio: $audioCodec (${player.audioRendererName})")
                             }.trimEnd()
                         delay(500)

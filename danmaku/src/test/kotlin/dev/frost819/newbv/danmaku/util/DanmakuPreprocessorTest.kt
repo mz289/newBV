@@ -111,7 +111,7 @@ class DanmakuPreprocessorTest {
         val state =
             DanmakuState(
                 mergeMode = DanmakuMergeMode.Similar,
-                enabledTypes = listOf(dev.frost819.newbv.danmaku.entity.DanmakuType.Top),
+                enabledTypes = listOf(dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType.Top),
             )
         val result = DanmakuPreprocessor.process(items, state).single()
         assertThat(result.mode).isEqualTo(5)
@@ -119,8 +119,10 @@ class DanmakuPreprocessorTest {
         // 恢复类型后默认跨类型合并：同文归入簇首（滚动）一簇
         val merged =
             DanmakuPreprocessor
-                .process(items, state.copy(enabledTypes = dev.frost819.newbv.danmaku.entity.DanmakuType.entries))
-                .single()
+                .process(
+                    items,
+                    state.copy(enabledTypes = dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType.entries),
+                ).single()
         assertThat(merged.mode).isEqualTo(1)
         assertThat(merged.mergedCount).isEqualTo(2)
     }
@@ -143,7 +145,7 @@ class DanmakuPreprocessorTest {
         val hidden =
             DanmakuPreprocessor.process(
                 listOf(special),
-                state.copy(enabledTypes = listOf(dev.frost819.newbv.danmaku.entity.DanmakuType.Rolling)),
+                state.copy(enabledTypes = listOf(dev.frost819.newbv.biliapi.entity.danmaku.DanmakuType.Rolling)),
             )
         assertThat(hidden).isEmpty()
 

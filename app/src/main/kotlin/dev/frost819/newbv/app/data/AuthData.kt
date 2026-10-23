@@ -2,7 +2,6 @@ package dev.frost819.newbv.app.data
 
 import dev.frost819.newbv.data.datastore.Prefs
 import kotlinx.serialization.Serializable
-import java.util.Date
 
 /**
  * 登录凭证数据。
@@ -64,7 +63,7 @@ data class AuthData(
         Prefs.sid = sid
         Prefs.biliJct = biliJct
         Prefs.sessData = sessData
-        Prefs.tokenExpiredDate = Date(tokenExpiredDate)
+        Prefs.tokenExpiredDate = tokenExpiredDate
         Prefs.accessToken = accessToken
         Prefs.refreshToken = refreshToken
         Prefs.isLogin = true

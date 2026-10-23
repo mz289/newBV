@@ -103,7 +103,7 @@ class ExoMediaPlayerStreamTest {
                         ),
                 )
             }
-        runOnMainVoid { player.setOptions() }
+        runOnMainVoid { player.start() }
     }
 
     @After
