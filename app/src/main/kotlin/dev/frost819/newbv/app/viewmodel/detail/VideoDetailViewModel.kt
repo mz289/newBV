@@ -160,7 +160,7 @@ class VideoDetailViewModel
                         val detail =
                             videoDetailRepository.getVideoDetail(
                                 aid = aid,
-                                preferApiType = ApiType.Web,
+                                preferApiType = prefApiType(),
                                 bvid = routeBvid,
                             )
                         _uiState.update { it.copy(detail = detail) }
