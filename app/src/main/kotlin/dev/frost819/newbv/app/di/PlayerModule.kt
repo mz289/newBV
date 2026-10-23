@@ -12,6 +12,7 @@ import dev.frost819.newbv.player.CdnSelector
 import dev.frost819.newbv.player.OkHttpCdnSelector
 import dev.frost819.newbv.player.OkHttpUtil
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
+import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
 /**
@@ -23,6 +24,13 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object PlayerModule {
+    /** 播放与 CDN 测速共用单例，避免每轮播放重建 SSL 配置和连接池。 */
+    @Provides
+    @Singleton
+    fun providePlayerHttpClient(
+        @ApplicationContext context: Context,
+    ): OkHttpClient = OkHttpUtil.generateCustomSslOkHttpClient(context)
+
     /**
      * 提供 [ExoPlayerFactory] 单例。
      *
@@ -31,7 +39,7 @@ object PlayerModule {
      */
     @Provides
     @Singleton
-    fun provideExoPlayerFactory(): ExoPlayerFactory = ExoPlayerFactory()
+    fun provideExoPlayerFactory(playerHttpClient: OkHttpClient): ExoPlayerFactory = ExoPlayerFactory(playerHttpClient)
 
     /**
      * 提供设备视频解码能力查询器。
@@ -54,7 +62,5 @@ object PlayerModule {
      */
     @Provides
     @Singleton
-    fun provideCdnSelector(
-        @ApplicationContext context: Context,
-    ): CdnSelector = OkHttpCdnSelector(OkHttpUtil.generateCustomSslOkHttpClient(context))
+    fun provideCdnSelector(playerHttpClient: OkHttpClient): CdnSelector = OkHttpCdnSelector(playerHttpClient)
 }

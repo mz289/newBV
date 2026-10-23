@@ -33,6 +33,7 @@ import okhttp3.OkHttpClient
 import okio.Path.Companion.toPath
 import java.io.File
 import javax.inject.Inject
+import javax.inject.Provider
 
 /**
  * new BV 应用入口。
@@ -65,6 +66,9 @@ class BVApplication : Application() {
 
     @Inject
     lateinit var accountRepository: AccountRepositoryImpl
+
+    @Inject
+    lateinit var playerHttpClientProvider: Provider<OkHttpClient>
 
     override fun onCreate() {
         super.onCreate()
@@ -162,6 +166,11 @@ class BVApplication : Application() {
                 .components {
                     add(OkHttpNetworkFetcherFactory(OkHttpClient()))
                 }.build()
+        }
+
+        // SSL 初始化涉及系统 CA 库读取，在 IO 线程提前构建播放器共享 client。
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            playerHttpClientProvider.get()
         }
 
         // 启动时检查缓存阈值，超限自动 LRU 清理（检查时机 = App 启动 + 缓存写入后）

@@ -217,8 +217,10 @@ class DanmakuPlayer(
         actionHandler.removeCallbacksAndMessages(null)
 //    Choreographer.getInstance().removeFrameCallback(frameCallback)
         started = false
+        // 唤醒可能阻塞在 acquire() 的工作线程，再等待 act() 完成，最后释放引擎。
+        drawSemaphore.release()
         actionThread.quitSafely()
-        actionThread.join(50L)
+        actionThread.join()
         engine.release()
     }
 

@@ -24,10 +24,10 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.upstream.ParsingLoadable
-import dev.frost819.newbv.player.OkHttpUtil
 import dev.frost819.newbv.player.VideoPlayerListener
 import dev.frost819.newbv.player.VideoPlayerOptions
 import dev.frost819.newbv.player.formatMinSec
+import okhttp3.OkHttpClient
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.util.Locale
@@ -48,6 +48,7 @@ import java.util.Locale
 class ExoMediaPlayer(
     private val context: Context,
     private val options: VideoPlayerOptions,
+    internal val httpClient: OkHttpClient,
 ) : Player.Listener {
     companion object {
         private const val BEHIND_LIVE_WINDOW_RECOVER_WINDOW_MS = 15_000L
@@ -74,7 +75,7 @@ class ExoMediaPlayer(
     private var behindLiveWindowLastRecoverAtMs = 0L
 
     private val httpDataSourceFactory =
-        OkHttpDataSource.Factory(OkHttpUtil.generateCustomSslOkHttpClient(context)).apply {
+        OkHttpDataSource.Factory(httpClient).apply {
             options.userAgent?.let { setUserAgent(it) }
             options.referer?.let { setDefaultRequestProperties(mapOf("referer" to it)) }
         }

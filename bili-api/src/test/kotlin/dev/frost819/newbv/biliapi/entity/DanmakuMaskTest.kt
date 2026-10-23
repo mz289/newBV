@@ -53,4 +53,21 @@ class DanmakuMaskTest {
         }
         assertEquals(Long.MAX_VALUE, position)
     }
+
+    @Test
+    fun `non-final web mask segments cover the last millisecond`() {
+        val mask = loadMask("webmask", DanmakuMaskType.WebMask)
+        forEachSegment(mask) { segment ->
+            if (segment.range.last + 1 != Long.MAX_VALUE) {
+                assertTrue(segment.frames.any { segment.range.last in it.range })
+            }
+        }
+    }
+
+    @Test
+    fun `final web mask frame ends with the actual data`() {
+        val mask = loadMask("webmask", DanmakuMaskType.WebMask)
+        val segment = assertNotNull(mask.getSegmentAt(Long.MAX_VALUE - 1))
+        assertTrue(segment.frames.last().range.last < Long.MAX_VALUE - 1)
+    }
 }

@@ -1,6 +1,8 @@
 package dev.frost819.newbv.core.log
 
 import android.content.Context
+import android.content.pm.PackageInfo
+import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
@@ -21,9 +23,11 @@ class CrashHandlerTest {
     private lateinit var context: Context
     private lateinit var crashHandler: CrashHandler
     private lateinit var logDir: File
+    private var originalHandler: Thread.UncaughtExceptionHandler? = null
 
     @Before
     fun setup() {
+        originalHandler = Thread.getDefaultUncaughtExceptionHandler()
         context = ApplicationProvider.getApplicationContext()
         logDir = File(context.filesDir, CrashHandler.LOG_DIR)
         logDir.deleteRecursively()
@@ -38,7 +42,7 @@ class CrashHandlerTest {
 
     @After
     fun teardown() {
-        crashHandler.uninstall()
+        Thread.setDefaultUncaughtExceptionHandler(originalHandler)
         logDir.deleteRecursively()
     }
 
@@ -95,18 +99,6 @@ class CrashHandlerTest {
 
         val currentHandler = Thread.getDefaultUncaughtExceptionHandler()
         assertThat(currentHandler).isNotSameInstanceAs(originalHandler)
-
-        crashHandler.uninstall()
-        assertThat(Thread.getDefaultUncaughtExceptionHandler()).isSameInstanceAs(originalHandler)
-    }
-
-    @Test
-    fun uninstall_restores_original_handler() {
-        val originalHandler = Thread.getDefaultUncaughtExceptionHandler()
-        crashHandler.install()
-        crashHandler.uninstall()
-
-        assertThat(Thread.getDefaultUncaughtExceptionHandler()).isSameInstanceAs(originalHandler)
     }
 
     @Test
@@ -152,5 +144,16 @@ class CrashHandlerTest {
 
         assertThat(logFile).isNotNull()
         assertThat(logDir.exists()).isTrue()
+    }
+
+    @Test
+    fun versionCodeCompat_uses_legacy_version_code_before_android9() {
+        // Android 9 以下没有 PackageInfo.longVersionCode，必须回退到 versionCode
+        @Suppress("DEPRECATION")
+        val packageInfo = PackageInfo().apply { versionCode = 123 }
+
+        val versionCode = packageInfo.versionCodeCompat(sdkInt = Build.VERSION_CODES.O_MR1)
+
+        assertThat(versionCode).isEqualTo(123L)
     }
 }

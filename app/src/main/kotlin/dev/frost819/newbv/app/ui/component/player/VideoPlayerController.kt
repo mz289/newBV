@@ -142,7 +142,13 @@ fun VideoPlayerController(
     var seekChangeCount by remember { mutableLongStateOf(0L) }
     var lastSeekChangeTime by remember { mutableLongStateOf(0L) }
     var seekCountdown: Job? by remember { mutableStateOf(null) }
-    var hideInfoSeekCountdown: Job? by remember { mutableStateOf(null) }
+
+    // 拖拽期间停用自动隐藏，松手后由可见性重新决定是否计时。
+    val onInteraction =
+        rememberControllerAutoHide(
+            visible = showInfoSeekController && !isSeekDragActive,
+            onHide = { showInfoSeekController = false },
+        )
 
     // 常显进度条
     var showPersistentSeek by remember { mutableStateOf(Prefs.showPersistentSeek) }
@@ -196,7 +202,6 @@ fun VideoPlayerController(
     fun onSeekDragStart() {
         isSeekDragActive = true
         seekCountdown?.cancel()
-        hideInfoSeekCountdown?.cancel()
     }
 
     /** 触摸拖拽 seek 结束（手指抬起）。[positionMs] 非空时以其为最终位置，立即执行 seek。 */
@@ -239,19 +244,6 @@ fun VideoPlayerController(
 
     fun onSeekGoTime() {
         executeSeek()
-    }
-
-    /**
-     * 控制器自动隐藏计时器。触屏交互后 5 秒无操作自动收起控制器。
-     */
-    fun startControllerAutoHide() {
-        if (!showInfoSeekController) return
-        hideInfoSeekCountdown?.cancel()
-        hideInfoSeekCountdown =
-            scope.launch {
-                delay(PlayerConstants.CONTROLLER_AUTO_HIDE_MS)
-                showInfoSeekController = false
-            }
     }
 
     /**
@@ -475,17 +467,17 @@ fun VideoPlayerController(
                 .background(Color.Black)
                 .focusable()
                 .onPreviewKeyEvent { event ->
-                    startControllerAutoHide()
+                    onInteraction()
                     handleKeyEvent(event)
                 }.playerGestures(
                     totalDuration = { seekerState.value.totalDuration },
                     controllerVisible = { showInfoSeekController },
                     callbacks =
                         PlayerGestureCallbacks(
+                            onUserInteraction = onInteraction,
                             onSingleTap = {
                                 if (!showClickableControllers) {
                                     showInfoSeekController = !showInfoSeekController
-                                    if (showInfoSeekController) startControllerAutoHide()
                                 } else {
                                     closeAllControllers()
                                 }
@@ -656,11 +648,9 @@ fun VideoPlayerController(
                 onSeekDragEnd = ::onSeekDragEnd,
                 onPlayPause = {
                     onPlay()
-                    startControllerAutoHide()
                 },
                 onDanmakuSwitchChange = {
                     onToggleDanmaku()
-                    startControllerAutoHide()
                 },
                 onShowSettings = { showMenuController = true },
                 onShowRelatedVideos = { showRelatedVideosController = true },
@@ -668,7 +658,6 @@ fun VideoPlayerController(
                 onGoToVideoInfo = onGoToVideoDetail,
                 onToggleLoop = {
                     onToggleLoop()
-                    startControllerAutoHide()
                 },
                 onGoToUpPage = onGoToUpPage,
                 onShowInteraction = onShowInteraction,
@@ -685,7 +674,6 @@ fun VideoPlayerController(
                     showListController = false
                     // 面板关闭会带走焦点，重新唤出控制栏并把焦点交还进度条
                     showInfoSeekController = true
-                    startControllerAutoHide()
                     seekFocusKick++
                 },
             )
@@ -701,7 +689,6 @@ fun VideoPlayerController(
                     showChapterListController = false
                     // 面板关闭会带走焦点，重新唤出控制栏并把焦点交还进度条
                     showInfoSeekController = true
-                    startControllerAutoHide()
                     seekFocusKick++
                 },
             )

@@ -49,6 +49,7 @@ enum class GestureTipType {
  * @param onSeekEnd seek 拖拽手指抬起时触发一次（拖拽结束，此时应执行 seek）。
  * @param onBrightnessChange 亮度变化：deltaY > 0 增加亮度，< 0 降低亮度。
  * @param onVolumeChange 音量变化：deltaY > 0 增加音量，< 0 降低音量。
+ * @param onUserInteraction 任意触摸按下（含子组件消费的事件），用于续期自动隐藏倒计时。
  */
 data class PlayerGestureCallbacks(
     val onSingleTap: () -> Unit,
@@ -58,6 +59,7 @@ data class PlayerGestureCallbacks(
     val onSeekEnd: () -> Unit = {},
     val onBrightnessChange: (deltaY: Float) -> Unit,
     val onVolumeChange: (deltaY: Float) -> Unit,
+    val onUserInteraction: () -> Unit = {},
 )
 
 /**
@@ -106,6 +108,7 @@ fun Modifier.playerGestures(
 
         awaitEachGesture {
             val firstDown = awaitFirstDown(requireUnconsumed = false)
+            callbacks.onUserInteraction()
             val startX = firstDown.position.x
             val startY = firstDown.position.y
             val width = this.size.width.toFloat()

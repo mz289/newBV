@@ -45,6 +45,7 @@ class ExoMediaPlayerTest {
             runOnMain {
                 ExoMediaPlayer(
                     context = context,
+                    httpClient = OkHttpUtil.generateCustomSslOkHttpClient(context),
                     options =
                         VideoPlayerOptions(
                             userAgent = "test-agent",
@@ -178,6 +179,7 @@ class ExoMediaPlayerTest {
             runOnMain {
                 ExoMediaPlayer(
                     context = context,
+                    httpClient = OkHttpUtil.generateCustomSslOkHttpClient(context),
                     options =
                         VideoPlayerOptions(
                             enableFfmpegAudioRenderer = true,

@@ -54,6 +54,12 @@ private data class SegmentEntry(
     val compressedBytes: ByteArray,
 )
 
+private fun DanmakuMaskFrame.withEnd(end: Long): DanmakuMaskFrame =
+    when (this) {
+        is DanmakuWebMaskFrame -> copy(range = range.first until end)
+        is DanmakuMobMaskFrame -> copy(range = range.first until end)
+    }
+
 /** 保存压缩数据，仅在 [getSegmentAt] 时解压当前段；解压结果由调用方管理。 */
 class DanmakuMask private constructor(
     val type: DanmakuMaskType,
@@ -108,6 +114,17 @@ class DanmakuMask private constructor(
                     }
                 }
             }
+        }
+
+        // 关闭段尾空洞：webmask 每段约 10s，段内帧按 ~33ms（30fps）推进，但服务端在该段
+        // 通常少生成最后一帧，使最后帧结束时间比下一段起始时间早一帧（~33ms）。若不补齐，
+        // findFrame 在该空洞内返回 null，蒙版会在每段边界短暂消失（表现为每隔数秒闪烁一下）。
+        // segRange.last + 1 恰为下一段起始时间；仅末段等于 Long.MAX_VALUE，此时不能延伸，
+        // 否则蒙版会在蒙版数据结束后一直残留。
+        val segmentEnd = entry.segRange.last + 1
+        if (segmentEnd != Long.MAX_VALUE && frames.isNotEmpty()) {
+            val last = frames.last()
+            frames[frames.lastIndex] = last.withEnd(maxOf(last.range.last + 1, segmentEnd))
         }
 
         return DanmakuMaskSegment(range = entry.segRange, frames = frames)
