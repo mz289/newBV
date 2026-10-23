@@ -7,6 +7,7 @@ import dev.frost819.newbv.biliapi.entity.user.DynamicVideo
 import dev.frost819.newbv.biliapi.entity.user.HistoryItem
 import dev.frost819.newbv.biliapi.entity.user.ToViewItem
 import dev.frost819.newbv.biliapi.entity.video.RelatedVideo
+import dev.frost819.newbv.biliapi.http.util.toSmartDate
 
 /**
  * 视频卡片数据。
@@ -63,6 +64,7 @@ data class VideoCardData(
                 playString = related.view.toWanString(),
                 danmakuString = related.danmaku.toWanString(),
                 timeString = (related.duration * 1000L).formatHourMinSec(),
+                pubTime = related.pubdate.toSmartDate(),
             )
 
         /** 由首页推荐/热门条目 [UgcItem] 转换。 */
