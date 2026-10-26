@@ -73,7 +73,7 @@ fun NavGraphBuilder.videoPlayerScreen(navController: NavController) {
                     playerViewModel.uiState.value.lastPlayed
                         .toLong() * 1000,
             )
-            danmakuViewModel.loadDanmakuMask(route.aid, actualCid)
+            danmakuViewModel.loadDanmakuMask()
             subtitleViewModel.loadSubtitleList(route.aid, actualCid)
             // 6. 投屏指定的弹幕开关与倍速（不落盘为用户默认值）
             route.danmakuEnabled?.let { applyCastDanmakuState(danmakuViewModel, it) }
