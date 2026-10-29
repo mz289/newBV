@@ -8,6 +8,7 @@ import dev.frost819.newbv.biliapi.repositories.LivePlayInfo
 import dev.frost819.newbv.biliapi.repositories.LivePlayLine
 import dev.frost819.newbv.biliapi.repositories.LiveQuality
 import dev.frost819.newbv.biliapi.repositories.LiveRepository
+import dev.frost819.newbv.player.VideoPlayerListener
 import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
 import io.mockk.coEvery
@@ -225,6 +226,60 @@ class LivePlayerViewModelTest {
             assertThat(qualities.map { it.qn }).containsExactly(30000, 10000)
         }
 
+    // ── 播放器回调 ───────────────────────────────────────────
+
+    @Test
+    fun `onError sets error state with user facing message`() =
+        runTest(testDispatcher) {
+            // When
+            getVideoPlayerListener().onError(RuntimeException("boom"))
+
+            // Then
+            val state = viewModel.uiState.value
+            assertThat(state.playerState).isEqualTo(LivePlayerState.Error)
+            assertThat(state.errorMessage).isEqualTo("播放失败，请稍后重试")
+            assertThat(state.isBuffering).isFalse()
+        }
+
+    @Test
+    fun `onPause after error keeps error state`() =
+        runTest(testDispatcher) {
+            // Given: 出错后 ExoPlayer 会立刻回调 isPlaying=false
+            val listener = getVideoPlayerListener()
+            listener.onError(RuntimeException("boom"))
+
+            // When
+            listener.onPause()
+
+            // Then: 错误提示不能被暂停态覆盖
+            assertThat(viewModel.uiState.value.playerState).isEqualTo(LivePlayerState.Error)
+        }
+
+    @Test
+    fun `onVideoDecodeUnsupported sets actionable error`() =
+        runTest(testDispatcher) {
+            // When
+            getVideoPlayerListener().onVideoDecodeUnsupported()
+
+            // Then
+            val state = viewModel.uiState.value
+            assertThat(state.playerState).isEqualTo(LivePlayerState.Error)
+            assertThat(state.errorMessage).isEqualTo("解码失败，请尝试切换画质或线路")
+            assertThat(state.isBuffering).isFalse()
+        }
+
+    @Test
+    fun `onAudioDecodeUnsupported sets actionable error`() =
+        runTest(testDispatcher) {
+            // When
+            getVideoPlayerListener().onAudioDecodeUnsupported()
+
+            // Then
+            val state = viewModel.uiState.value
+            assertThat(state.playerState).isEqualTo(LivePlayerState.Error)
+            assertThat(state.errorMessage).isEqualTo("音频解码失败，请尝试切换线路")
+        }
+
     // ── Helpers ──────────────────────────────────────────────
 
     @Test
@@ -263,6 +318,15 @@ class LivePlayerViewModelTest {
             verify(exactly = 0) { mockPlayer.playUrl(any()) }
             assertThat(viewModel.uiState.value.availableLines).isEmpty()
         }
+
+    private fun setVideoPlayer(player: ExoMediaPlayer?) {
+
+    /** 读取 `videoPlayerListener` 字段（播放器事件匿名对象）。 */
+    private fun getVideoPlayerListener(): VideoPlayerListener {
+        val field = LivePlayerViewModel::class.java.getDeclaredField("videoPlayerListener")
+        field.isAccessible = true
+        return field.get(viewModel) as VideoPlayerListener
+    }
 
     private fun setVideoPlayer(player: ExoMediaPlayer?) {
         val field = LivePlayerViewModel::class.java.getDeclaredField("videoPlayer${'$'}delegate")
