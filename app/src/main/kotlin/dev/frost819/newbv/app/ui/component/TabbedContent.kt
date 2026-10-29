@@ -35,7 +35,6 @@ import androidx.compose.material3.Scaffold as Material3Scaffold
  * @param initialTab 初始（上次记住的）Tab。
  * @param displayName Tab 显示名称。
  * @param onRefresh 点击 Tab 或按菜单键时的刷新回调。
- * @param topBarTrailing 顶栏尾部操作位（如筛选入口），null 时不占位。
  * @param animated Tab 切换是否使用横向滑动动画（多子页壳为 true，数据切换单内容壳为 false）。
  * @param onTabSelected Tab 切换回调（如懒加载），同 Tab 重复聚焦不触发。
  * @param content Tab 内容。
@@ -48,7 +47,6 @@ fun <T> TabbedContent(
     displayName: (T) -> String,
     onRefresh: (T) -> Unit,
     modifier: Modifier = Modifier,
-    topBarTrailing: (@Composable () -> Unit)? = null,
     animated: Boolean = false,
     onTabSelected: (T) -> Unit = {},
     content: @Composable (T) -> Unit,
@@ -70,7 +68,6 @@ fun <T> TabbedContent(
                 displayName = displayName,
                 selectedIndex = reorderedTabs.indexOf(selectedTab),
                 isLargePadding = !focusOnContent,
-                trailing = topBarTrailing,
                 onSelectedChanged = { tab ->
                     if (tab != selectedTab) {
                         selectedTab = tab

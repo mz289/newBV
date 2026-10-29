@@ -44,7 +44,6 @@ import dev.frost819.newbv.core.focus.touchClickable
  * @param displayName Tab 项显示名称。
  * @param selectedIndex 当前选中的 Tab 索引（由外部控制，用于导航返回后恢复）。
  * @param isLargePadding 内容区未获焦点时使用较大内边距。
- * @param trailing Tab 行尾部的操作位（如筛选入口），null 时不占位。
  * @param onSelectedChanged Tab 焦点切换回调。
  * @param onClick Tab 点击回调。
  */
@@ -55,7 +54,6 @@ fun <T> TopNav(
     displayName: (T) -> String,
     selectedIndex: Int = 0,
     isLargePadding: Boolean,
-    trailing: (@Composable () -> Unit)? = null,
     onSelectedChanged: (T) -> Unit = {},
     onClick: (T) -> Unit = {},
 ) {
@@ -77,13 +75,11 @@ fun <T> TopNav(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = verticalPadding),
         horizontalArrangement = Arrangement.Start,
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         TabRow(
             modifier =
                 Modifier
-                    .focusRestorer(focusRequester)
-                    .let { if (trailing != null) it.weight(1f) else it },
+                    .focusRestorer(focusRequester),
             selectedTabIndex = selectedTabIndex,
             separator = { Spacer(modifier = Modifier.width(12.dp)) },
             indicator = { _, _ -> },
@@ -101,7 +97,6 @@ fun <T> TopNav(
                 )
             }
         }
-        trailing?.invoke()
     }
 }
 
