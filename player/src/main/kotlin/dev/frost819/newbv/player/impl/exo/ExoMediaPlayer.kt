@@ -122,6 +122,8 @@ class ExoMediaPlayer(
         return ExoPlayer
             .Builder(context)
             .setRenderersFactory(renderersFactory)
+            // 限制缓冲时长与字节数：默认 50 秒窗在 4K 高码率流上会占满低内存电视的堆
+            .setLoadControl(PlayerLoadControl.create())
             .build()
             .also { it.addListener(this) }
     }
