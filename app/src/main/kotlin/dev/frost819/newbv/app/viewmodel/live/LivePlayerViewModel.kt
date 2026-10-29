@@ -147,12 +147,17 @@ class LivePlayerViewModel
 
                 override fun onReady() {
                     _uiState.update {
-                        it.copy(playerState = LivePlayerState.Playing, isBuffering = false)
+                        it.copy(
+                            playerState = LivePlayerState.Playing,
+                            isBuffering = false,
+                            // 恢复播放后清掉旧错误文案，避免下次仅切状态时残留显示
+                            errorMessage = null,
+                        )
                     }
                 }
 
                 override fun onPlay() {
-                    _uiState.update { it.copy(playerState = LivePlayerState.Playing) }
+                    _uiState.update { it.copy(playerState = LivePlayerState.Playing, errorMessage = null) }
                 }
 
                 override fun onPause() {
@@ -476,6 +481,10 @@ class LivePlayerViewModel
             val preferredOrder = _uiState.value.currentLine
             streamJob?.cancel()
             streamJob = viewModelScope.launch {
+                // 换档/换线路期间进入加载态并清掉旧错误，避免错误浮层压住新的加载状态
+                _uiState.update {
+                    it.copy(playerState = LivePlayerState.Loading, isBuffering = true, errorMessage = null)
+                }
                 runCatching {
                     val playInfo = withTimeout(LOAD_TIMEOUT_MS) { liveRepository.getLivePlayInfo(realRoomId, key) }
                     currentCoroutineContext().ensureActive()
