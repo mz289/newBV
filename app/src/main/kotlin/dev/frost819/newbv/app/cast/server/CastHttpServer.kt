@@ -7,14 +7,10 @@ import dev.frost819.newbv.app.cast.CastPlaybackLauncher
 import dev.frost819.newbv.app.cast.CastTransportState
 import dev.frost819.newbv.app.cast.protocol.CastContent
 import dev.frost819.newbv.app.cast.protocol.CastContentParser
-import dev.frost819.newbv.app.cast.protocol.NvaExtDecoder
 import dev.frost819.newbv.core.log.Loggers
 import io.ktor.http.Parameters
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
@@ -30,18 +26,12 @@ import java.util.Locale
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
- * 投屏接收端网络服务（原生 TCP，端口 9958），同一端口承载三类通道：
+ * 投屏接收端网络服务（原生 TCP，端口 9958），承载两类通道：
  *
  * 1. **HTTP/SOAP**：UPnP 设备描述、SCPD、标准 DLNA 控制端点与 B 站私有
  *    NirvanaControl SOAP 端点（通用 DLNA 控制点与官方客户端 SOAP 流程）；
- * 2. **哔哩必连（NVA Socket）**：手机端以 HTTP `SETUP /projection` 请求升级，
- *    之后同一 TCP 连接走 NVA 二进制帧协议（协议细节与社区开源实现的
- *    云视听小电视对接行为一致，见 [NvaSession]），是官方客户端的首选控制通道；
- * 3. **catch-all**：任意未匹配路径都尝试解析投屏内容并触发播放，兼容
+ * 2. **catch-all**：任意未匹配路径都尝试解析投屏内容并触发播放，兼容
  *    各类非标准投递姿势。
- *
- * 不用 Ktor 的原因：`SETUP` 升级需要把 HTTP 连接劫持为裸 TCP 长连接，
- * Ktor 服务端引擎不暴露 socket hijack 能力。
  */
 class CastHttpServer(
     private val uuid: String,
@@ -56,8 +46,6 @@ class CastHttpServer(
     private var running = false
 
     private val connections = CopyOnWriteArraySet<Socket>()
-    private val nvaSessions = CopyOnWriteArraySet<NvaSession>()
-    private var statusPushJob: Job? = null
 
     @Volatile
     private var currentUri: String = ""
@@ -76,8 +64,7 @@ class CastHttpServer(
             serverSocket = server
             running = true
             scope.launch(Dispatchers.IO) { acceptLoop(server) }
-            statusPushJob = scope.launch { statusPushLoop() }
-            requestLogger.log("Cast HTTP/NVA server started on ${CastReceiverConfig.HTTP_PORT}")
+            requestLogger.log("Cast HTTP server started on ${CastReceiverConfig.HTTP_PORT}")
         } catch (t: Throwable) {
             runCatching { server.close() }
             serverSocket = null
@@ -88,13 +75,10 @@ class CastHttpServer(
 
     fun stop() {
         running = false
-        statusPushJob?.cancel()
-        statusPushJob = null
         runCatching { serverSocket?.close() }
         serverSocket = null
         connections.toList().forEach { runCatching { it.close() } }
         connections.clear()
-        nvaSessions.clear()
     }
 
     private suspend fun acceptLoop(server: ServerSocket) {
@@ -135,13 +119,6 @@ class CastHttpServer(
                 headers = request.headers.mapValues { listOf(it.value) },
                 body = request.body,
             )
-            if (request.method.equals("SETUP", ignoreCase = true) &&
-                request.path.startsWith(CastReceiverConfig.NVA_PROJECTION_PATH)
-            ) {
-                // 必连：劫持连接为 NVA 二进制帧会话
-                nvaSessionLoop(socket, request)
-                return
-            }
             val keepAlive = respond(socket, request)
             if (!keepAlive) return
         }
@@ -304,13 +281,6 @@ class CastHttpServer(
             headers = request.headers,
         )
 
-    /** 解析独立 JSON 载荷（NVA 命令 body / nva_ext 解密结果）。 */
-    private fun parseContentJson(body: String): CastContent? =
-        CastContentParser.parse(
-            path = "",
-            queryParameters = Parameters.Empty,
-            body = body.takeIf { it.isNotBlank() },
-        )
 
     private fun localDescriptionHost(socket: Socket): String {
         val remote = socket.inetAddress ?: return CastNetworkUtil.localIpv4Address()
@@ -345,324 +315,6 @@ class CastHttpServer(
     private fun xmlResult(xml: String): RouteResult =
         RouteResult("200 OK", "text/xml; charset=\"utf-8\"", emptyList(), xml)
 
-    // ── 哔哩必连（NVA Socket） ─────────────────────────────────
-
-    /**
-     * NVA 二进制帧协议（对齐官方云视听小电视的线上行为）。
-     *
-     * 帧结构（客户端→服务端命令帧）：
-     * `0xE0 | paramCount(1) | version(4, BE) | 0x01 | cmdLen(1) + cmd |
-     *  actionLen(1) + action | [bodyLen(4, BE) + body(JSON)]`
-     * `paramCount`：0 = 心跳；2 = 无 body；3 = 有 body。
-     * 服务端应答帧：`0xC0 | 0x00 + version`（空应答）或
-     * `0xC0 | 0x01 + version + len(4) + body`；服务端命令把首字节换回 `0xE0`。
-     */
-    private inner class NvaSession(private val socket: Socket) {
-        private val input = DataInputStream(BufferedInputStream(socket.getInputStream()))
-        private val output = BufferedOutputStream(socket.getOutputStream())
-
-        /** 帧版本单调递增，随收到的客户端帧版本推进。 */
-        private var currentVersion = 1L
-
-        fun readLoop() {
-            while (running && !socket.isClosed) {
-                val fst = input.read()
-                if (fst < 0) return
-                val paramCount = input.read()
-                if (paramCount < 0) return
-                currentVersion = readInt32(input).toLong() and 0xFFFFFFFFL
-                if (paramCount == 0) {
-                    // 心跳，无需应答
-                    continue
-                }
-                input.read() // 0x01 分隔
-                val command = readShortString(input)
-                if (fst != 0xE0 || paramCount == 1) {
-                    requestLogger.log("NVA reply frame: $command")
-                    continue
-                }
-                val action = readShortString(input)
-                val body =
-                    if (paramCount >= 3) {
-                        val bodyLength = readInt32(input)
-                        if (bodyLength <= 0 || bodyLength > MAX_BODY_BYTES) "" else readString(input, bodyLength)
-                    } else {
-                        ""
-                    }
-                requestLogger.log("NVA command action=$action body=$body")
-                handleCommand(action = action, body = body)
-            }
-        }
-
-        private fun handleCommand(
-            action: String,
-            body: String,
-        ) {
-            when (action) {
-                "GetVolume" -> sendReply(content = mapOf("volume" to 30))
-
-                "Play" -> {
-                    parseContentJson(body)?.let { maybeLaunch(it) }
-                    sendEmpty()
-                }
-
-                "PlayUrl" -> {
-                    parsePlayUrlContent(body)?.let { maybeLaunch(it) }
-                    sendEmpty()
-                }
-
-                "Pause" -> {
-                    launchPlaybackAction(action) { pause() }
-                    sendEmpty()
-                }
-
-                "Resume" -> {
-                    launchPlaybackAction(action) { play() }
-                    sendEmpty()
-                }
-
-                "Seek" -> {
-                    val seekSeconds = extractJsonNumber(body, "seekTs")
-                    if (seekSeconds != null) {
-                        launchPlaybackAction(action) { seekTo((seekSeconds * 1000).toLong()) }
-                    }
-                    sendEmpty()
-                }
-
-                "Stop" -> {
-                    launchPlaybackAction(action) { stop() }
-                    sendEmpty()
-                }
-
-                "SwitchDanmaku" -> {
-                    val open = extractJsonBoolean(body, "open")
-                    if (open != null) {
-                        launchPlaybackAction(action) { setDanmakuEnabled(open) }
-                    }
-                    sendEmpty()
-                }
-
-                "SetSpeed", "SwitchSpeed" -> {
-                    extractJsonNumber(body, "speed")?.let { speed ->
-                        if (speed > 0f) launchPlaybackAction(action) { setSpeed(speed) }
-                    }
-                    sendEmpty()
-                }
-
-                "SwitchQuality", "SetQuality" -> {
-                    extractJsonNumber(body, "qn")?.let { qn ->
-                        if (qn > 0) launchPlaybackAction(action) { setQuality(qn.toInt()) }
-                    }
-                    sendEmpty()
-                }
-
-                else -> {
-                    requestLogger.log("NVA unhandled action=$action")
-                    sendEmpty()
-                }
-            }
-        }
-
-        private fun launchPlaybackAction(
-            action: String,
-            block: CastPlaybackSession.() -> Unit,
-        ) {
-            scope.launch {
-                withPlaybackSession(action, block)
-            }
-        }
-
-        private val writeLock = Any()
-
-        /** 应答帧：`0xC0 0x01 + version(4) + len(4) + JSON`。 */
-        private fun sendReply(content: Map<String, Any?>) {
-            val json = jsonBody(content).toByteArray(Charsets.UTF_8)
-            writeLockedFrame { out ->
-                out.write(0xC0)
-                out.write(0x01)
-                writeInt32(out, bumpVersion())
-                writeInt32(out, json.size)
-                out.write(json)
-            }
-        }
-
-        /** 空应答帧：`0xC0 0x00 + version(4)`。 */
-        private fun sendEmpty() {
-            writeLockedFrame { out ->
-                out.write(0xC0)
-                out.write(0x00)
-                writeInt32(out, bumpVersion())
-            }
-        }
-
-        /** 服务端命令帧：`0xE0 0x03 + version(4) + 0x01 + cmdLen+cmd + actionLen+action + len(4) + JSON`。 */
-        fun sendCommand(
-            action: String,
-            content: Map<String, Any?>,
-        ) {
-            val command = "Command".toByteArray(Charsets.US_ASCII)
-            val actionBytes = action.toByteArray(Charsets.US_ASCII)
-            val json = jsonBody(content).toByteArray(Charsets.UTF_8)
-            writeLockedFrame { out ->
-                out.write(0xE0)
-                out.write(0x03)
-                writeInt32(out, bumpVersion())
-                out.write(0x01)
-                out.write(command.size)
-                out.write(command)
-                out.write(actionBytes.size)
-                out.write(actionBytes)
-                writeInt32(out, json.size)
-                out.write(json)
-            }
-        }
-
-        private inline fun writeLockedFrame(write: (ByteArrayOutputStream) -> Unit) {
-            val out = ByteArrayOutputStream()
-            synchronized(writeLock) {
-                write(out)
-                try {
-                    output.write(out.toByteArray())
-                    output.flush()
-                } catch (e: IOException) {
-                    requestLogger.log("NVA write failed: ${e.message}")
-                }
-            }
-        }
-
-        /** 仅在 writeLock 内调用；帧版本随每次写入单调递增。 */
-        private fun bumpVersion(): Int {
-            currentVersion += 1
-            return currentVersion.toInt()
-        }
-
-        private fun readShortString(input: DataInputStream): String {
-            val length = input.read()
-            if (length <= 0) return ""
-            return readString(input, length)
-        }
-
-        private fun readString(
-            input: DataInputStream,
-            length: Int,
-        ): String {
-            val bytes = ByteArray(length)
-            input.readFully(bytes)
-            return String(bytes, Charsets.UTF_8)
-        }
-
-        private fun readInt32(input: DataInputStream): Int {
-            val bytes = ByteArray(4)
-            input.readFully(bytes)
-            return ((bytes[0].toInt() and 0xFF) shl 24) or
-                ((bytes[1].toInt() and 0xFF) shl 16) or
-                ((bytes[2].toInt() and 0xFF) shl 8) or
-                (bytes[3].toInt() and 0xFF)
-        }
-
-        private fun writeInt32(
-            out: ByteArrayOutputStream,
-            value: Int,
-        ) {
-            out.write((value ushr 24) and 0xFF)
-            out.write((value ushr 16) and 0xFF)
-            out.write((value ushr 8) and 0xFF)
-            out.write(value and 0xFF)
-        }
-
-        private fun jsonBody(content: Map<String, Any?>): String =
-            content.entries.joinToString(prefix = "{", postfix = "}") { (key, value) ->
-                val rendered =
-                    when (value) {
-                        is String -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
-                        else -> value.toString()
-                    }
-                "\"$key\":$rendered"
-            }
-    }
-
-    private fun nvaSessionLoop(
-        socket: Socket,
-        request: HttpRequest,
-    ) {
-        val session = request.headers["session"]
-        if (session.isNullOrBlank()) {
-            requestLogger.log("NVA setup without session header, reject")
-            return
-        }
-        val out = BufferedOutputStream(socket.getOutputStream())
-        val head =
-            buildString {
-                append("HTTP/1.1 200 OK\r\n")
-                append("Session: ").append(session).append("\r\n")
-                append("NvaVersion: 1\r\n")
-                append("Connection: Keep-Alive\r\n")
-                append("UUID: ").append(uuid).append("\r\n")
-                append("User-Agent: ").append(CastReceiverConfig.NVA_USER_AGENT).append("\r\n")
-                append("\r\n")
-            }
-        out.write(head.toByteArray(Charsets.UTF_8))
-        out.flush()
-        requestLogger.log("NVA session connected session=$session")
-
-        val nva = NvaSession(socket)
-        nvaSessions.add(nva)
-        try {
-            nva.readLoop()
-        } finally {
-            nvaSessions.remove(nva)
-            requestLogger.log("NVA session disconnected session=$session")
-        }
-    }
-
-    /**
-     * 状态推送：官方客户端在 NVA 通道上被动接收 `OnPlayState`/`OnProgress`，
-     * 这里按 1s 轮询当前会话快照，状态/进度变化时广播给所有已连接手机端。
-     */
-    private suspend fun statusPushLoop() {
-        var lastState: CastTransportState? = null
-        var lastPositionSec = Long.MIN_VALUE
-        var lastDurationSec = Long.MIN_VALUE
-        while (scope.isActive && running) {
-            delay(STATUS_PUSH_INTERVAL_MS)
-            val sessions = nvaSessions.toList()
-            if (sessions.isEmpty()) {
-                lastState = null
-                lastPositionSec = Long.MIN_VALUE
-                lastDurationSec = Long.MIN_VALUE
-                continue
-            }
-            val snapshot =
-                withContext(Dispatchers.Main.immediate) {
-                    CastPlaybackSessionRegistry.current()?.snapshot()
-                } ?: continue
-            val positionSec = snapshot.positionMs / 1000
-            val durationSec = snapshot.durationMs / 1000
-            if (snapshot.state != lastState) {
-                sessions.forEach { it.sendCommand("OnPlayState", mapOf("playState" to snapshot.state.toNvaPlayState())) }
-            }
-            if (positionSec != lastPositionSec || durationSec != lastDurationSec) {
-                sessions.forEach {
-                    it.sendCommand(
-                        "OnProgress",
-                        mapOf("duration" to durationSec, "position" to positionSec),
-                    )
-                }
-            }
-            lastState = snapshot.state
-            lastPositionSec = positionSec
-            lastDurationSec = durationSec
-        }
-    }
-
-    private fun CastTransportState.toNvaPlayState(): Int =
-        when (this) {
-            CastTransportState.TRANSITIONING -> 3
-            CastTransportState.PLAYING -> 4
-            CastTransportState.PAUSED_PLAYBACK -> 5
-            CastTransportState.STOPPED -> 7
-        }
-
     // ── 投屏内容解析与播放启动 ────────────────────────────────
 
     private fun maybeLaunch(content: CastContent): Boolean {
@@ -673,68 +325,6 @@ class CastHttpServer(
         }
         return true
     }
-
-    /**
-     * `PlayUrl` 命令：body 形如 `{"url": "...?nva_ext=<编码内容>"}`，
-     * 官方客户端把真实播放信息放在 URL 的 `nva_ext` 查询参数里
-     * （与 DLNA 元数据中的 `_nva_ext_` 同源，AES 加密或明文 JSON）。
-     */
-    private fun parsePlayUrlContent(body: String): CastContent? {
-        val url = extractXmlText(body, "url") ?: extractJsonStringField(body, "url") ?: return null
-        val nvaExt = uriQueryParameter(url, "nva_ext") ?: return null
-        val jsonText =
-            if (nvaExt.trim().startsWith("{")) {
-                nvaExt
-            } else {
-                NvaExtDecoder.decode(nvaExt)
-            } ?: return null
-        return CastContentParser.parse(
-            path = "",
-            queryParameters = Parameters.Empty,
-            body = jsonText,
-        )
-    }
-
-    private fun uriQueryParameter(
-        url: String,
-        name: String,
-    ): String? {
-        val query = url.substringAfter("?", missingDelimiterValue = "").ifBlank { url }
-        return query.split("&")
-            .firstOrNull { it.substringBefore("=").equals(name, ignoreCase = true) }
-            ?.substringAfter("=")
-            ?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }
-    }
-
-    private fun extractJsonStringField(
-        body: String,
-        name: String,
-    ): String? {
-        val quoted = Regex("\"$name\"\\s*:\\s*\"([^\"]*)\"").find(body)?.groupValues?.getOrNull(1)
-        return quoted?.replace("\\/", "/")
-    }
-
-    private fun extractJsonNumber(
-        body: String,
-        name: String,
-    ): Float? {
-        val quoted = Regex("\"$name\"\\s*:\\s*(\"?-?\\d+(?:\\.\\d+)?\"?)").find(body) ?: return null
-        return quoted.groupValues[1].trim('"').toFloatOrNull()
-    }
-
-    private fun extractJsonBoolean(
-        body: String,
-        name: String,
-    ): Boolean? =
-        when (Regex("\"$name\"\\s*:\\s*(\"?(?:true|false|1|0)\"?)", RegexOption.IGNORE_CASE).find(body)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.trim('"')
-            ?.lowercase()) {
-            "true", "1" -> true
-            "false", "0" -> false
-            else -> null
-        }
 
     // ── SOAP 控制处理（标准 DLNA + NirvanaControl） ──────────
 
@@ -1191,6 +781,5 @@ class CastHttpServer(
     private companion object {
         const val MAX_HEAD_BYTES = 64 * 1024
         const val MAX_BODY_BYTES = 4 * 1024 * 1024
-        const val STATUS_PUSH_INTERVAL_MS = 1_000L
     }
 }

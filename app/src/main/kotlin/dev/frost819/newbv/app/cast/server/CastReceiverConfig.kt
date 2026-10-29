@@ -4,8 +4,7 @@ package dev.frost819.newbv.app.cast.server
  * 投屏接收端常量。
  *
  * 端口与协议形态对齐官方云视听小电视（参考社区开源实现 ATV-Bilibili-demo）：
- * - HTTP/必连通道同端口 9958：SSDP LOCATION 与设备描述指向它，
- *   手机端在 `SETUP /projection` 上完成 HTTP → NVA 二进制帧协议升级；
+ * - HTTP 通道端口 9958：SSDP LOCATION 与设备描述指向它；
  * - `SERVER` 头伪装为 B 站电视端使用的 Platinum UPnP 栈，部分手机端
  *   会依据该特征识别官方设备；
  * - `urn:app-bilibili-com:service:NirvanaControl:3` 是官方私有控制服务。
@@ -14,10 +13,6 @@ object CastReceiverConfig {
     const val HTTP_PORT = 9958
     const val SSDP_PORT = 1900
     const val SSDP_ADDRESS = "239.255.255.250"
-
-    /** 必连（NVA Socket）升级端点：手机以 HTTP `SETUP` 方法请求该路径。 */
-    const val NVA_PROJECTION_PATH = "/projection"
-    const val NVA_USER_AGENT = "Linux/3.0.0 UPnP/1.0 Platinum/1.0.5.13"
 
     /** SSDP/HTTP 响应的 SERVER 头（官方电视端为 Platinum UPnP 栈）。 */
     const val SERVER_TOKEN = "Linux/3.0.0, UPnP/1.0, Platinum/1.0.5.13"

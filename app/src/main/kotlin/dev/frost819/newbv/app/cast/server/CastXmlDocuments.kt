@@ -43,7 +43,7 @@ object CastXmlDocuments {
     /**
      * 设备描述，字段形态对齐官方云视听小电视（参考社区开源实现）：
      * - `X_brandName/hostVersion/ottVersion/channelName/capability` 为官方
-     *   电视端特征字段，手机端「必连」会据此识别；
+     *   电视端特征字段，手机端据此识别官方设备；
      * - 无 URLBase，服务地址为相对路径（相对 description.xml 的 URL 解析）；
      * - 在官方双服务（AVTransport + NirvanaControl）之外附加
      *   RenderingControl/ConnectionManager，兼容通用 DLNA 控制点。
