@@ -182,7 +182,7 @@ class BVApplication : Application() {
         registerActivityLifecycleCallbacks(
             object : Application.ActivityLifecycleCallbacks {
                 override fun onActivityResumed(activity: Activity) {
-                    if (prefs.enableCastReceiver) CastReceiverService.start(this@BVApplication)
+                    CastReceiverService.start(this@BVApplication)
                 }
 
                 override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
@@ -198,6 +198,6 @@ class BVApplication : Application() {
                 override fun onActivityDestroyed(activity: Activity) = Unit
             },
         )
-        if (prefs.enableCastReceiver) CastReceiverService.start(this)
+        CastReceiverService.start(this)
     }
 }

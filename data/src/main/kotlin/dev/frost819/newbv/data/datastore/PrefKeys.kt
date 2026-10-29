@@ -38,7 +38,6 @@ internal object PrefKeys {
     // ===== 网络 & API =====
     val apiType = intPreferencesKey("api_type")
     val autoSelectCdn = booleanPreferencesKey("auto_select_cdn")
-    val enableCastReceiver = booleanPreferencesKey("enable_cast_receiver")
     val castReceiverUuid = stringPreferencesKey("cast_receiver_uuid")
 
     // ===== 更新 =====
