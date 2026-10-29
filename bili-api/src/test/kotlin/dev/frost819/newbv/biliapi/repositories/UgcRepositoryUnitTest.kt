@@ -6,11 +6,15 @@ import dev.frost819.newbv.biliapi.entity.ugc.region.UgcFeedPage
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.BiliResponse
 import dev.frost819.newbv.biliapi.http.entity.region.RegionFeedRcmd
+import dev.frost819.newbv.biliapi.http.entity.search.SearchResultData
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -18,7 +22,7 @@ import org.junit.jupiter.api.Test
 /**
  * [UgcRepository] 的单元测试。
  *
- * 通过 MockK 模拟 [BiliHttpApi] 单例，验证分区推荐视频获取的
+ * 通过 MockK 模拟 [BiliHttpApi] 单例，验证分区推荐视频与筛选搜索的
  * 参数传递、分页递增与数据转换。不依赖真实网络。
  */
 class UgcRepositoryUnitTest {
@@ -149,4 +153,162 @@ class UgcRepositoryUnitTest {
         goto = "av",
         recReason = "",
     )
+
+    // ------------------------------------------------------------------
+    // getRegionFeedBySearch（筛选）
+    // ------------------------------------------------------------------
+
+    /** 构造分类搜索接口的单条视频 JSON（SearchResultData 的 init 会解析 result 数组）。 */
+    private fun fakeSearchVideoJson(
+        aid: Long,
+        title: String = "title",
+    ) = buildJsonObject {
+        put("type", "video")
+        put("id", aid)
+        put("author", "up-$aid")
+        put("mid", aid * 10)
+        put("typeid", "24")
+        put("typename", "MAD·AMV")
+        put("arcurl", "https://www.bilibili.com/video/BV$aid")
+        put("aid", aid)
+        put("bvid", "BV$aid")
+        put("title", title)
+        put("description", "desc")
+        put("pic", "//i0.hdslb.com/bfs/$aid.jpg")
+        put("play", 1000)
+        put("video_review", 10)
+        put("favorites", 5)
+        put("tag", "tag")
+        put("review", 1)
+        put("pubdate", 1_700_000_000)
+        put("senddate", 1_700_000_000)
+        put("duration", "3:59")
+        put("badgepay", false)
+        put("hit_columns", buildJsonArray {})
+        put("view_type", "")
+        put("is_pay", 0)
+        put("is_union_video", 0)
+        put("like", 9)
+        put("upic", "//i0.hdslb.com/bfs/face/$aid.jpg")
+        put("corner", "")
+        put("cover", "")
+        put("desc", "desc")
+        put("url", "")
+        put("rec_reason", "")
+        put("danmaku", 10)
+        put("vt_display", "")
+        put("subtitle", "")
+        put("episode_count_text", "")
+        put("release_status", 0)
+        put("is_intervene", 0)
+    }
+
+    private fun fakeSearchResult(
+        page: Int,
+        numPages: Int,
+        aids: List<Long>,
+    ) = SearchResultData(
+        page = page,
+        numPages = numPages,
+        result =
+            aids.map { aid ->
+                fakeSearchVideoJson(aid, title = "video-$aid")
+            },
+    )
+
+    @Test
+    fun `getRegionFeedBySearch passes keyword tid order duration and page`() =
+        runTest {
+            coEvery { BiliHttpApi.searchType(any(), any(), any(), any(), any(), any()) } returns
+                BiliResponse(code = 0, message = "", data = fakeSearchResult(page = 1, numPages = 26, aids = listOf(1L)))
+
+            repository.getRegionFeedBySearch(
+                searchTid = 1,
+                keyword = "动画",
+                order = SearchFilterOrderType.MostClicks,
+                duration = SearchFilterDuration.Between10And30Minutes,
+                page = UgcFeedPage(nextPage = 1),
+            )
+
+            coVerify {
+                BiliHttpApi.searchType(
+                    keyword = eq("动画"),
+                    type = eq("video"),
+                    page = eq(1),
+                    tid = eq(1),
+                    order = eq("click"),
+                    duration = eq(2),
+                )
+            }
+        }
+
+    @Test
+    fun `getRegionFeedBySearch maps search videos to UgcItems`() =
+        runTest {
+            coEvery { BiliHttpApi.searchType(any(), any(), any(), any(), any(), any()) } returns
+                BiliResponse(code = 0, message = "", data = fakeSearchResult(page = 1, numPages = 26, aids = listOf(1L, 2L)))
+
+            val result =
+                repository.getRegionFeedBySearch(
+                    searchTid = 1,
+                    keyword = "动画",
+                    order = SearchFilterOrderType.LatestPublish,
+                    duration = SearchFilterDuration.All,
+                    page = UgcFeedPage(nextPage = 1),
+                )
+
+            assertThat(result.items).hasSize(2)
+            assertThat(result.items[0].aid).isEqualTo(1L)
+            assertThat(result.items[0].cover).isEqualTo("https://i0.hdslb.com/bfs/1.jpg")
+            assertThat(result.items[0].authorMid).isEqualTo(10L)
+            assertThat(result.items[0].play).isEqualTo(1000)
+            assertThat(result.items[0].danmaku).isEqualTo(10)
+            assertThat(result.items[0].duration).isEqualTo(239)
+            assertThat(result.hasNext).isTrue()
+            assertThat(result.nextPage.nextPage).isEqualTo(2)
+        }
+
+    @Test
+    fun `getRegionFeedBySearch hasMore false when page reaches numPages`() =
+        runTest {
+            coEvery { BiliHttpApi.searchType(any(), any(), any(), any(), any(), any()) } returns
+                BiliResponse(code = 0, message = "", data = fakeSearchResult(page = 26, numPages = 26, aids = listOf(1L)))
+
+            val result =
+                repository.getRegionFeedBySearch(
+                    searchTid = 4,
+                    keyword = "游戏",
+                    order = SearchFilterOrderType.ComprehensiveSort,
+                    duration = SearchFilterDuration.MoreThan60Minutes,
+                    page = UgcFeedPage(nextPage = 26),
+                )
+
+            assertThat(result.hasNext).isFalse()
+        }
+
+    @Test
+    fun `getRegionFeedBySearch omits order param on comprehensive sort`() =
+        runTest {
+            coEvery { BiliHttpApi.searchType(any(), any(), any(), any(), any(), any()) } returns
+                BiliResponse(code = 0, message = "", data = fakeSearchResult(page = 1, numPages = 1, aids = emptyList()))
+
+            repository.getRegionFeedBySearch(
+                searchTid = 129,
+                keyword = "舞蹈",
+                order = SearchFilterOrderType.ComprehensiveSort,
+                duration = SearchFilterDuration.All,
+                page = UgcFeedPage(nextPage = 1),
+            )
+
+            coVerify {
+                BiliHttpApi.searchType(
+                    keyword = eq("舞蹈"),
+                    type = eq("video"),
+                    page = eq(1),
+                    tid = eq(129),
+                    order = isNull(),
+                    duration = isNull(),
+                )
+            }
+        }
 }

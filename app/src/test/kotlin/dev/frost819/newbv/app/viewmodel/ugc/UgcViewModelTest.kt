@@ -5,6 +5,8 @@ import dev.frost819.newbv.biliapi.entity.ugc.UgcItem
 import dev.frost819.newbv.biliapi.entity.ugc.UgcTypeV2
 import dev.frost819.newbv.biliapi.entity.ugc.region.UgcFeedData
 import dev.frost819.newbv.biliapi.entity.ugc.region.UgcFeedPage
+import dev.frost819.newbv.biliapi.repositories.SearchFilterDuration
+import dev.frost819.newbv.biliapi.repositories.SearchFilterOrderType
 import dev.frost819.newbv.biliapi.repositories.UgcRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -23,7 +25,7 @@ import java.io.IOException
 /**
  * [UgcViewModel] 的单元测试。
  *
- * 验证分区数据加载、切换分区、刷新、超时/错误处理。
+ * 验证分区数据加载、切换分区、刷新、筛选数据源切换与超时/错误处理。
  * 使用 MockK mock [UgcRepository]，用 answers + callCount 区分多次调用。
  */
 class UgcViewModelTest {
@@ -116,7 +118,7 @@ class UgcViewModelTest {
             viewModel = UgcViewModel(ugcRepository)
 
             advanceUntilIdle()
-            viewModel.switchType(UgcTypeV2.Music)
+            viewModel.switchType(UgcTabItem.Music)
             advanceUntilIdle()
 
             assertThat(viewModel.uiState.value.items).hasSize(1)
@@ -212,7 +214,7 @@ class UgcViewModelTest {
             viewModel = UgcViewModel(ugcRepository)
             advanceUntilIdle()
 
-            viewModel.switchType(UgcTypeV2.Douga)
+            viewModel.switchType(UgcTabItem.Douga)
             advanceUntilIdle()
 
             coVerify(exactly = 1) { ugcRepository.getRegionFeedRcmd(any(), any()) }
@@ -228,7 +230,7 @@ class UgcViewModelTest {
             viewModel = UgcViewModel(ugcRepository)
             advanceUntilIdle()
 
-            viewModel.switchType(UgcTypeV2.Game)
+            viewModel.switchType(UgcTabItem.Game)
             advanceUntilIdle()
 
             assertThat(viewModel.uiState.value.items).hasSize(2)
@@ -296,5 +298,133 @@ class UgcViewModelTest {
                 viewModel.uiState.value.items[2]
                     .aid,
             ).isEqualTo(3)
+        }
+
+    // ------------------------------------------------------------------
+    // 筛选（排序/时长 -> 分区搜索数据源）
+    // ------------------------------------------------------------------
+
+    private fun stubRegionFeed() {
+        coEvery { ugcRepository.getRegionFeedRcmd(any(), any()) } returns
+            fakeFeedData(listOf(fakeUgcItem(1)), hasNext = true, nextPage = 2)
+    }
+
+    @Test
+    fun `updateFilter switches to search data source with tab params`() =
+        runTest(testDispatcher) {
+            stubRegionFeed()
+            coEvery { ugcRepository.getRegionFeedBySearch(any(), any(), any(), any(), any()) } returns
+                fakeFeedData(listOf(fakeUgcItem(10)), hasNext = true, nextPage = 2)
+            viewModel = UgcViewModel(ugcRepository)
+            advanceUntilIdle()
+
+            viewModel.switchType(UgcTabItem.Music)
+            advanceUntilIdle()
+            viewModel.updateFilter(SearchFilterOrderType.MostClicks, SearchFilterDuration.Between10And30Minutes)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.isFiltered).isTrue()
+            assertThat(viewModel.uiState.value.items).hasSize(1)
+            assertThat(
+                viewModel.uiState.value.items[0]
+                    .aid,
+            ).isEqualTo(10)
+            coVerify {
+                ugcRepository.getRegionFeedBySearch(
+                    searchTid = eq(UgcTabItem.Music.searchTid),
+                    keyword = eq(UgcTabItem.Music.displayName),
+                    order = eq(SearchFilterOrderType.MostClicks),
+                    duration = eq(SearchFilterDuration.Between10And30Minutes),
+                    page = eq(UgcFeedPage(1)),
+                )
+            }
+        }
+
+    @Test
+    fun `updateFilter back to default returns to region feed`() =
+        runTest(testDispatcher) {
+            stubRegionFeed()
+            coEvery { ugcRepository.getRegionFeedBySearch(any(), any(), any(), any(), any()) } returns
+                fakeFeedData(listOf(fakeUgcItem(10)), hasNext = true, nextPage = 2)
+            viewModel = UgcViewModel(ugcRepository)
+            advanceUntilIdle()
+
+            viewModel.updateFilter(SearchFilterOrderType.MostDanmaku, SearchFilterDuration.All)
+            advanceUntilIdle()
+            assertThat(viewModel.uiState.value.isFiltered).isTrue()
+
+            viewModel.updateFilter(SearchFilterOrderType.ComprehensiveSort, SearchFilterDuration.All)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.isFiltered).isFalse()
+            coVerify(exactly = 2) { ugcRepository.getRegionFeedRcmd(any(), any()) }
+        }
+
+    @Test
+    fun `updateFilter with unchanged values does not reload`() =
+        runTest(testDispatcher) {
+            stubRegionFeed()
+            viewModel = UgcViewModel(ugcRepository)
+            advanceUntilIdle()
+
+            viewModel.updateFilter(SearchFilterOrderType.ComprehensiveSort, SearchFilterDuration.All)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.showFilter).isFalse()
+            coVerify(exactly = 1) { ugcRepository.getRegionFeedRcmd(any(), any()) }
+        }
+
+    @Test
+    fun `search load dedupes items by aid and stops when page fully duplicated`() =
+        runTest(testDispatcher) {
+            stubRegionFeed()
+            coEvery { ugcRepository.getRegionFeedBySearch(any(), any(), any(), any(), any()) } returns
+                fakeFeedData(
+                    listOf(fakeUgcItem(1), fakeUgcItem(1), fakeUgcItem(2)),
+                    hasNext = true,
+                    nextPage = 2,
+                )
+            viewModel = UgcViewModel(ugcRepository)
+            advanceUntilIdle()
+
+            viewModel.updateFilter(SearchFilterOrderType.LatestPublish, SearchFilterDuration.All)
+            advanceUntilIdle()
+            assertThat(viewModel.uiState.value.items.map { it.aid }).containsExactly(1L, 2L).inOrder()
+            assertThat(viewModel.uiState.value.hasMore).isTrue()
+
+            // 第二页与第一页完全重复 -> hasMore 变 false
+            coEvery { ugcRepository.getRegionFeedBySearch(any(), any(), any(), any(), any()) } returns
+                fakeFeedData(listOf(fakeUgcItem(1), fakeUgcItem(2)), hasNext = true, nextPage = 3)
+            viewModel.loadMore()
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.items.map { it.aid }).containsExactly(1L, 2L).inOrder()
+            assertThat(viewModel.uiState.value.hasMore).isFalse()
+        }
+
+    @Test
+    fun `switchType keeps filter and loads via search`() =
+        runTest(testDispatcher) {
+            stubRegionFeed()
+            coEvery { ugcRepository.getRegionFeedBySearch(any(), any(), any(), any(), any()) } returns
+                fakeFeedData(listOf(fakeUgcItem(100)), hasNext = true, nextPage = 2)
+            viewModel = UgcViewModel(ugcRepository)
+            advanceUntilIdle()
+
+            viewModel.updateFilter(SearchFilterOrderType.MostFavorites, SearchFilterDuration.All)
+            advanceUntilIdle()
+            viewModel.switchType(UgcTabItem.Game)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.isFiltered).isTrue()
+            coVerify {
+                ugcRepository.getRegionFeedBySearch(
+                    searchTid = eq(UgcTabItem.Game.searchTid),
+                    keyword = eq(UgcTabItem.Game.displayName),
+                    order = eq(SearchFilterOrderType.MostFavorites),
+                    duration = eq(SearchFilterDuration.All),
+                    page = eq(UgcFeedPage(1)),
+                )
+            }
         }
 }

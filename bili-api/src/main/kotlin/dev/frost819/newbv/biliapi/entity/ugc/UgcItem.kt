@@ -2,6 +2,7 @@ package dev.frost819.newbv.biliapi.entity.ugc
 
 import dev.frost819.newbv.biliapi.http.entity.home.RcmdIndexData
 import dev.frost819.newbv.biliapi.http.entity.home.RcmdTopData
+import dev.frost819.newbv.biliapi.http.entity.search.SearchVideoResult
 import dev.frost819.newbv.biliapi.http.util.smartDate
 import dev.frost819.newbv.biliapi.http.util.toSmartDate
 import dev.frost819.newbv.biliapi.util.convertStringTimeToSeconds
@@ -113,6 +114,21 @@ data class UgcItem(
                 play = archive.stat.view,
                 danmaku = archive.stat.danmaku,
                 pubTime = archive.pubdate.toSmartDate(),
+            )
+
+        /** web 分类搜索的视频结果 -> 分区条目（搜索标题含高亮标签，由展示层去 HTML）。 */
+        fun fromSearchVideoResult(video: SearchVideoResult) =
+            UgcItem(
+                aid = video.aid,
+                bvid = video.bvid,
+                title = video.title,
+                cover = "https:${video.pic}",
+                author = video.author,
+                authorMid = video.mid,
+                play = video.play ?: -1,
+                danmaku = video.danmaku,
+                duration = video.duration.convertStringTimeToSeconds(),
+                pubTime = video.pubDate.smartDate,
             )
     }
 }
