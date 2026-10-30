@@ -670,17 +670,13 @@ fun VideoPlayerController(
             )
 
             // 分集列表
+            // 切换视频后保持列表展开，方便连续选集；按返回键收起
             VideoListController(
                 show = showListController,
                 currentCid = uiState.cid,
                 videoList = overlayState.videoList,
-                onPlayNewVideo = { item ->
-                    onPlayNewVideo(item)
-                    showListController = false
-                    // 面板关闭会带走焦点，重新唤出控制栏并把焦点交还进度条
-                    showInfoSeekController = true
-                    seekFocusKick++
-                },
+                // 切换视频后保持列表展开，方便连续选集；按返回键收起
+                onPlayNewVideo = onPlayNewVideo,
             )
 
             // 章节列表
