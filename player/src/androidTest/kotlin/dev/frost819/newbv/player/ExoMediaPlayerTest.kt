@@ -50,7 +50,6 @@ class ExoMediaPlayerTest {
                         VideoPlayerOptions(
                             userAgent = "test-agent",
                             referer = "https://www.bilibili.com",
-                            enableFfmpegAudioRenderer = false,
                             enableSoftwareVideoDecoder = false,
                         ),
                 )
@@ -182,7 +181,6 @@ class ExoMediaPlayerTest {
                     httpClient = OkHttpUtil.generateCustomSslOkHttpClient(context),
                     options =
                         VideoPlayerOptions(
-                            enableFfmpegAudioRenderer = true,
                             enableSoftwareVideoDecoder = true,
                         ),
                 )

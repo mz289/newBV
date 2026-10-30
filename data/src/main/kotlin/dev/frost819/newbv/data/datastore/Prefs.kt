@@ -216,9 +216,6 @@ object Prefs {
         restore = { Audio.fromCode(it) },
     )
 
-    /** 启用 FFmpeg 音频软解。 */
-    var enableFfmpegAudioRenderer by pref(PrefKeys.enableFfmpegAudioRenderer, false)
-
     // --- 播放器 - 弹幕（PRD 7.3） ---
 
     /** 默认弹幕总开关（进度条下方按钮；关闭不影响各类型勾选）。 */

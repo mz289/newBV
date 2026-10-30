@@ -737,7 +737,6 @@ class PlayerViewModel
                 VideoPlayerOptions(
                     userAgent = userAgent,
                     referer = referer,
-                    enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer,
                     enableSoftwareVideoDecoder = Prefs.enableSoftwareVideoDecoder,
                 )
 

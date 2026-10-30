@@ -52,7 +52,6 @@ internal object PrefKeys {
 
     // ===== 播放器 - 音频 =====
     val defaultAudio = intPreferencesKey("da")
-    val enableFfmpegAudioRenderer = booleanPreferencesKey("enable_ffmpeg_audio_renderer")
 
     // ===== 播放器 - 弹幕 =====
     val defaultDanmakuEnabled = booleanPreferencesKey("dden")
