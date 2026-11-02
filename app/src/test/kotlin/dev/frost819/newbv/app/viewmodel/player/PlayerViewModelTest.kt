@@ -57,6 +57,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.io.IOException
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.coroutines.suspendCoroutine
@@ -1017,7 +1018,7 @@ class PlayerViewModelTest {
                 audio = listOf("https://cdn1.example/a.m4s"),
             )
 
-            getVideoPlayerListener().onError(RuntimeException("source error"))
+            getVideoPlayerListener().onError(IOException("source error"))
 
             verify { mockPlayer.playUrl("https://cdn2.example/v.m4s", "https://cdn1.example/a.m4s") }
             verify { mockPlayer.prepare() }
@@ -1036,7 +1037,7 @@ class PlayerViewModelTest {
                 audio = emptyList(),
             )
 
-            getVideoPlayerListener().onError(RuntimeException("boom"))
+            getVideoPlayerListener().onError(IOException("boom"))
 
             assertThat(viewModel.uiState.value.playerState).isInstanceOf(PlayerState.Error::class.java)
         }
@@ -1069,7 +1070,7 @@ class PlayerViewModelTest {
             )
 
             viewModel.uiEffect.test {
-                getVideoPlayerListener().onError(RuntimeException("source error"))
+                getVideoPlayerListener().onError(IOException("source error"))
                 advanceUntilIdle()
 
                 val effect = awaitItem()
@@ -1078,6 +1079,23 @@ class PlayerViewModelTest {
             }
 
             verify { mockPlayer.playUrl("https://cdn2.example/v.m4s", "https://cdn1.example/a.m4s") }
+        }
+
+    @Test
+    fun `onError does not switch CDN for non network errors`() =
+        runTest(testDispatcher) {
+            setVideoPlayer(mockPlayer)
+            every { Prefs.autoSelectCdn } returns true
+            setCdnCandidates(
+                video = listOf("https://cdn1.example/v.m4s", "https://cdn2.example/v.m4s"),
+                audio = listOf("https://cdn1.example/a.m4s"),
+            )
+
+            // 解码 / 音频管线类错误换源地址不会改善，不应白白重播
+            getVideoPlayerListener().onError(IllegalArgumentException("Buffer too small"))
+
+            verify(exactly = 0) { mockPlayer.playUrl(any(), any()) }
+            assertThat(viewModel.uiState.value.playerState).isInstanceOf(PlayerState.Error::class.java)
         }
 
     private fun dashVideo(
