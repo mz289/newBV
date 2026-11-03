@@ -99,6 +99,7 @@ class LoginRepository {
                 86039 -> QrLoginState.WaitingForScan
                 86090 -> QrLoginState.WaitingForConfirm
                 86038 -> QrLoginState.Expired
+                ACCOUNT_NOT_SUPPORTED -> QrLoginState.Error
                 else -> QrLoginState.Unknown
             }
         return QrLoginResult(
@@ -106,6 +107,12 @@ class LoginRepository {
             accessToken = response.data?.accessToken,
             refreshToken = response.data?.refreshToken,
             cookies = resultCookies,
+            message =
+                if (response.code == ACCOUNT_NOT_SUPPORTED) {
+                    ACCOUNT_NOT_SUPPORTED_MESSAGE
+                } else {
+                    response.message
+                },
         )
     }
 }

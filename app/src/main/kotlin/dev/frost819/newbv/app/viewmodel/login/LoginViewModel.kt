@@ -148,6 +148,16 @@ class LoginViewModel
                         return
                     }
 
+                    QrLoginState.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                state = QrLoginState.Error,
+                                errorMessage = result.message.ifBlank { "登录失败，请稍后重试" },
+                            )
+                        }
+                        return
+                    }
+
                     else -> logger.warn { "Unknown QR login state: ${result.state}" }
                 }
             }
