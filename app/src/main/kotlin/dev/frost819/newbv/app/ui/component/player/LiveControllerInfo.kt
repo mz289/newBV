@@ -60,6 +60,7 @@ import kotlinx.coroutines.delay
  * @param danmakuEnabled 弹幕是否开启
  * @param onPlayPause 播放/暂停回调
  * @param onRefresh 刷新回调
+ * @param onGoToUpPage 跳转 UP 主主页回调
  * @param onDanmakuSwitchChange 弹幕开关回调
  * @param onShowSettings 打开设置回调
  */
@@ -74,6 +75,7 @@ fun LiveControllerInfo(
     danmakuEnabled: Boolean,
     onPlayPause: () -> Unit,
     onRefresh: () -> Unit,
+    onGoToUpPage: () -> Unit,
     onDanmakuSwitchChange: () -> Unit,
     onShowSettings: () -> Unit,
 ) {
@@ -105,6 +107,7 @@ fun LiveControllerInfo(
                 danmakuEnabled = danmakuEnabled,
                 onPlayPause = onPlayPause,
                 onRefresh = onRefresh,
+                onGoToUpPage = onGoToUpPage,
                 onDanmakuSwitchChange = onDanmakuSwitchChange,
                 onShowSettings = onShowSettings,
             )
@@ -211,6 +214,7 @@ private fun LiveControllerInfoBottom(
     danmakuEnabled: Boolean,
     onPlayPause: () -> Unit,
     onRefresh: () -> Unit,
+    onGoToUpPage: () -> Unit,
     onDanmakuSwitchChange: () -> Unit,
     onShowSettings: () -> Unit,
 ) {
@@ -235,6 +239,7 @@ private fun LiveControllerInfoBottom(
             buildList {
                 add(LiveControllerIcon(R.drawable.play_pause_24px, "播放/暂停", onPlayPause))
                 add(LiveControllerIcon(R.drawable.baseline_refresh_24, "刷新", onRefresh))
+                add(LiveControllerIcon(R.drawable.contact_page_24px, "up主页", onGoToUpPage))
                 add(
                     LiveControllerIcon(
                         if (danmakuEnabled) R.drawable.danmaku_on_24px else R.drawable.danmaku_off_24px,

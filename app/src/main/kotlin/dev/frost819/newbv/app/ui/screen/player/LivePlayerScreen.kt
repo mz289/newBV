@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavController
 import dev.frost819.newbv.app.ui.component.player.LivePlayerController
 import dev.frost819.newbv.app.ui.component.rememberDoublePressExit
+import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
 import dev.frost819.newbv.app.viewmodel.live.LivePlayerState
 import dev.frost819.newbv.app.viewmodel.live.LivePlayerViewModel
 import dev.frost819.newbv.app.viewmodel.player.DanmakuViewModel
@@ -92,6 +93,16 @@ fun LivePlayerScreen(
         onBack = handleBack,
         onPlayPause = { viewModel.togglePlayPause() },
         onRefresh = { viewModel.refresh() },
+        onGoToUpPage = {
+            val mid = uiState.upMid
+            if (mid != 0L) {
+                navController.navigate(
+                    UserSpaceRoute(mid = mid, name = uiState.upName, face = uiState.upFace),
+                ) {
+                    launchSingleTop = true
+                }
+            }
+        },
         onToggleDanmaku = { danmakuViewModel.toggleDanmaku() },
         onQualityChange = { viewModel.changeQuality(it) },
         onLineChange = { viewModel.changeLine(it) },

@@ -48,7 +48,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -76,6 +75,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.LoadingTip
+import dev.frost819.newbv.app.ui.component.UpActionButton
 import dev.frost819.newbv.app.ui.component.comment.CommentDialogMode
 import dev.frost819.newbv.app.ui.component.comment.CommentsDialog
 import dev.frost819.newbv.app.ui.component.dialog.EpisodeListButton
@@ -704,7 +704,7 @@ private fun VideoInfoHeader(
                         )
                     }
                 }
-                ActionButton(
+                UpActionButton(
                     text = if (isFollowing) "已关注" else "关注",
                     icon = if (isFollowing) Icons.Rounded.PersonAdd else Icons.Outlined.PersonAdd,
                     highlighted = isFollowing,
@@ -720,7 +720,7 @@ private fun VideoInfoHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ActionButton(
+                UpActionButton(
                     text = "点赞",
                     icon = if (isLiked) Icons.Rounded.ThumbUp else Icons.Outlined.ThumbUp,
                     highlighted = isLiked,
@@ -730,7 +730,7 @@ private fun VideoInfoHeader(
                         Modifier
                             .focusSaverItem(focusSaver, "like"),
                 )
-                ActionButton(
+                UpActionButton(
                     text = "投币",
                     icon = if (isCoined) Icons.Rounded.Paid else Icons.Outlined.Paid,
                     highlighted = isCoined,
@@ -739,7 +739,7 @@ private fun VideoInfoHeader(
                         Modifier
                             .focusSaverItem(focusSaver, "coin"),
                 )
-                ActionButton(
+                UpActionButton(
                     text = "收藏",
                     icon = if (isFavorite) Icons.Rounded.Star else Icons.Outlined.StarBorder,
                     highlighted = isFavorite,
@@ -748,7 +748,7 @@ private fun VideoInfoHeader(
                         Modifier
                             .focusSaverItem(focusSaver, "favorite"),
                 )
-                ActionButton(
+                UpActionButton(
                     text = "评论",
                     icon = Icons.AutoMirrored.Outlined.Comment,
                     highlighted = false,
@@ -817,57 +817,6 @@ private fun StatSeparator() {
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
     )
-}
-
-@Composable
-private fun ActionButton(
-    text: String,
-    icon: ImageVector,
-    highlighted: Boolean,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        // 外层不裁切，保留焦点外描边的绘制空间。
-        modifier = modifier.touchClickable(onClick = onClick, onLongClick = onLongClick),
-        onClick = onClick,
-        onLongClick = onLongClick,
-        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-        colors =
-            ControlFocusDefaults.surfaceColors(
-                containerColor =
-                    if (highlighted) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                contentColor =
-                    if (highlighted) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            ),
-        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = text,
-                modifier = Modifier.size(20.dp),
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
-    }
 }
 
 @Composable
