@@ -34,7 +34,7 @@ class SearchRemoteFeature private constructor(
         fun create(onSearch: suspend (String) -> Unit): SearchRemoteFeature = SearchRemoteFeature(onSearch)
 
         /** 面板：关键词输入 + 提交（JS 用字符串拼接避免模板字面量） */
-        private val PANEL_HTML =
+        private const val PANEL_HTML =
             """
         <style>
           #sr_panel .sr-field { display: flex; flex-direction: column; gap: 12px; }

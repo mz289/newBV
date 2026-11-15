@@ -14,14 +14,14 @@ class DanmakuMaskFinderTest {
     private val mobMaskFile = Any::class::class.java.getResource("/35496788838_30_0.mobmask")!!
 
     private fun loadWebMask() =
-        DanmakuMask.fromBinary(
-            File(webMaskFile.toURI()).readBytes(),
+        DanmakuMask.fromStream(
+            File(webMaskFile.toURI()).readBytes().inputStream(),
             DanmakuMaskType.WebMask,
         )
 
     private fun loadMobMask() =
-        DanmakuMask.fromBinary(
-            File(mobMaskFile.toURI()).readBytes(),
+        DanmakuMask.fromStream(
+            File(mobMaskFile.toURI()).readBytes().inputStream(),
             DanmakuMaskType.MobMask,
         )
 

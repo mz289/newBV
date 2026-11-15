@@ -238,7 +238,7 @@ class CacheManager(
                             item.state = ItemState.Rendered
                             item.drawState.cacheGeneration = config.cacheGeneration
                         } catch (e: Exception) {
-                            e.printStackTrace()
+                            Log.e(TAG, "Render cache build failed", e)
                             item.state = ItemState.Error
                         }
                     }
@@ -282,6 +282,7 @@ class CacheManager(
     }
 
     companion object {
+        private const val TAG = "CacheManager"
         const val THREAD_NAME = "AkDanmaku-Cache"
 
         private const val WORKER_MSG_RELEASE = -100

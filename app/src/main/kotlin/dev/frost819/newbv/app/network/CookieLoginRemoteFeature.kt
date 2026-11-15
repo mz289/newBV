@@ -29,7 +29,7 @@ class CookieLoginRemoteFeature
              */
             fun create(onSubmit: suspend (String) -> String): CookieLoginRemoteFeature = CookieLoginRemoteFeature(onSubmit)
 
-            private val PANEL_HTML =
+            private const val PANEL_HTML =
                 """
         <style>
           #cl_panel .cl-field { display: flex; flex-direction: column; gap: 12px; }
