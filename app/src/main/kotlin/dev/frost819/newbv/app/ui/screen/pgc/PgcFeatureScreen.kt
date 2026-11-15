@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -291,8 +292,9 @@ private fun SeasonInfoHeader(
             entryFocusKey.takeIf { it in validKeys } ?: if (detail.episodes.isEmpty()) "follow" else "play"
         }
     LaunchedEffect(detail.seasonId) {
-        // 等待首帧自动聚焦和 LazyRow 布局完成，避免系统自动聚焦覆盖入口保存的 key。
-        kotlinx.coroutines.delay(100)
+        // 等待首帧自动聚焦和 LazyRow 布局完成（逐帧等待，避免固定 100ms 盲等），
+        // 防止系统自动聚焦覆盖入口保存的 key。
+        repeat(3) { withFrameNanos { } }
         focusSaver.saveFocusedKey(initialFocusKey)
         runCatching { focusSaver.focusRequesterFor(initialFocusKey).requestFocus() }
     }

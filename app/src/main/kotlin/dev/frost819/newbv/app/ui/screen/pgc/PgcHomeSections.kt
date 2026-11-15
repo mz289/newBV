@@ -32,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import dev.frost819.newbv.app.ui.component.focusWhenReady
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -359,10 +360,7 @@ private suspend fun restoreTimelineFocus(
     if (listState.layoutInfo.visibleItemsInfo.none { it.index == index }) {
         listState.scrollToItem((index - 1).coerceAtLeast(0))
     }
-    repeat(6) {
-        if (runCatching { focusSaver.focusRequesterFor(key).requestFocus() }.isSuccess) return
-        delay(50)
-    }
+    focusSaver.focusRequesterFor(key).focusWhenReady(maxFrames = 6)
 }
 
 /**

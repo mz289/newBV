@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import dev.frost819.newbv.app.ui.component.focusWhenReady
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -321,8 +322,7 @@ fun ControllerVideoInfoBottom(
 
     // 首次显示或激励计数变化时（如章节/分集面板点击关闭后）抓取焦点
     LaunchedEffect(seekFocusKick) {
-        delay(50)
-        runCatching { seekFocusRequester.requestFocus() }
+        seekFocusRequester.focusWhenReady()
     }
 
     Column(

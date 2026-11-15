@@ -19,7 +19,6 @@ import dev.frost819.newbv.core.focus.DpadDirection
 import dev.frost819.newbv.core.focus.FocusShakeController
 import dev.frost819.newbv.core.interaction.InteractionTracker
 import dev.frost819.newbv.core.interaction.LocalInteractionTracker
-import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.core.theme.AccentColor
 import dev.frost819.newbv.core.theme.BVTheme
 import dev.frost819.newbv.core.theme.SystemBarsEffect
@@ -40,7 +39,6 @@ import javax.inject.Inject
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val logger = Loggers.get("MainActivity")
 
     @Inject
     lateinit var interactionTracker: InteractionTracker
@@ -76,7 +74,6 @@ class MainActivity : ComponentActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             interactionTracker.onDpadKey()
-            logger.info { "[INPUT] keyDown keyCode=${KeyEvent.keyCodeToString(event.keyCode)}" }
         }
         val consumed = super.dispatchKeyEvent(event)
         // 撞墙抖动：方向键未被 Compose 焦点系统与任何节点消费（super 返回 false），

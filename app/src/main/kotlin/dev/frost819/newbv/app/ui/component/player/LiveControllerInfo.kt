@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import dev.frost819.newbv.app.ui.component.focusWhenReady
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -221,8 +222,7 @@ private fun LiveControllerInfoBottom(
     val buttonsFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        delay(50)
-        runCatching { buttonsFocusRequester.requestFocus() }
+        buttonsFocusRequester.focusWhenReady()
     }
 
     Column(

@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import dev.frost819.newbv.app.ui.component.focusWhenReady
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -108,9 +109,12 @@ internal fun SeasonEpisodeDialog(
         if (target != null && target in start until end) {
             val episode = episodes[target]
             snapshotFlow { gridState.layoutInfo.visibleItemsInfo.any { it.key == episode.id } }.first { it }
-            // Dialog 首帧的自动焦点可能晚于网格布局，等待窗口获得焦点后再设置默认分集。
-            if (focusRequest == 0) delay(100)
-            focusSaver.focusRequesterFor("episode_${episode.id}").requestFocus()
+            // Dialog 首帧的自动焦点可能晚于网格布局，逐帧等待窗口就绪后再设置默认分集。
+            if (focusRequest == 0) {
+                focusSaver.focusRequesterFor("episode_${episode.id}").focusWhenReady()
+            } else {
+                focusSaver.focusRequesterFor("episode_${episode.id}").requestFocus()
+            }
             pendingIndex = null
         }
     }

@@ -76,8 +76,7 @@ class FocusSaver(
             val key = savedKey.value
             if (key.isNotEmpty()) {
                 requesters[key]?.let {
-                    kotlinx.coroutines.delay(50)
-                    runCatching { it.requestFocus() }
+                    it.focusWhenReady()
                 }
             }
         }

@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import dev.frost819.newbv.app.ui.component.focusWhenReady
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -211,8 +212,7 @@ fun CommentsDialog(
 
         val focusRequester = remember { FocusRequester() }
         LaunchedEffect(Unit) {
-            delay(50)
-            runCatching { focusRequester.requestFocus() }
+            focusRequester.focusWhenReady()
         }
 
         Box(
