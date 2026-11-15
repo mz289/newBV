@@ -11,7 +11,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -113,7 +113,7 @@ private class MaxCardWidthCells(
  */
 @Composable
 fun videoCardGridCells(): GridCells {
-    val cardWidth by Prefs.videoCardWidthFlow.collectAsState()
+    val cardWidth by Prefs.videoCardWidthFlow.collectAsStateWithLifecycle()
     return MaxCardWidthCells(cardWidth.dp)
 }
 

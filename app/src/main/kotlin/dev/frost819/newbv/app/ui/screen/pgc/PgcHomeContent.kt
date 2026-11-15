@@ -17,7 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,7 +80,7 @@ fun PgcHomeContent(
     focusSaver: FocusSaver,
     navController: NavController,
 ) {
-    val states by viewModel.uiStates.collectAsState()
+    val states by viewModel.uiStates.collectAsStateWithLifecycle()
     val state = states[pgcType] ?: PgcHomeUiState()
 
     // 首次进入分区时懒加载（切 Tab 后状态保留，不重复请求）

@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,8 +59,8 @@ fun UserPanel(
     onGoUserSwitch: () -> Unit = {},
     onGoFollowList: () -> Unit = {},
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val incognitoMode by Prefs.incognitoModeFlow.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val incognitoMode by Prefs.incognitoModeFlow.collectAsStateWithLifecycle()
 
     UserPanelContent(
         modifier = modifier,

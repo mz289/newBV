@@ -3,7 +3,7 @@ package dev.frost819.newbv.app.ui.screen.ugc
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -46,7 +46,7 @@ fun UgcContent(
     focusSaver: FocusSaver,
     viewModel: UgcViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Box(
         modifier =
@@ -107,7 +107,7 @@ private fun UgcGrid(
     focusSaver: FocusSaver,
     emptyText: String?,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     VideoFeedGrid(
         items = state.items,

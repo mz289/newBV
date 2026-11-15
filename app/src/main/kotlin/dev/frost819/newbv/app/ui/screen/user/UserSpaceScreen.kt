@@ -17,7 +17,7 @@ import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -89,7 +89,7 @@ private fun UserSpaceScreen(
     viewModel: UserSpaceViewModel,
     navController: NavController,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     val focusSaver = rememberFocusSaver()
     val watchLaterViewModel: WatchLaterViewModel = hiltViewModel()

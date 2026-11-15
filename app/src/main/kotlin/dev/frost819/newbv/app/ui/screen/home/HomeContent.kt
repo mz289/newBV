@@ -1,7 +1,7 @@
 package dev.frost819.newbv.app.ui.screen.home
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -29,7 +29,7 @@ fun HomeContent(
     focusSaver: FocusSaver,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     TabbedContent(
         navFocusRequester = navFocusRequester,

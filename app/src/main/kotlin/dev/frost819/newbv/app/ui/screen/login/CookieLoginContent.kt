@@ -15,7 +15,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,7 +60,7 @@ fun CookieLoginContent(
     onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val uiState by viewModel.cookieUiState.collectAsState()
+    val uiState by viewModel.cookieUiState.collectAsStateWithLifecycle()
     var input by remember { mutableStateOf("") }
     val inputFocusRequester = remember { FocusRequester() }
     val confirmIme = rememberConfirmImeBehavior()

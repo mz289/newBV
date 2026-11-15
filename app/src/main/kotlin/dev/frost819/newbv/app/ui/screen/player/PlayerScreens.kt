@@ -5,7 +5,7 @@ import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
@@ -101,7 +101,7 @@ fun NavGraphBuilder.videoPlayerScreen(navController: NavController) {
         }
 
         // 全屏 + 隐藏系统栏，并按播放状态保持屏幕常亮（issue #283）
-        val playerUiState by playerViewModel.uiState.collectAsState()
+        val playerUiState by playerViewModel.uiState.collectAsStateWithLifecycle()
         PlayerWindowEffect(
             keepScreenOn = playerUiState.playerState == PlayerState.Playing || playerUiState.isBuffering,
         )
@@ -163,7 +163,7 @@ fun NavGraphBuilder.externalMediaScreen(navController: NavController) {
             }
         }
 
-        val playerUiState by playerViewModel.uiState.collectAsState()
+        val playerUiState by playerViewModel.uiState.collectAsStateWithLifecycle()
         PlayerWindowEffect(
             keepScreenOn = playerUiState.playerState == PlayerState.Playing || playerUiState.isBuffering,
         )
@@ -207,7 +207,7 @@ fun NavGraphBuilder.livePlayerScreen(navController: NavController) {
         }
 
         // 全屏 + 隐藏系统栏，并按播放状态保持屏幕常亮（issue #283）
-        val liveUiState by viewModel.uiState.collectAsState()
+        val liveUiState by viewModel.uiState.collectAsStateWithLifecycle()
         PlayerWindowEffect(
             keepScreenOn = liveUiState.playerState == LivePlayerState.Playing || liveUiState.isBuffering,
         )

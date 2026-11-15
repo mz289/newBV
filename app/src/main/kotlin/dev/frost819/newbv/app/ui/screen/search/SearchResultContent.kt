@@ -17,7 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,7 +99,7 @@ fun SearchResultContent(
     keyword: String,
     navController: NavController,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val watchLaterViewModel: WatchLaterViewModel = hiltViewModel()
 
     CollectWatchLaterEffects(watchLaterViewModel)
@@ -228,18 +228,20 @@ fun SearchResultContent(
                             val v = item.video
                             val focusKey = "video_${v.aid}"
                             val cardData =
-                                VideoCardData(
-                                    avid = v.aid,
-                                    title = v.title.removeHtmlTags(),
-                                    cover = v.cover,
-                                    playString = v.play.toWanString(),
-                                    danmakuString = v.danmaku.toWanString(),
-                                    timeString = v.duration.formatHourMinSec(),
-                                    upName = v.author,
-                                    upMid = v.mid,
-                                    pubTime = v.pubTime,
-                                    badge = v.badge,
-                                )
+                                remember(v) {
+                                    VideoCardData(
+                                        avid = v.aid,
+                                        title = v.title.removeHtmlTags(),
+                                        cover = v.cover,
+                                        playString = v.play.toWanString(),
+                                        danmakuString = v.danmaku.toWanString(),
+                                        timeString = v.duration.formatHourMinSec(),
+                                        upName = v.author,
+                                        upMid = v.mid,
+                                        pubTime = v.pubTime,
+                                        badge = v.badge,
+                                    )
+                                }
                             SmallVideoCard(
                                 modifier = Modifier.focusSaverItem(focusSaver, focusKey),
                                 data = cardData,
@@ -261,13 +263,15 @@ fun SearchResultContent(
                             SeasonCard(
                                 modifier = Modifier.focusSaverItem(focusSaver, focusKey),
                                 data =
-                                    SeasonCardData(
-                                        seasonId = p.seasonId,
-                                        title = p.title.removeHtmlTags(),
-                                        cover = p.cover,
-                                        rating = if (p.star > 0) String.format("%.1f", p.star) else null,
-                                        badge = p.badge,
-                                    ),
+                                    remember(p) {
+                                        SeasonCardData(
+                                            seasonId = p.seasonId,
+                                            title = p.title.removeHtmlTags(),
+                                            cover = p.cover,
+                                            rating = if (p.star > 0) String.format("%.1f", p.star) else null,
+                                            badge = p.badge,
+                                        )
+                                    },
                                 onClick = {
                                     navController.navigate(
                                         PgcFeatureRoute(
@@ -296,18 +300,20 @@ fun SearchResultContent(
                             LiveRoomCard(
                                 modifier = Modifier.focusSaverItem(focusSaver, focusKey),
                                 data =
-                                    LiveRoomCardData(
-                                        roomId = room.roomId,
-                                        title = room.title.removeHtmlTags(),
-                                        uname = room.uname.removeHtmlTags(),
-                                        uid = room.uid,
-                                        cover = room.cover,
-                                        face = room.face,
-                                        areaV2Name = room.areaName.removeHtmlTags(),
-                                        areaV2ParentName = "",
-                                        onlineString = room.online.toWanString(),
-                                        watchedString = "",
-                                    ),
+                                    remember(room) {
+                                        LiveRoomCardData(
+                                            roomId = room.roomId,
+                                            title = room.title.removeHtmlTags(),
+                                            uname = room.uname.removeHtmlTags(),
+                                            uid = room.uid,
+                                            cover = room.cover,
+                                            face = room.face,
+                                            areaV2Name = room.areaName.removeHtmlTags(),
+                                            areaV2ParentName = "",
+                                            onlineString = room.online.toWanString(),
+                                            watchedString = "",
+                                        )
+                                    },
                                 onClick = {
                                     navController.navigate(LivePlayerRoute(roomId = room.roomId))
                                 },

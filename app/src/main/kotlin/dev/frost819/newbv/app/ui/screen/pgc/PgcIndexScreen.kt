@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -198,13 +199,15 @@ private fun IndexBody(
         ) { _, item ->
             SeasonCard(
                 data =
-                    SeasonCardData(
-                        seasonId = item.seasonId,
-                        title = item.title,
-                        subTitle = item.subTitle,
-                        cover = item.cover,
-                        rating = item.rating,
-                    ),
+                    remember(item) {
+                        SeasonCardData(
+                            seasonId = item.seasonId,
+                            title = item.title,
+                            subTitle = item.subTitle,
+                            cover = item.cover,
+                            rating = item.rating,
+                        )
+                    },
                 onClick = {
                     navController.navigate(PgcFeatureRoute(seasonId = item.seasonId.toLong()))
                 },

@@ -23,7 +23,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -94,7 +94,7 @@ fun DanmakuBlockPanel(
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var showQrDialog by remember { mutableStateOf(false) }
-    val totalHits by DanmakuBlockHitStats.totalHits.collectAsState()
+    val totalHits by DanmakuBlockHitStats.totalHits.collectAsStateWithLifecycle()
 
     Column(
         modifier =

@@ -21,7 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -81,7 +81,7 @@ fun LiveContent(
     focusSaver: FocusSaver,
     viewModel: LiveHomeViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
 
     LaunchedEffect(gridState) {
@@ -318,7 +318,7 @@ private fun AreaSection(
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            items(areas) { area ->
+            items(areas, key = { it.id }) { area ->
                 AreaMiniCard(
                     modifier = Modifier.focusSaverItem(focusSaver, "live_area_${area.id}"),
                     area = area,

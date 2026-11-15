@@ -8,8 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -50,9 +50,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            val themeMode by Prefs.themeModeFlow.collectAsState(initial = ThemeMode.Dark)
-            val density by Prefs.densityFlow.collectAsState(initial = 2.0f)
-            val accentColor by Prefs.accentColorFlow.collectAsState(initial = AccentColor.BiliPink)
+            val themeMode by Prefs.themeModeFlow.collectAsStateWithLifecycle(initialValue = ThemeMode.Dark)
+            val density by Prefs.densityFlow.collectAsStateWithLifecycle(initialValue = 2.0f)
+            val accentColor by Prefs.accentColorFlow.collectAsStateWithLifecycle(initialValue = AccentColor.BiliPink)
 
             BVTheme(themeMode = themeMode, density = density, accentColor = accentColor) {
                 SystemBarsEffect()

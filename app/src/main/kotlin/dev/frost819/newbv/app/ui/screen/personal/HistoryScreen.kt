@@ -1,7 +1,7 @@
 package dev.frost819.newbv.app.ui.screen.personal
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
@@ -28,7 +28,7 @@ fun HistoryScreen(
     navController: NavController,
     focusSaver: FocusSaver,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     if (state.historyItems.isEmpty() && !state.historyLoading && !state.historyError) {
         EmptyTip(text = "没有观看记录", modifier = modifier)

@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,9 +40,9 @@ fun LivePlayerScreen(
     viewModel: LivePlayerViewModel,
     danmakuViewModel: DanmakuViewModel,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val danmakuState by danmakuViewModel.danmakuState.collectAsState()
-    val debugInfo by viewModel.debugInfo.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val danmakuState by danmakuViewModel.danmakuState.collectAsStateWithLifecycle()
+    val debugInfo by viewModel.debugInfo.collectAsStateWithLifecycle()
     val videoPlayer = viewModel.videoPlayer
     val danmakuPlayer = danmakuViewModel.danmakuPlayer
 

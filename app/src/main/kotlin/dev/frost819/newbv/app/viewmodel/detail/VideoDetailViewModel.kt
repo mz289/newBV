@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
@@ -169,8 +170,11 @@ class VideoDetailViewModel
                         videoInfoRepository.updateVideoDetail(detail)
 
                         if (Prefs.isLogin) {
-                            fetchFavoriteFolders()
-                            fetchFollowingStatus(detail.author.mid)
+                            // 收藏夹与关注状态互不依赖，并行请求缩短详情页就绪时间
+                            coroutineScope {
+                                launch { fetchFavoriteFolders() }
+                                launch { fetchFollowingStatus(detail.author.mid) }
+                            }
                         }
                     }
                 }.onFailure { error ->

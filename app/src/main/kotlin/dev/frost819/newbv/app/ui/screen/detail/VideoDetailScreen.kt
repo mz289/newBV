@@ -37,7 +37,7 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -147,8 +147,8 @@ private fun VideoDetailScreen(
     aid: Long,
 ) {
     val viewModel: VideoDetailViewModel = hiltViewModel()
-    val state by viewModel.uiState.collectAsState()
-    val sharedState by viewModel.videoSharedState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val sharedState by viewModel.videoSharedState.collectAsStateWithLifecycle()
     // 仅采纳当前视频的共享状态，避免上一个视频的交互状态串入
     val shared = sharedState?.takeIf { it.aid == aid }
     val context = LocalContext.current
@@ -1002,8 +1002,8 @@ private fun RelatedVideoRow(
                 androidx.compose.foundation.layout
                     .PaddingValues(horizontal = 50.dp),
         ) {
-            items(videos) { video ->
-                val cardData = VideoCardData.fromRelatedVideo(video)
+            items(videos, key = { it.aid }) { video ->
+                val cardData = remember(video) { VideoCardData.fromRelatedVideo(video) }
                 SmallVideoCard(
                     modifier =
                         if (video == videos.first()) {

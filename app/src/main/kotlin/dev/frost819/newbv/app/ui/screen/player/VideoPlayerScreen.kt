@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,23 +75,23 @@ fun VideoPlayerScreen(
     val videoPlayer = playerViewModel.videoPlayer
     val danmakuPlayer = danmakuViewModel.danmakuPlayer
 
-    val uiState by playerViewModel.uiState.collectAsState()
-    val seekerState = playerViewModel.seekerState.collectAsState()
-    val danmakuState by danmakuViewModel.danmakuState.collectAsState()
-    val danmakuMask by danmakuViewModel.danmakuMask.collectAsState()
-    val subtitleState by subtitleViewModel.subtitleState.collectAsState()
-    val subtitleId by subtitleViewModel.subtitleId.collectAsState()
-    val subtitleData by subtitleViewModel.subtitleData.collectAsState()
-    val subtitleList by subtitleViewModel.subtitleList.collectAsState()
-    val sharedState by playerViewModel.videoSharedState.collectAsState()
+    val uiState by playerViewModel.uiState.collectAsStateWithLifecycle()
+    val seekerState = playerViewModel.seekerState.collectAsStateWithLifecycle()
+    val danmakuState by danmakuViewModel.danmakuState.collectAsStateWithLifecycle()
+    val danmakuMask by danmakuViewModel.danmakuMask.collectAsStateWithLifecycle()
+    val subtitleState by subtitleViewModel.subtitleState.collectAsStateWithLifecycle()
+    val subtitleId by subtitleViewModel.subtitleId.collectAsStateWithLifecycle()
+    val subtitleData by subtitleViewModel.subtitleData.collectAsStateWithLifecycle()
+    val subtitleList by subtitleViewModel.subtitleList.collectAsStateWithLifecycle()
+    val sharedState by playerViewModel.videoSharedState.collectAsStateWithLifecycle()
 
     // 播放列表与相关视频：直接观察共享仓库
     val videoInfoRepository = playerViewModel.videoInfoRepository
-    val videoList by videoInfoRepository.videoList.collectAsState()
-    val relatedVideosRaw by videoInfoRepository.relatedVideos.collectAsState()
+    val videoList by videoInfoRepository.videoList.collectAsStateWithLifecycle()
+    val relatedVideosRaw by videoInfoRepository.relatedVideos.collectAsStateWithLifecycle()
     val videoDetailAid =
         videoInfoRepository.videoDetail
-            .collectAsState()
+            .collectAsStateWithLifecycle()
             .value
             ?.aid
 

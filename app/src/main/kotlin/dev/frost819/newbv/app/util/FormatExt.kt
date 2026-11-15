@@ -98,13 +98,21 @@ fun Long.formatCommentTime(now: Long = System.currentTimeMillis()): String {
     }
 }
 
+/** 评论日期格式化器：仅主线程组合期调用，SimpleDateFormat 非线程安全故不跨线程共享。 */
+private val commentDateFormats =
+    mapOf(
+        "M月d日" to SimpleDateFormat("M月d日", Locale.CHINESE),
+        "yyyy年M月d日" to SimpleDateFormat("yyyy年M月d日", Locale.CHINESE),
+    )
+
 /** 评论时间超过两天时的日期文案：同年省略年份，往年带年份。 */
 private fun formatCommentDate(
     timeMs: Long,
     nowMs: Long,
 ): String {
     val time = Calendar.getInstance().apply { timeInMillis = timeMs }
-    val current = Calendar.getInstance().apply { timeInMillis = nowMs }
-    val pattern = if (time.get(Calendar.YEAR) == current.get(Calendar.YEAR)) "M月d日" else "yyyy年M月d日"
-    return SimpleDateFormat(pattern, Locale.CHINESE).format(time.time)
+    val sameYear =
+        time.get(Calendar.YEAR) == Calendar.getInstance().apply { timeInMillis = nowMs }.get(Calendar.YEAR)
+    val pattern = if (sameYear) "M月d日" else "yyyy年M月d日"
+    return commentDateFormats.getValue(pattern).format(time.time)
 }

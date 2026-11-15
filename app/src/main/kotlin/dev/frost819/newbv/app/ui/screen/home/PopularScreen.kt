@@ -1,7 +1,7 @@
 package dev.frost819.newbv.app.ui.screen.home
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
@@ -18,7 +18,7 @@ fun PopularScreen(
     navController: NavController,
     focusSaver: FocusSaver,
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     VideoFeedGrid(
         items = state.popularItems,
         isLoading = state.popularLoading,

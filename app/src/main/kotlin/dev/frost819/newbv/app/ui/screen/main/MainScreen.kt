@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,7 +61,7 @@ fun MainScreen(
     navController: NavController,
     userViewModel: UserViewModel = hiltViewModel(),
 ) {
-    val userUiState by userViewModel.uiState.collectAsState()
+    val userUiState by userViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showUserPanel by remember { mutableStateOf(false) }
     var selectedDrawerItem by rememberSaveable { mutableStateOf(Prefs.homeLeftNavItem) }
