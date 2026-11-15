@@ -214,21 +214,3 @@ data class RecordInfo(
     val record: String,
 )
 
-@Serializable
-enum class VideoQuality(
-    val qn: Int,
-    val displayName: String,
-) {
-    Q260P(6, "240P 极速"),
-    Q360P(16, "360P 流畅"),
-    Q480P(32, "480P 清晰"),
-    Q720P(64, ""),
-    Q720P60(74, ""),
-    Q1080P(80, ""),
-    Q1080PPlus(112, ""),
-    Q1080P60(116, ""),
-    Q4K(120, ""),
-    HDR(125, ""),
-    Dolby(126, ""),
-    Q8K(127, ""),
-}

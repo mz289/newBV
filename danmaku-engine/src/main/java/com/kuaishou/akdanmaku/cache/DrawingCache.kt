@@ -23,9 +23,7 @@
 
 package com.kuaishou.akdanmaku.cache
 
-import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.os.Build
 import android.util.Log
 import com.kuaishou.akdanmaku.ecs.DanmakuEngine
 import com.kuaishou.akdanmaku.ext.EMPTY_BITMAP
@@ -64,14 +62,9 @@ class DrawingCache {
         }
     }
 
-    @SuppressLint("ObsoleteSdkInt")
     private fun getBitmapSize(bitmap: Bitmap?): Int {
         bitmap ?: return 0
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) { // API 19
-            return bitmap.allocationByteCount
-        }
-        // 在低版本中用一行的字节x高度
-        return bitmap.rowBytes * bitmap.height
+        return bitmap.allocationByteCount
     }
 
     fun erase() {

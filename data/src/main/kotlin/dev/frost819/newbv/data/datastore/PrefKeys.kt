@@ -64,7 +64,7 @@ internal object PrefKeys {
     val danmakuBlockEnabled = booleanPreferencesKey("danmaku_block_enabled")
     val danmakuBlockRules = stringPreferencesKey("danmaku_block_rules")
 
-    /** 合并模式固定编码：0=关闭，2=相似（历史编码 1 由 Prefs.init 一次性迁移为 2）。 */
+    /** 合并模式固定编码：0=关闭，2=相似。 */
     val danmakuMergeMode = intPreferencesKey("danmaku_merge_mode")
     val danmakuBlockLevel = intPreferencesKey("danmaku_block_level")
 
@@ -89,8 +89,6 @@ internal object PrefKeys {
     /** 视频卡片宽度上限（dp），列数按屏宽自适应。 */
     val videoCardWidth = intPreferencesKey("video_card_width")
 
-    /** 已废弃：旧"视频卡片列数"设置，仅在 [Prefs] 迁移为卡宽时读取。 */
-    val videoColumns = intPreferencesKey("video_columns")
     val homeLeftNavItem = intPreferencesKey("home_left_nav")
     val firstHomeTopNavItem = intPreferencesKey("first_home_top_nav")
     val firstPersonalTopNavItem = intPreferencesKey("first_personal_top_nav")

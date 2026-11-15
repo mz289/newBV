@@ -45,14 +45,6 @@ data class SpaceVideoData(
                     ),
             )
 
-        /** 将 App gRPC `Space.Archive` 响应转换为用户空间视频数据。 */
-        fun fromGrpcSpaceVideoData(
-            items: List<BiliSpaceVideo>,
-            page: SpaceVideoPage,
-        ) = SpaceVideoData(
-            videos = items.map { SpaceVideo.fromGrpcSpaceVideoItem(it) },
-            page = page,
-        )
     }
 }
 

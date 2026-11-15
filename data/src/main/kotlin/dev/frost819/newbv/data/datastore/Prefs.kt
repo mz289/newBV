@@ -429,8 +429,6 @@ object Prefs {
         val initialPrefs = runBlocking { dataStore.data.first() }
         delegates.forEach { it.load(initialPrefs) }
         initialized = true
-        migrateVideoColumnsToCardWidth(initialPrefs)
-        migrateDanmakuMergeMode(initialPrefs)
         checkAndInitBuvid(initialPrefs)
     }
 
@@ -444,32 +442,6 @@ object Prefs {
         check(initialized) {
             "Prefs 尚未初始化，禁止读写（初始化由依赖图 providePrefs 完成，先于任何 Prefs 消费者构造）"
         }
-    }
-
-    /**
-     * 旧"视频卡片列数"迁移为"视频卡片宽度"。
-     *
-     * 列数档位按默认 TV 布局（可用宽度约 820dp）换算为近似卡宽，
-     * 仅在新键缺失时执行一次；旧键保留在 DataStore 中，之后不再读写。
-     */
-    private fun migrateVideoColumnsToCardWidth(prefs: Preferences) {
-        if (prefs.contains(PrefKeys.videoCardWidth)) return
-        val legacyColumns = prefs[PrefKeys.videoColumns] ?: return
-        videoCardWidth =
-            when (legacyColumns) {
-                5 -> 155
-                6 -> 125
-                7 -> 105
-                else -> VIDEO_CARD_WIDTH_DEFAULT
-            }
-    }
-
-    /**
-     * 旧"合并模式"编码 1（相同文本合并）一次性迁移为 2（相似文本合并）。
-     * 当前只提供相似合并，兼容已保存的旧精确档位。
-     */
-    private fun migrateDanmakuMergeMode(prefs: Preferences) {
-        if (prefs[PrefKeys.danmakuMergeMode] == 1) danmakuMergeMode = 2
     }
 
     /** 检查 buvid / buvid3 是否缺失，缺失则自动生成并持久化。 */

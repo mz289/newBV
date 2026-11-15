@@ -3,16 +3,6 @@ package dev.frost819.newbv.biliapi.http.entity.live
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * 直播两级分区列表响应。
- *
- * 端点: `GET /room/v1/area/getList`
- */
-@Serializable
-data class LiveAreaListResponse(
-    val data: List<LiveAreaParent> = emptyList(),
-)
-
 @Serializable
 data class LiveAreaParent(
     val id: Int,

@@ -386,13 +386,6 @@ class LiveRepository {
         return firstFormat.codec.firstOrNull { !it.isUnplayableIn(firstFormat.formatName) }
     }
 
-    /**
-     * 获取可用画质列表。
-     *
-     * 从 [getLivePlayInfo] 提取，失败时返回空列表。
-     */
-    suspend fun getAvailableQualities(roomId: Int): List<LiveQuality> = getLivePlayInfo(roomId, 0).qualities
-
     /** 按 qn 档位推导 HDR 档的分辨率（用于能力判定，非实际 rendition 尺寸）。 */
     private fun hdrResolution(qn: Int): Pair<Int, Int> =
         when {

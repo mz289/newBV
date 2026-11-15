@@ -9,7 +9,6 @@
     <string name="login_success">登录成功</string>
     <string name="login_error">登录失败</string>
     <string name="login_retry">重试</string>
-    <string name="login_title">登录</string>
     <string name="login_tab_qr">扫码登录</string>
     <string name="login_tab_cookie">Cookie 登录</string>
     <string name="login_cookie_hint">粘贴浏览器 Cookie（含 SESSDATA、bili_jct、DedeUserID）或凭证 JSON</string>
@@ -19,18 +18,10 @@
     <string name="login_cookie_submitting">正在登录…</string>
     <string name="login_cookie_remote_title">手机远程输入</string>
     <string name="login_cookie_remote_hint">手机与电视连接同一网络，扫码后粘贴 Cookie，发送即自动登录</string>
-    <string name="login_cookie_remote_starting">正在启动远程输入…</string>
-    <string name="login_cookie_remote_error">远程输入启动失败，请检查网络后重试</string>
 
     <!-- User Switch -->
     <string name="user_switch_title">账号管理</string>
     <string name="user_switch_add">添加账号</string>
-    <string name="user_switch_manage">管理</string>
-    <string name="user_switch_delete_confirm">确定删除该账号？</string>
-    <string name="user_switch_delete_confirm_btn">删除</string>
-    <string name="user_switch_cancel">取消</string>
-    <string name="user_switch_show_token">查看凭证</string>
-    <string name="user_switch_delete">删除账号</string>
     <string name="user_switch_no_users">暂无账号，请登录</string>
     <string name="user_switch_current">当前</string>
     <string name="user_switch_parse_active">解析账号</string>
@@ -39,7 +30,6 @@
 
     <!-- User Panel -->
     <string name="user_panel_incognito">无痕模式</string>
-    <string name="user_panel_following">关注</string>
     <string name="user_panel_account">账号管理</string>
     <string name="user_panel_not_login">未登录</string>
 

@@ -137,12 +137,6 @@ class DanmakuMask private constructor(
             type: DanmakuMaskType,
         ): DanmakuMask = input.source().buffer().use { parseFromSource(it, type) }
 
-        /** 从已加载的字节解析压缩块。 */
-        fun fromBinary(
-            binary: ByteArray,
-            type: DanmakuMaskType,
-        ): DanmakuMask = parseFromSource(Buffer().write(binary), type)
-
         private fun parseFromSource(
             source: BufferedSource,
             type: DanmakuMaskType,

@@ -77,7 +77,7 @@ class DanmakuMobMaskFrameTest {
     // ------------------------------------------------------------------
 
     /**
-     * Builds a minimal MASK binary for [DanmakuMask.fromBinary].
+     * Builds a minimal MASK binary for [DanmakuMask.fromStream].
      *
      * Format: magic("MASK") + version(int32) + skip(4 bytes) + size(int32) +
      * [time(int64) + offset(int64)] * size + gzip-compressed-segment-data
@@ -117,11 +117,11 @@ class DanmakuMobMaskFrameTest {
     }
 
     @Test
-    fun `DanmakuMask fromBinary with invalid magic throws exception`() {
+    fun `DanmakuMask fromStream with invalid magic throws exception`() {
         val invalidData = ByteArray(20) { 0 }
 
         try {
-            DanmakuMask.fromBinary(invalidData, DanmakuMaskType.WebMask)
+            DanmakuMask.fromStream(invalidData.inputStream(), DanmakuMaskType.WebMask)
             assertThat(false).isTrue()
         } catch (e: IllegalArgumentException) {
             assertThat(e.message).contains("Not a mask file")
@@ -129,11 +129,11 @@ class DanmakuMobMaskFrameTest {
     }
 
     @Test
-    fun `DanmakuMask fromBinary with single segment returns correct segmentCount`() {
+    fun `DanmakuMask fromStream with single segment returns correct segmentCount`() {
         val segmentData = gzipCompress(ByteArray(0))
         val binary = buildMaskBinary(listOf(60000L), segmentData)
 
-        val mask = DanmakuMask.fromBinary(binary, DanmakuMaskType.WebMask)
+        val mask = DanmakuMask.fromStream(binary.inputStream(), DanmakuMaskType.WebMask)
 
         assertThat(mask.segmentCount).isEqualTo(1)
     }
@@ -143,7 +143,7 @@ class DanmakuMobMaskFrameTest {
         val segmentData = gzipCompress(ByteArray(0))
         val binary = buildMaskBinary(listOf(60000L), segmentData)
 
-        val mask = DanmakuMask.fromBinary(binary, DanmakuMaskType.WebMask)
+        val mask = DanmakuMask.fromStream(binary.inputStream(), DanmakuMaskType.WebMask)
 
         // negative position is not in any segment range
         val segment = mask.getSegmentAt(-1L)
@@ -155,7 +155,7 @@ class DanmakuMobMaskFrameTest {
         val segmentData = gzipCompress(ByteArray(0))
         val binary = buildMaskBinary(listOf(60000L), segmentData)
 
-        val mask = DanmakuMask.fromBinary(binary, DanmakuMaskType.WebMask)
+        val mask = DanmakuMask.fromStream(binary.inputStream(), DanmakuMaskType.WebMask)
 
         val segment = mask.getSegmentAt(30000L)
         assertThat(segment).isNotNull()

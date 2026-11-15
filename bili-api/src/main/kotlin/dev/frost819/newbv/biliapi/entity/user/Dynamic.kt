@@ -165,7 +165,3 @@ private fun convertStringPlayCountToNumberPlayCount(play: String): Int {
     }
     return -1
 }
-
-enum class DynamicType {
-    Video,
-}
