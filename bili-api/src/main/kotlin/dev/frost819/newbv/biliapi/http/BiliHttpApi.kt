@@ -30,6 +30,7 @@ import dev.frost819.newbv.biliapi.http.entity.season.SeasonFollowData
 import dev.frost819.newbv.biliapi.http.entity.season.WebSeasonData
 import dev.frost819.newbv.biliapi.http.entity.toview.ToViewData
 import dev.frost819.newbv.biliapi.http.entity.user.AppSpaceVideoData
+import dev.frost819.newbv.biliapi.http.entity.user.UserCardData
 import dev.frost819.newbv.biliapi.http.entity.user.FollowAction
 import dev.frost819.newbv.biliapi.http.entity.user.FollowActionSource
 import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
@@ -494,6 +495,22 @@ object BiliHttpApi {
      * 通过[sessData]获取用户个人信息
      */
     suspend fun getUserSelfInfo(): BiliResponse<MyInfoData> = client.get("/x/space/myinfo").body()
+
+    /**
+     * 获取用户[mid]的卡片信息（昵称/头像/粉丝数等，匿名可访问）
+     *
+     * @param uid 用户id
+     * @param photo 是否请求用户主页头图
+     */
+    suspend fun getUserCardInfo(
+        uid: Long,
+        photo: Boolean = false,
+    ): BiliResponse<UserCardData> =
+        client
+            .get("/x/web-interface/card") {
+                parameter("mid", uid)
+                parameter("photo", photo)
+            }.body()
 
     /**
      * 获取截止至目标id[max]和目标时间[viewAt]历史记录

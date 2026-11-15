@@ -12,6 +12,12 @@ import java.util.Date
  *
  * TV 端仅支持 App 扫码登录（passport-tv-login 通道）。
  */
+/** B 站服务端返回：当前账号不支持 TV 端登录。 */
+private const val ACCOUNT_NOT_SUPPORTED = 48007
+
+/** 48007 的用户提示：说明是账号限制。 */
+private const val ACCOUNT_NOT_SUPPORTED_MESSAGE = "当前账号无法登录"
+
 class LoginRepository {
     /**
      * 请求扫码登录的二维码

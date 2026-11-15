@@ -38,11 +38,6 @@ class LiveRepository {
         hdrContainerPreference.flatMap { (protocol, formats) -> formats.map { protocol to it } }
 
     /**
-     * 获取直播首页模块化列表。
-     */
-    suspend fun getLiveList(): LiveListResponse = BiliLiveHttpApi.getLiveList().getResponseData()
-
-    /**
      * 获取推荐直播间列表。
      */
     suspend fun getLiveRecommend(): LiveRecommendResponse = BiliLiveHttpApi.getLiveRecommend().getResponseData()
@@ -142,36 +137,6 @@ class LiveRepository {
                 logger.warn { "getLivePlayInfo fallback failed: ${e.message}" }
             }.getOrDefault(LivePlayInfo(currentQn = 0, qualities = emptyList(), lines = emptyList()))
         }
-
-    /**
-     * 获取直播流地址（取第一条线路）。
-     *
-     * @param roomId 真实房间号（长号）
-     * @param qualityKey 画质档位标识（[LiveQuality.key]，0 = 自动）
-     * @return 流地址 URL，或 null 表示无可用流
-     */
-    suspend fun getLiveStreamUrl(
-        roomId: Int,
-        qualityKey: Int = 0,
-    ): String? = getLiveStreamInfo(roomId, qualityKey).url
-
-    /**
-     * 获取直播流地址和当前画质（取第一条线路）。
-     *
-     * @param roomId 真实房间号（长号）
-     * @param qualityKey 画质档位标识（[LiveQuality.key]，0 = 自动）
-     * @return [LiveStreamInfo]，包含流 URL 和当前画质 qn
-     */
-    suspend fun getLiveStreamInfo(
-        roomId: Int,
-        qualityKey: Int = 0,
-    ): LiveStreamInfo {
-        val playInfo = getLivePlayInfo(roomId, qualityKey)
-        return LiveStreamInfo(
-            url = playInfo.lines.firstOrNull()?.url,
-            currentQn = playInfo.currentQn,
-        )
-    }
 
     /**
      * 从 v2 流地址响应中解析出可用画质与多条线路。
