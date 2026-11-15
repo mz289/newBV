@@ -1059,7 +1059,7 @@ class PlayerViewModel
 
             // 异步加载详情 + 历史进度（不阻塞 playVideoWithResources）
             if (shouldUpdateDetail) {
-                viewModelScope.launch(Dispatchers.IO) {
+                viewModelScope.launch {
                     videoInfoRepository.loadVideoDetail(newVideo.aid, Prefs.apiType)
                     val detail = videoInfoRepository.videoDetail.value?.takeIf { it.aid == newVideo.aid }
                     // 仅当历史 cid 与当前播放 cid 一致时才应用断点续播

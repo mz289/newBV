@@ -118,7 +118,7 @@ class UserSpaceViewModel
             if (state.mid == 0L || state.followLoading) return
 
             val wasFollowing = state.isFollowing
-            val preferApiType = prefApiType()
+            val preferApiType = Prefs.apiType
             _uiState.update { it.copy(followLoading = true) }
 
             viewModelScope.launch {

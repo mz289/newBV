@@ -16,7 +16,6 @@ import dev.frost819.newbv.app.ui.state.player.PlayerUiEffect
 import dev.frost819.newbv.app.ui.state.player.PlayerUiState
 import dev.frost819.newbv.app.util.PlaybackCandidate
 import dev.frost819.newbv.app.util.VideoCapabilityProvider
-import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.DashAudio
 import dev.frost819.newbv.biliapi.entity.DashVideo
 import dev.frost819.newbv.biliapi.entity.PlayData
@@ -61,7 +60,7 @@ import java.io.IOException
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.coroutines.suspendCoroutine
-import dev.frost819.newbv.data.datastore.ApiType as DataApiType
+import dev.frost819.newbv.biliapi.entity.ApiType
 
 /**
  * [PlayerViewModel] 的单元测试。

@@ -150,11 +150,6 @@ fun VideoPlayerScreen(
         }
     }
 
-    // 相关视频归属随当前播放视频切换（播放器内切视频不会更新导航路由参数）
-    LaunchedEffect(uiState.aid) {
-        videoListViewModel.setCurrentAid(uiState.aid)
-    }
-
     // 切换视频事件：协调弹幕/字幕/蒙版重载
     LaunchedEffect(Unit) {
         playerViewModel.videoSwitchEvent.collect { event ->

@@ -81,6 +81,12 @@ data class LivePlayerUiState(
     val currentQuality: Int = 0,
     val availableLines: List<LivePlayLine> = emptyList(),
     val currentLine: Int = 0,
+    /** 主播 uid，用于跳转 UP 主页。 */
+    val upMid: Long = 0L,
+    /** 主播昵称（用户卡片补全，缺省回退房间信息 uname）。 */
+    val upName: String = "",
+    /** 主播头像（用户卡片补全，缺省回退房间信息 face）。 */
+    val upFace: String = "",
 )
 
 /**
@@ -174,9 +180,6 @@ class LivePlayerViewModel
                     _uiState.update { it.copy(playerState = LivePlayerState.Ended) }
                 }
 
-                override fun onSeekBack(seekBackIncrementMs: Long) {}
-
-                override fun onSeekForward(seekForwardIncrementMs: Long) {}
             }
 
         /**

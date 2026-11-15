@@ -16,7 +16,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
-import dev.frost819.newbv.core.focus.focusInvertedColors
+import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -48,7 +48,7 @@ fun UpActionButton(
         onLongClick = onLongClick,
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
         colors =
-            focusInvertedColors(
+            ControlFocusDefaults.surfaceColors(
                 containerColor =
                     if (highlighted) {
                         MaterialTheme.colorScheme.primaryContainer

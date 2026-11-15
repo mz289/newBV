@@ -415,8 +415,6 @@ class LivePlayerViewModelTest {
             assertThat(viewModel.uiState.value.availableLines).isEmpty()
         }
 
-    private fun setVideoPlayer(player: ExoMediaPlayer?) {
-
     /** 读取 `videoPlayerListener` 字段（播放器事件匿名对象）。 */
     private fun getVideoPlayerListener(): VideoPlayerListener {
         val field = LivePlayerViewModel::class.java.getDeclaredField("videoPlayerListener")
