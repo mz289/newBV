@@ -19,10 +19,8 @@ import dev.frost819.newbv.core.focus.DpadDirection
 import dev.frost819.newbv.core.focus.FocusShakeController
 import dev.frost819.newbv.core.interaction.InteractionTracker
 import dev.frost819.newbv.core.interaction.LocalInteractionTracker
-import dev.frost819.newbv.core.theme.AccentColor
 import dev.frost819.newbv.core.theme.BVTheme
 import dev.frost819.newbv.core.theme.SystemBarsEffect
-import dev.frost819.newbv.core.theme.ThemeMode
 import dev.frost819.newbv.data.datastore.Prefs
 import javax.inject.Inject
 
@@ -48,9 +46,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            val themeMode by Prefs.themeModeFlow.collectAsStateWithLifecycle(initialValue = ThemeMode.Dark)
-            val density by Prefs.densityFlow.collectAsStateWithLifecycle(initialValue = 2.0f)
-            val accentColor by Prefs.accentColorFlow.collectAsStateWithLifecycle(initialValue = AccentColor.BiliPink)
+            // 首帧响应修正：三者均为 StateFlow，无参重载首帧直接同步取 flow.value。
+            // Prefs 在 Hilt 构造单例时已阻塞读盘（DatabaseModule.providePrefs），
+            // 因此首帧即为用户已保存的缩放/主题/强调色，不再出现"默认尺寸渲染一帧后跳变"。
+            // flow 订阅持续保活，运行中修改设置仍即时生效。
+            val themeMode by Prefs.themeModeFlow.collectAsStateWithLifecycle()
+            val density by Prefs.densityFlow.collectAsStateWithLifecycle()
+            val accentColor by Prefs.accentColorFlow.collectAsStateWithLifecycle()
 
             BVTheme(themeMode = themeMode, density = density, accentColor = accentColor) {
                 SystemBarsEffect()
