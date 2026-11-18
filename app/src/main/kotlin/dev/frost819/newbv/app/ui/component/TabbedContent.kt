@@ -2,6 +2,7 @@ package dev.frost819.newbv.app.ui.component
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,8 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.SaveableStateHolder
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -59,12 +58,6 @@ fun <T> TabbedContent(
     var selectedTab by rememberSaveable { mutableStateOf(initialTab) }
     var focusOnContent by remember { mutableStateOf(false) }
 
-    // 各 Tab 的组合状态（滚动位置、焦点记忆等 rememberSaveable 状态）跨切换保留：
-    // 切回不再全页从头组合，Lazy 网格直接恢复到原位置——"切回秒回原位"。
-    val stateHolder = rememberSaveableStateHolder()
-
-    // key 用固定映射的 displayName：应用内稳定唯一，不随用户设置漂移。
-    // SaveableStateProvider 是 @Composable 扩展，须在组合上下文直接调用。
 
     val reorderedTabs =
         remember {
@@ -109,23 +102,26 @@ fun <T> TabbedContent(
                     targetState = selectedTab,
                     label = "tabbed-content",
                     transitionSpec = {
-                        // 固定 150ms 标准曲线：默认 spring 无明确时长，低端盒子感知拖沓
-                        val fade = tween<Float>(150, easing = FastOutSlowInEasing)
-                        val slide = tween<IntOffset>(150, easing = FastOutSlowInEasing)
+                        // 固定 150ms：入场 LinearOutSlowIn（快起缓收），出场 FastOutSlowIn；
+                        // 默认 spring 无明确时长，低端盒子感知拖沓
+                        val enterFade = tween<Float>(150, easing = LinearOutSlowInEasing)
+                        val enterSlide = tween<IntOffset>(150, easing = LinearOutSlowInEasing)
+                        val exitFade = tween<Float>(150, easing = FastOutSlowInEasing)
+                        val exitSlide = tween<IntOffset>(150, easing = FastOutSlowInEasing)
                         val coefficient = 10
                         if (reorderedTabs.indexOf(targetState) < reorderedTabs.indexOf(initialState)) {
-                            fadeIn(fade) + slideInHorizontally(slide) { -it / coefficient } togetherWith
-                                fadeOut(fade) + slideOutHorizontally(slide) { it / coefficient }
+                            fadeIn(enterFade) + slideInHorizontally(enterSlide) { -it / coefficient } togetherWith
+                                fadeOut(exitFade) + slideOutHorizontally(exitSlide) { it / coefficient }
                         } else {
-                            fadeIn(fade) + slideInHorizontally(slide) { it / coefficient } togetherWith
-                                fadeOut(fade) + slideOutHorizontally(slide) { -it / coefficient }
+                            fadeIn(enterFade) + slideInHorizontally(enterSlide) { it / coefficient } togetherWith
+                                fadeOut(exitFade) + slideOutHorizontally(exitSlide) { -it / coefficient }
                         }
                     },
                 ) { tab ->
-                    stateHolder.SaveableStateProvider(key = displayName(tab)) { content(tab) }
+                    content(tab)
                 }
             } else {
-                stateHolder.SaveableStateProvider(key = displayName(selectedTab)) { content(selectedTab) }
+                content(selectedTab)
             }
         }
     }
