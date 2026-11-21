@@ -46,6 +46,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -1581,6 +1582,38 @@ class PlayerViewModelTest {
             assertThat(viewModel.uiState.value.mediaProfileState.qualityId)
                 .isEqualTo(Resolution.R1080P.code)
             assertThat(viewModel.uiState.value.mediaProfileState.videoCodec).isEqualTo(VideoCodec.AVC)
+        }
+
+    // ── loadVideoWithResources tests ─────────────────────────
+
+    @Test
+    fun `loadVideoWithResources shows buffering before player prepares`() =
+        runTest(testDispatcher) {
+            coEvery { videoPlayRepository.getPlayData(any(), any(), any()) } coAnswers {
+                delay(Long.MAX_VALUE)
+                error("unreachable")
+            }
+
+            viewModel.loadVideoWithResources()
+
+            // prepare()（STATE_BUFFERING 回调）前的加载窗口（详情/playurl 串行网络请求）
+            // 必须处于缓冲态，否则 PlayStateTips 命中暂停图标分支，
+            // 表现为起播前先“卡”在暂停态一两秒
+            assertThat(viewModel.uiState.value.isBuffering).isTrue()
+            assertThat(viewModel.uiState.value.playerState).isNotInstanceOf(PlayerState.Error::class.java)
+        }
+
+    @Test
+    fun `loadVideoWithResources failure enters error and clears buffering`() =
+        runTest(testDispatcher) {
+            coEvery { videoPlayRepository.getPlayData(any(), any(), any()) } throws IOException("boom")
+
+            viewModel.loadVideoWithResources()
+
+            // 加载协程运行在 Dispatchers.IO（不走 test scheduler），用状态流等待其落地
+            val state = viewModel.uiState.first { it.playerState is PlayerState.Error }
+
+            assertThat(state.isBuffering).isFalse()
         }
 
     // ── loadVideoDetail cid tests ────────────────────────────

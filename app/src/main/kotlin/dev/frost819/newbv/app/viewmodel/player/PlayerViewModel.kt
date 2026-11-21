@@ -1106,6 +1106,13 @@ class PlayerViewModel
             val cid = state.cid
             val epid = state.epid
 
+            // 进入加载即置缓冲态：从首帧组合到 ExoPlayer prepare()（STATE_BUFFERING 回调）
+            // 之间隔着详情/弹幕/字幕/playurl 多次串行网络请求，若沿用初始 isBuffering=false，
+            // 该窗口会命中 PlayStateTips 的暂停图标分支（!isPlaying && !isBuffering && !isError），
+            // 表现为起播前先“卡”在暂停态一两秒。与 playNewVideo/切档路径的预置行为对齐。
+            // 失败路径由 catch / failPlayback 统一回收 isBuffering = false，不会卡加载圈。
+            _uiState.update { it.copy(isBuffering = true) }
+
             loadVideoJob?.cancel()
             loadVideoJob =
                 viewModelScope.launch(Dispatchers.IO) {
@@ -1136,6 +1143,8 @@ class PlayerViewModel
          */
         fun playExternalMedia() {
             val url = externalMediaUrl ?: return
+            // 与 loadVideoWithResources 同理：prepare() 前的网络/装载窗口预置缓冲态
+            _uiState.update { it.copy(isBuffering = true) }
             loadVideoJob?.cancel()
             loadVideoJob =
                 viewModelScope.launch {
@@ -1638,6 +1647,9 @@ class PlayerViewModel
             val player =
                 videoPlayer ?: run {
                     logger.error { "VideoPlayer is not initialized!" }
+                    // 预置的 isBuffering=true 需要有出口：播放器缺失时明确进入错误态，
+                    // 避免缓冲圈永久悬挂
+                    failPlayback("播放器未初始化")
                     return
                 }
             player.playUrl(mediaUrls.videoUrl, mediaUrls.audioUrl)
