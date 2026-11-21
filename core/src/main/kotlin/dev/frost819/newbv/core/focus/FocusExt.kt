@@ -61,16 +61,20 @@ fun outerFocusBorder(cornerRadius: Dp = 8.dp): Border =
  * modifier 自带 6dp padding 作绘制余量兼布局间距；应放在背景裁切修饰符之前；
  * 不会添加点击或焦点节点，沿用原控件的语义和导航。
  *
- * 聚焦时描边带辉光（两层低透明度外扩描边）并 ~150ms 渐入，
+ * 聚焦时描边带辉光（两层低透明度外扩描边）并 [fadeMillis] 渐入，
  * 颜色取自 [LocalFocusOutlineColor]；同时挂载撞墙抖动（[focusShakeTarget]）。
+ *
+ * 导航部件（如顶部 Tab 行）建议传 0：切换瞬间边框即落位——若带渐变，
+ * 紧随其后的重内容组合帧会把主线程卡住、渐变冻结在半途，视觉上边框
+ * 要等页面加载完才移过去。
  */
-fun Modifier.controlFocusOutline(): Modifier =
+fun Modifier.controlFocusOutline(fadeMillis: Int = 150): Modifier =
     composed {
         var focused by remember { mutableStateOf(false) }
         val color = LocalFocusOutlineColor.current
         val outlineAlpha by animateFloatAsState(
             targetValue = if (focused) 1f else 0f,
-            animationSpec = tween(durationMillis = 150),
+            animationSpec = tween(durationMillis = fadeMillis),
             label = "control-focus-outline-alpha",
         )
         focusShakeTarget()

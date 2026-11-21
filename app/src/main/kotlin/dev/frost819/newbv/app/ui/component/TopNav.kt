@@ -121,7 +121,8 @@ private fun TabRowScope.NavItemTab(
     Tab(
         modifier =
             modifier
-                .controlFocusOutline()
+                // Tab 行是导航部件：边框瞬时落位（0ms），不与冷装载重帧争抢渐变窗口
+                .controlFocusOutline(fadeMillis = 0)
                 .clip(RoundedCornerShape(8.dp))
                 .background(containerColor)
                 .touchClickable(onClick = onClick),
