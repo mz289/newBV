@@ -100,6 +100,7 @@ class UserSpaceViewModel
 
         private var videoPage = SpaceVideoPage()
         private var collectionPage = SpaceCollectionPage()
+        private var favPage = SpaceCollectionPage()
 
         /**
          * 初始化：设置用户信息（由路由传入），按当前栏目加载内容。
@@ -154,6 +155,7 @@ class UserSpaceViewModel
 
             videoPage = SpaceVideoPage()
             collectionPage = SpaceCollectionPage()
+            favPage = SpaceCollectionPage()
             _uiState.update {
                 it.copy(
                     section = section,
@@ -202,6 +204,7 @@ class UserSpaceViewModel
         fun refresh(mid: Long) {
             videoPage = SpaceVideoPage()
             collectionPage = SpaceCollectionPage()
+            favPage = SpaceCollectionPage()
             _uiState.update {
                 it.copy(
                     videos = emptyList(),
@@ -378,7 +381,7 @@ class UserSpaceViewModel
             }
         }
 
-        /** 拉取公开收藏夹列表（list-all 一次全量，无分页）。 */
+        /** 拉取公开收藏夹列表下一页（分页接口，has_more 驱动）。 */
         fun loadFavFolders(mid: Long) {
             if (_uiState.value.loading || !_uiState.value.hasMore) return
 
@@ -389,21 +392,22 @@ class UserSpaceViewModel
                     withTimeout(LOAD_TIMEOUT_MS) {
                         userRepository.getSpaceFavFolders(
                             mid = mid,
+                            page = favPage,
                             preferApiType = Prefs.apiType,
                         )
                     }
-                }.onSuccess { folders ->
+                }.onSuccess { data ->
                     _uiState.update {
                         it.copy(
                             favFolders =
-                                it.favFolders + folders.filterNot { f ->
+                                it.favFolders + data.folders.filterNot { f ->
                                     it.favFolders.any { f2 -> f2.id == f.id }
                                 },
                             loading = false,
-                            // 收藏夹一次全量返回，没有下一页
-                            hasMore = false,
+                            hasMore = data.page.hasNext,
                         )
                     }
+                    favPage = data.page
                 }.onFailure { error ->
                     error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load space fav folders" }

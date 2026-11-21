@@ -724,26 +724,29 @@ class UserRepositoryUnitTest {
         }
 
     @Test
-    fun `getSpaceFavFolders maps public folders only`() =
+    fun `getSpaceFavFolders maps folders with covers and pagination`() =
         runTest {
-            coEvery { BiliHttpApi.getWebUserFavFolders(any()) } returns
+            coEvery { BiliHttpApi.getWebUserFavFolders(any(), any(), any()) } returns
                 BiliResponse(
                     code = 0,
                     message = "",
                     data =
                         dev.frost819.newbv.biliapi.http.entity.user.WebUserFavFolders(
                             count = 3,
+                            hasMore = true,
                             list =
                                 listOf(
                                     dev.frost819.newbv.biliapi.http.entity.user.WebUserFavFolders.FolderItem(
                                         id = 4058080750L,
                                         title = "AI调用",
                                         mediaCount = 129,
+                                        cover = "https://example.com/fav1.jpg",
                                     ),
                                     dev.frost819.newbv.biliapi.http.entity.user.WebUserFavFolders.FolderItem(
                                         id = 1212612050L,
                                         title = "狸粮",
                                         mediaCount = 255,
+                                        cover = "https://example.com/fav2.jpg",
                                     ),
                                     dev.frost819.newbv.biliapi.http.entity.user.WebUserFavFolders.FolderItem(
                                         id = 999L,
@@ -757,23 +760,28 @@ class UserRepositoryUnitTest {
             val result = repository.getSpaceFavFolders(mid = MID, preferApiType = ApiType.Web)
 
             // 标题缺失的条目被过滤
-            assertThat(result).hasSize(2)
-            assertThat(result[0].id).isEqualTo(4058080750L)
-            assertThat(result[0].title).isEqualTo("AI调用")
-            assertThat(result[0].mediaCount).isEqualTo(129)
-            coVerify { BiliHttpApi.getWebUserFavFolders(MID) }
+            assertThat(result.folders).hasSize(2)
+            assertThat(result.folders[0].id).isEqualTo(4058080750L)
+            assertThat(result.folders[0].title).isEqualTo("AI调用")
+            assertThat(result.folders[0].cover).isEqualTo("https://example.com/fav1.jpg")
+            assertThat(result.folders[0].mediaCount).isEqualTo(129)
+            // has_more=true → 还有下一页
+            assertThat(result.page.hasNext).isTrue()
+            assertThat(result.page.nextPageNumber).isEqualTo(2)
+            coVerify { BiliHttpApi.getWebUserFavFolders(MID, 1, 20) }
         }
 
     @Test
     fun `getSpaceFavFolders returns empty when data is null`() =
         runTest {
-            // UP 没有公开收藏夹时接口返回 code=0 且 data=null
-            coEvery { BiliHttpApi.getWebUserFavFolders(any()) } returns
+            // 防御：接口异常形态下 data 为 null 按空列表处理
+            coEvery { BiliHttpApi.getWebUserFavFolders(any(), any(), any()) } returns
                 BiliResponse(code = 0, message = "", data = null)
 
             val result = repository.getSpaceFavFolders(mid = MID, preferApiType = ApiType.Web)
 
-            assertThat(result).isEmpty()
+            assertThat(result.folders).isEmpty()
+            assertThat(result.page.hasNext).isFalse()
         }
 
     @Test

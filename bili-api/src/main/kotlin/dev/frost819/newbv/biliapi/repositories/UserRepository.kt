@@ -13,6 +13,7 @@ import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
 import dev.frost819.newbv.biliapi.entity.user.UpCollection
 import dev.frost819.newbv.biliapi.entity.user.UserFavFolder
+import dev.frost819.newbv.biliapi.entity.user.UserFavFolderData
 import dev.frost819.newbv.biliapi.grpc.utils.handleGrpcException
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.user.FollowAction
@@ -211,28 +212,37 @@ class UserRepository(
         }
 
     /**
-     * 获取用户[mid]的公开收藏夹列表。
+     * 获取用户[mid]的公开收藏夹列表下一页。
      *
-     * 仅 Web 通道；list-all 一次全量返回（无分页），仅含公开夹。
-     * UP 没有任何（公开）收藏夹时接口返回 code=0 且 data=null，按空列表处理。
+     * 仅 Web 通道；分页接口带封面与 has_more；无收藏夹时 list 为空。
      */
     suspend fun getSpaceFavFolders(
         mid: Long,
+        page: SpaceCollectionPage = SpaceCollectionPage(),
         preferApiType: ApiType,
-    ): List<UserFavFolder> {
-        val response = BiliHttpApi.getWebUserFavFolders(mid = mid)
-        // 非 0 错误码仍走统一异常；code=0 且 data=null 是"没有收藏夹"的正常形态
+    ): UserFavFolderData {
+        val response = BiliHttpApi.getWebUserFavFolders(mid = mid, pageNumber = page.nextPageNumber, pageSize = page.pageSize)
+        // 非 0 错误码仍走统一异常；code=0 且 data=null 按空列表处理
         if (response.code != 0) response.getResponseData()
-        val folders = response.data ?: return emptyList()
-        return folders.list
-            .mapNotNull { folder ->
+        val folders =
+            response.data?.list.orEmpty().mapNotNull { folder ->
                 val title = folder.title?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 UserFavFolder(
                     id = folder.id,
                     title = title,
+                    cover = folder.cover ?: "",
                     mediaCount = folder.mediaCount ?: 0,
                 )
             }
+        return UserFavFolderData(
+            folders = folders,
+            page =
+                SpaceCollectionPage(
+                    hasNext = response.data?.hasMore == true,
+                    nextPageNumber = page.nextPageNumber + 1,
+                    pageSize = page.pageSize,
+                ),
+        )
     }
 
     /** 获取收藏夹[folderId]的内容视频列表（Web，按收藏时间倒序）。 */

@@ -11,6 +11,7 @@ import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
 import dev.frost819.newbv.biliapi.entity.user.UpCollection
 import dev.frost819.newbv.biliapi.entity.user.UserFavFolder
+import dev.frost819.newbv.biliapi.entity.user.UserFavFolderData
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
@@ -109,7 +110,16 @@ class UserSpaceViewModelTest {
         id: Long,
         title: String,
         mediaCount: Int,
-    ) = UserFavFolder(id = id, title = title, mediaCount = mediaCount)
+        cover: String = "https://example.com/fav$id.jpg",
+    ) = UserFavFolder(id = id, title = title, cover = cover, mediaCount = mediaCount)
+
+    private fun fakeFavFolderData(
+        folders: List<UserFavFolder>,
+        hasNext: Boolean = false,
+    ) = UserFavFolderData(
+        folders = folders,
+        page = SpaceCollectionPage(hasNext = hasNext, nextPageNumber = 2, pageSize = 20),
+    )
 
     // ------------------------------------------------------------------
     // init
@@ -434,12 +444,15 @@ class UserSpaceViewModelTest {
         }
 
     @Test
-    fun `selectSection to Fav loads fav folders without pagination`() =
+    fun `selectSection to Fav loads fav folders`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
             coEvery {
-                userRepository.getSpaceFavFolders(mid = 1L, preferApiType = BiliApiType.Web)
-            } returns listOf(fakeFavFolder(100, "AI调用", 129), fakeFavFolder(101, "狸粮", 255))
+                userRepository.getSpaceFavFolders(mid = 1L, page = any(), preferApiType = BiliApiType.Web)
+            } returns fakeFavFolderData(
+                folders = listOf(fakeFavFolder(100, "AI调用", 129), fakeFavFolder(101, "狸粮", 255)),
+                hasNext = false,
+            )
 
             viewModel = createViewModel()
             viewModel.init(1L, "测试UP")
@@ -453,21 +466,48 @@ class UserSpaceViewModelTest {
             assertThat(state.collections).isEmpty()
             assertThat(state.favFolders).hasSize(2)
             assertThat(state.favFolders[0].title).isEqualTo("AI调用")
-            // list-all 一次全量返回，没有下一页
+            assertThat(state.favFolders[0].cover).isNotEmpty()
             assertThat(state.hasMore).isFalse()
             assertThat(state.error).isFalse()
 
-            // 滚动触发的 loadMore 不应再发请求
+            // has_more=false 后滚动触发的 loadMore 不应再发请求
             viewModel.loadMore(1L)
             advanceUntilIdle()
-            coVerify(exactly = 1) { userRepository.getSpaceFavFolders(any(), any()) }
+            coVerify(exactly = 1) { userRepository.getSpaceFavFolders(any(), any(), any()) }
+        }
+
+    @Test
+    fun `loadMore appends fav folder pages`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+            coEvery { userRepository.getSpaceFavFolders(any(), any(), any()) } returnsMany
+                listOf(
+                    fakeFavFolderData(folders = listOf(fakeFavFolder(100, "AI调用", 129)), hasNext = true),
+                    fakeFavFolderData(folders = listOf(fakeFavFolder(102, "收藏三", 7)), hasNext = false),
+                )
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectSection(1L, UserSpaceSection.Fav)
+            advanceUntilIdle()
+            assertThat(viewModel.uiState.value.favFolders).hasSize(1)
+            assertThat(viewModel.uiState.value.hasMore).isTrue()
+
+            viewModel.loadMore(1L)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.favFolders.map { it.id }).containsExactly(100L, 102L).inOrder()
+            assertThat(viewModel.uiState.value.hasMore).isFalse()
         }
 
     @Test
     fun `selectSection to Fav with no public folders shows empty state`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
-            coEvery { userRepository.getSpaceFavFolders(any(), any()) } returns emptyList()
+            coEvery { userRepository.getSpaceFavFolders(any(), any(), any()) } returns
+                fakeFavFolderData(folders = emptyList(), hasNext = false)
 
             viewModel = createViewModel()
             viewModel.init(1L, "测试UP")

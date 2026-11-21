@@ -18,6 +18,7 @@ data class WebSeasonsSeriesData(
     @Serializable
     data class ItemsLists(
         val page: Page? = null,
+        @SerialName("seasons_list")
         val seasonsList: List<Item> = emptyList(),
         @SerialName("series_list")
         val seriesList: List<Item> = emptyList(),

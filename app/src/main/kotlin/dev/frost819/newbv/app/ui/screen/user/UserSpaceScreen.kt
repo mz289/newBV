@@ -1,15 +1,12 @@
 package dev.frost819.newbv.app.ui.screen.user
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,9 +15,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.runtime.Composable
@@ -43,13 +38,10 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.FilterChip
 import androidx.tv.material3.FilterChipDefaults
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.FocusSaver
@@ -61,9 +53,9 @@ import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.videoCardGridCells
 import dev.frost819.newbv.app.ui.component.videoGridHSpacing
 import dev.frost819.newbv.app.ui.component.videoGridVSpacing
-import dev.frost819.newbv.app.ui.component.videocard.SeasonCard
-import dev.frost819.newbv.app.ui.component.videocard.SeasonCardData
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
+import dev.frost819.newbv.app.ui.component.videocard.UpCollectionCardData
+import dev.frost819.newbv.app.ui.component.videocard.UpCollectionCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
 import dev.frost819.newbv.app.ui.navigation.UserCollectionKind
 import dev.frost819.newbv.app.ui.navigation.UserCollectionRoute
@@ -81,8 +73,6 @@ import dev.frost819.newbv.app.viewmodel.user.UserSpaceViewModel
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.UserFavFolder
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
-import dev.frost819.newbv.core.focus.focusShakeTarget
-import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -207,10 +197,9 @@ private fun UserSpaceScreen(
                 ) { index, collection ->
                     val kind =
                         if (collection.isSeason) UserCollectionKind.Season else UserCollectionKind.Series
-                    SeasonCard(
+                    UpCollectionCard(
                         data =
-                            SeasonCardData(
-                                seasonId = collection.id.toInt(),
+                            UpCollectionCardData(
                                 title = collection.title,
                                 subTitle = "共${collection.total}个视频",
                                 cover = collection.cover,
@@ -254,8 +243,14 @@ private fun UserSpaceScreen(
                     items = state.favFolders,
                     key = { _, folder -> "fav_${folder.id}" },
                 ) { index, folder ->
-                    FavFolderCard(
-                        folder = folder,
+                    UpCollectionCard(
+                        data =
+                            UpCollectionCardData(
+                                title = folder.title,
+                                subTitle = "共${folder.mediaCount}个内容",
+                                cover = folder.cover,
+                                badge = "收藏",
+                            ),
                         onClick = {
                             navController.navigate(
                                 UserCollectionRoute(
@@ -263,7 +258,7 @@ private fun UserSpaceScreen(
                                     collectionId = folder.id,
                                     kind = UserCollectionKind.Fav,
                                     title = folder.title,
-                                    cover = "",
+                                    cover = folder.cover,
                                 ),
                             )
                         },
@@ -461,70 +456,6 @@ private fun UserSpaceSortRow(
                             },
                     )
                 }
-            }
-        }
-    }
-}
-
-/**
- * 公开收藏夹卡片（无封面：收藏夹列表接口不返回封面，用图标块占位）。
- */
-@Composable
-private fun FavFolderCard(
-    folder: UserFavFolder,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier =
-            modifier
-                .focusShakeTarget()
-                .padding(horizontal = 6.dp, vertical = 6.dp)
-                .touchClickable(onClick = onClick),
-        onClick = onClick,
-        colors = ControlFocusDefaults.surfaceColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
-        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp, horizontal = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(0.75f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Folder,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(48.dp),
-                )
-            }
-            Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) {
-                Text(
-                    text = folder.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = "共${folder.mediaCount}个内容",
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }

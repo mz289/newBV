@@ -1429,17 +1429,23 @@ object BiliHttpApi {
             }.body()
 
     /**
-     * 获取用户[mid]的公开收藏夹列表（Web）
+     * 获取用户[mid]的公开收藏夹列表（Web，分页）
      *
-     * 端点：GET /x/v3/fav/folder/created/list-all（匿名可访问，仅返回公开夹，一次全量无分页）
+     * 端点：GET /x/v3/fav/folder/created/list（匿名可访问，仅返回公开夹；带封面与 has_more）
+     *
+     * @param pageNumber 页码
+     * @param pageSize 每页项数
      */
     suspend fun getWebUserFavFolders(
         mid: Long,
+        pageNumber: Int = 1,
+        pageSize: Int = 20,
     ): BiliResponse<WebUserFavFolders> =
         client
-            .get("/x/v3/fav/folder/created/list-all") {
+            .get("/x/v3/fav/folder/created/list") {
                 parameter("up_mid", mid)
-                parameter("type", 0)
+                parameter("pn", pageNumber)
+                parameter("ps", pageSize)
                 header("referer", "https://space.bilibili.com")
             }.body()
 

@@ -340,12 +340,22 @@ data class SpaceCollectionData(
  *
  * @param id 收藏夹 ID（内容页 media_id）
  * @param title 收藏夹标题
+ * @param cover 收藏夹封面（可为空，空时用占位图）
  * @param mediaCount 收藏内容数
  */
 data class UserFavFolder(
     val id: Long,
     val title: String,
+    val cover: String,
     val mediaCount: Int,
+)
+
+/**
+ * UP 主公开收藏夹列表数据。
+ */
+data class UserFavFolderData(
+    val folders: List<UserFavFolder>,
+    val page: SpaceCollectionPage,
 )
 
 /**

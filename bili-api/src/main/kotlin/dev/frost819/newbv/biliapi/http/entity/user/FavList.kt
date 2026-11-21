@@ -4,14 +4,17 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * 用户公开收藏夹列表（Web）
+ * 用户公开收藏夹列表（Web，分页）
  *
- * 端点：GET /x/v3/fav/folder/created/list-all?up_mid={mid}&type=0（匿名可访问，仅返回公开夹）
+ * 端点：GET /x/v3/fav/folder/created/list?up_mid={mid}&pn=&ps=
+ * （匿名可访问，仅返回公开夹；分页版带封面，优于 list-all）
  */
 @Serializable
 data class WebUserFavFolders(
     val count: Int? = null,
     val list: List<FolderItem> = emptyList(),
+    @SerialName("has_more")
+    val hasMore: Boolean? = null,
 ) {
     @Serializable
     data class FolderItem(
@@ -20,6 +23,8 @@ data class WebUserFavFolders(
         val title: String? = null,
         @SerialName("media_count")
         val mediaCount: Int? = null,
+        /** 收藏夹封面（取自夹内视频封面）。 */
+        val cover: String? = null,
         val attr: Int? = null,
     )
 }
@@ -59,6 +64,7 @@ data class WebFavResourceList(
         /** 条目类型：2=视频。 */
         val type: Int? = null,
         val pubtime: Long? = null,
+        @SerialName("cnt_info")
         val cntInfo: CntInfo? = null,
     ) {
         @Serializable
