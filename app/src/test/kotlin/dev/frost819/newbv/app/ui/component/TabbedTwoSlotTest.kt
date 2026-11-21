@@ -45,7 +45,7 @@ import org.robolectric.annotation.Config
  * - 生命周期：连续访问 5 个 Tab 后存活 Composition ≤ 2；槽位交换后页面身份不串位；
  * - 复用：目标已在备用槽位时不重建（remember 实例同址）；
  * - 状态：被淘汰的 Tab 重进后 LazyGridState 滚动位经 SaveableStateHolder 恢复；
- * - 焦点：↓ 进当前页、切换动画中途 ↓ 落最新目标页、备份页不可达；
+ * - 焦点：↓ 进当前页、切换后立即 ↓ 落最新目标页、备份页不可达；
  * - 快速切换与动画竞争；animated=false 保持旧行为。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -211,22 +211,17 @@ class TabbedTwoSlotTest {
         assertEquals(2, liveTabs.size)
     }
 
-    /** 切换动画进行中按 ↓：焦点必须落在最新目标页，退场页不得抢占。 */
+    /** 切换后立即按 ↓（即时替换、无过渡动画）：焦点必须落在最新目标页，旧页不得抢占。 */
     @Test
-    fun midAnimation_focusLandsOnNewestTarget() {
+    fun immediateDownAfterSwitch_focusLandsOnNewestTarget() {
         setUpShell()
 
-        press(Key.DirectionRight) // A→B，动画已启动（waitForIdle 只推进到动画中段之前）
-        compose.mainClock.autoAdvance = false
-        try {
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-            compose.runOnIdle { }
-            assertTrue("动画中 ↓ 应进入新页 B", focused("card-B"))
-            assertFalse("退场中的 A 不得抢焦点", focused("card-A"))
-        } finally {
-            compose.mainClock.autoAdvance = true
-        }
+        press(Key.DirectionRight) // A→B（即时替换）
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.waitForIdle()
+        assertTrue("切换后 ↓ 应进入新页 B", focused("card-B"))
+        assertFalse("已退场的 A 不得抢焦点", focused("card-A"))
+        assertEquals(setOf("A", "B"), liveTabs)
     }
 
     /** 快速连续切换（动画竞争）：焦点最终落在最新目标，槽位不串位。 */
