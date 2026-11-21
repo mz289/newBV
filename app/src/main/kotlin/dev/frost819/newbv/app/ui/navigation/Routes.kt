@@ -99,14 +99,26 @@ data class UserSpaceRoute(
     val face: String? = null,
 )
 
-/** UP 主空间合集/系列视频列表页。 */
+/** UP 主空间合集/系列/收藏夹内容类型。 */
+@Serializable
+enum class UserCollectionKind {
+    /** 合集（season）。 */
+    Season,
+
+    /** 系列（series）。 */
+    Series,
+
+    /** 公开收藏夹。 */
+    Fav,
+}
+
+/** UP 主空间合集/系列/收藏夹视频列表页。 */
 @Serializable
 data class UserCollectionRoute(
     val mid: Long,
-    /** 合集（seasonId）或系列（seriesId）的 ID。 */
+    /** 内容 ID：合集（seasonId）/系列（seriesId）/收藏夹（media_id）。 */
     val collectionId: Long,
-    /** true=合集（season）false=系列（series）。 */
-    val isSeason: Boolean,
+    val kind: UserCollectionKind,
     val title: String = "",
     val cover: String = "",
 )

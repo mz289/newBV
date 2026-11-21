@@ -10,6 +10,7 @@ import dev.frost819.newbv.biliapi.entity.user.SpaceVideo
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
 import dev.frost819.newbv.biliapi.entity.user.UpCollection
+import dev.frost819.newbv.biliapi.entity.user.UserFavFolder
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
@@ -29,7 +30,7 @@ import javax.inject.Inject
 /**
  * UP 主空间内容栏目。
  *
- * 投稿（Videos）支持三种排序（见 [UserSpaceUiState.order]）；合集/系列为聚合内容页。
+ * 投稿（Videos）支持三种排序（见 [UserSpaceUiState.order]）；合集/系列为聚合内容页；收藏为公开收藏夹。
  */
 enum class UserSpaceSection(
     val label: String,
@@ -37,6 +38,7 @@ enum class UserSpaceSection(
     Videos("投稿"),
     Seasons("合集"),
     Series("系列"),
+    Fav("收藏"),
 }
 
 /**
@@ -53,6 +55,7 @@ data class UserSpaceUiState(
     val face: String = "",
     val videos: List<SpaceVideo> = emptyList(),
     val collections: List<UpCollection> = emptyList(),
+    val favFolders: List<UserFavFolder> = emptyList(),
     val section: UserSpaceSection = UserSpaceSection.Videos,
     /** 投稿排序（仅 [UserSpaceSection.Videos] 生效）。 */
     val order: SpaceVideoOrder = SpaceVideoOrder.PubDate,
@@ -125,6 +128,7 @@ class UserSpaceViewModel
                         order = if (sameMid) it.order else SpaceVideoOrder.PubDate,
                         videos = if (sameMid) it.videos else emptyList(),
                         collections = if (sameMid) it.collections else emptyList(),
+                        favFolders = if (sameMid) it.favFolders else emptyList(),
                         loading = false,
                         hasMore = true,
                         error = false,
@@ -155,6 +159,7 @@ class UserSpaceViewModel
                     section = section,
                     videos = emptyList(),
                     collections = emptyList(),
+                    favFolders = emptyList(),
                     loading = false,
                     hasMore = true,
                     error = false,
@@ -201,6 +206,7 @@ class UserSpaceViewModel
                 it.copy(
                     videos = emptyList(),
                     collections = emptyList(),
+                    favFolders = emptyList(),
                     hasMore = true,
                     error = false,
                 )
@@ -210,10 +216,10 @@ class UserSpaceViewModel
 
         private fun hasDisplayedContent(): Boolean {
             val state = _uiState.value
-            return if (state.section == UserSpaceSection.Videos) {
-                state.videos.isNotEmpty()
-            } else {
-                state.collections.isNotEmpty()
+            return when (state.section) {
+                UserSpaceSection.Videos -> state.videos.isNotEmpty()
+                UserSpaceSection.Seasons, UserSpaceSection.Series -> state.collections.isNotEmpty()
+                UserSpaceSection.Fav -> state.favFolders.isNotEmpty()
             }
         }
 
@@ -221,6 +227,7 @@ class UserSpaceViewModel
             when (_uiState.value.section) {
                 UserSpaceSection.Videos -> loadVideos(mid)
                 UserSpaceSection.Seasons, UserSpaceSection.Series -> loadCollections(mid)
+                UserSpaceSection.Fav -> loadFavFolders(mid)
             }
         }
 
@@ -334,10 +341,11 @@ class UserSpaceViewModel
             }
         }
 
-        /** 拉取合集/系列列表下一页。 */
+        /** 拉取当前栏目的合集/系列列表下一页（合集与系列分别走专用端点）。 */
         fun loadCollections(mid: Long) {
             if (_uiState.value.loading || !_uiState.value.hasMore) return
 
+            val isSeason = _uiState.value.section == UserSpaceSection.Seasons
             _uiState.update { it.copy(loading = true, error = false) }
 
             viewModelScope.launch {
@@ -345,6 +353,7 @@ class UserSpaceViewModel
                     withTimeout(LOAD_TIMEOUT_MS) {
                         userRepository.getSpaceCollections(
                             mid = mid,
+                            isSeason = isSeason,
                             page = collectionPage,
                             preferApiType = Prefs.apiType,
                         )
@@ -364,6 +373,40 @@ class UserSpaceViewModel
                 }.onFailure { error ->
                     error.rethrowUnlessTimeout()
                     logger.error(error) { "Failed to load space collections" }
+                    _uiState.update { it.copy(loading = false, error = true) }
+                }
+            }
+        }
+
+        /** 拉取公开收藏夹列表（list-all 一次全量，无分页）。 */
+        fun loadFavFolders(mid: Long) {
+            if (_uiState.value.loading || !_uiState.value.hasMore) return
+
+            _uiState.update { it.copy(loading = true, error = false) }
+
+            viewModelScope.launch {
+                runCatching {
+                    withTimeout(LOAD_TIMEOUT_MS) {
+                        userRepository.getSpaceFavFolders(
+                            mid = mid,
+                            preferApiType = Prefs.apiType,
+                        )
+                    }
+                }.onSuccess { folders ->
+                    _uiState.update {
+                        it.copy(
+                            favFolders =
+                                it.favFolders + folders.filterNot { f ->
+                                    it.favFolders.any { f2 -> f2.id == f.id }
+                                },
+                            loading = false,
+                            // 收藏夹一次全量返回，没有下一页
+                            hasMore = false,
+                        )
+                    }
+                }.onFailure { error ->
+                    error.rethrowUnlessTimeout()
+                    logger.error(error) { "Failed to load space fav folders" }
                     _uiState.update { it.copy(loading = false, error = true) }
                 }
             }

@@ -69,6 +69,27 @@ data class SpaceVideoData(
                     ),
             )
 
+        /** 收藏夹内容列表（x/v3/fav/resource/list）转换；过滤非视频（type!=2）与已失效条目。 */
+        fun fromWebFavResourceList(
+            webFavResourceList: dev.frost819.newbv.biliapi.http.entity.user.WebFavResourceList,
+            pageNumber: Int,
+            pageSize: Int,
+        ): SpaceVideoData {
+            val videos =
+                webFavResourceList.medias
+                    .filter { it.type == 2 && !it.bvid.isNullOrEmpty() }
+                    .map { SpaceVideo.fromFavResourceItem(it) }
+            return SpaceVideoData(
+                videos = videos,
+                page =
+                    SpaceVideoPage(
+                        hasNext = webFavResourceList.hasMore == true,
+                        nextWebPageSize = pageSize,
+                        nextWebPageNumber = pageNumber + 1,
+                    ),
+            )
+        }
+
         /** 页码×页宽小于总数即还有下一页（两个归档接口的分页对象字段名不同，统一按三要素判断）。 */
         private fun pageHasNext(
             pageNumber: Int?,
@@ -138,6 +159,30 @@ data class SpaceVideo(
             pubTime = spaceVideoItem.ctime.smartDate,
         )
 
+        /** 收藏夹内视频稿件（x/v3/fav/resource/list 条目）转换。 */
+        fun fromFavResourceItem(
+            mediaItem: dev.frost819.newbv.biliapi.http.entity.user.WebFavResourceList.MediaItem,
+        ) = SpaceVideo(
+            aid = mediaItem.id,
+            bvid = mediaItem.bvid ?: "",
+            title = mediaItem.title ?: "",
+            cover = mediaItem.cover ?: "",
+            author = "",
+            duration = mediaItem.duration ?: 0,
+            play =
+                when (val play = mediaItem.cntInfo?.play) {
+                    null -> -1
+                    else ->
+                        if (play > Int.MAX_VALUE) {
+                            Int.MAX_VALUE
+                        } else {
+                            play.toInt()
+                        }
+                },
+            danmaku = mediaItem.cntInfo?.danmaku ?: -1,
+            pubTime = mediaItem.pubtime?.toSmartDate(),
+        )
+
         /** 合集/系列内视频稿件（polymer 归档对象）转换。 */
         fun fromCollectionArchiveItem(
             archiveItem: dev.frost819.newbv.biliapi.http.entity.user.WebCollectionArchiveItem,
@@ -205,8 +250,13 @@ data class SpaceCollectionData(
     val page: SpaceCollectionPage,
 ) {
     companion object {
-        /** 由 Web polymer seasons_series_list 响应转换；分页按合集在前、系列在后的总条数推进。 */
-        fun fromWebSeasonsSeries(
+        /**
+         * 合集栏目（仅 seasons）：由 seasons_series_list 响应转换。
+         *
+         * 合集在混合分页中排在系列之前，某页 seasons 为空即说明合集已翻完，
+         * 提前终止避免无谓地拉取系列页。
+         */
+        fun fromWebSeasonsOnly(
             webSeasonsSeriesData: dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData,
         ): SpaceCollectionData {
             val itemsLists = webSeasonsSeriesData.itemsLists
@@ -218,15 +268,46 @@ data class SpaceCollectionData(
                 itemsLists?.seasonsList
                     .orEmpty()
                     .mapNotNull { it.meta?.toUpCollection(isSeason = true) }
+            return SpaceCollectionData(
+                collections = seasons,
+                page =
+                    SpaceCollectionPage(
+                        hasNext = seasons.isNotEmpty() && pageSize > 0 && pageNumber * pageSize < total,
+                        nextPageNumber = pageNumber + 1,
+                        pageSize = if (pageSize > 0) pageSize else DEFAULT_PAGE_SIZE,
+                    ),
+            )
+        }
+
+        /**
+         * 系列栏目（仅 series）：由 home/seasons_series 响应转换。
+         *
+         * 该端点的 page.total 为总页数语义，hasNext 按 页码 < 总页数 判断。
+         */
+        fun fromWebSeriesOnly(
+            webSeasonsSeriesData: dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData,
+        ): SpaceCollectionData {
+            val itemsLists = webSeasonsSeriesData.itemsLists
+            val page = itemsLists?.page
+            val pageNumber = page?.pageNumber ?: 1
+            val pageSize = page?.pageSize ?: 0
+            val totalPages = page?.total ?: 0
             val series =
                 itemsLists?.seriesList
                     .orEmpty()
                     .mapNotNull { it.meta?.toUpCollection(isSeason = false) }
             return SpaceCollectionData(
-                collections = seasons + series,
+                collections = series,
                 page =
                     SpaceCollectionPage(
-                        hasNext = pageSize > 0 && pageNumber * pageSize < total,
+                        hasNext =
+                            series.isNotEmpty() && (
+                                if (totalPages > 0) {
+                                    pageNumber < totalPages
+                                } else {
+                                    true
+                                }
+                            ),
                         nextPageNumber = pageNumber + 1,
                         pageSize = if (pageSize > 0) pageSize else DEFAULT_PAGE_SIZE,
                     ),
@@ -253,6 +334,19 @@ data class SpaceCollectionData(
         const val DEFAULT_PAGE_SIZE = 20
     }
 }
+
+/**
+ * UP 主公开收藏夹条目。
+ *
+ * @param id 收藏夹 ID（内容页 media_id）
+ * @param title 收藏夹标题
+ * @param mediaCount 收藏内容数
+ */
+data class UserFavFolder(
+    val id: Long,
+    val title: String,
+    val mediaCount: Int,
+)
 
 /**
  * UP 主空间合集/系列分页游标。

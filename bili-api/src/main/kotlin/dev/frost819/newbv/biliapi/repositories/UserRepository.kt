@@ -12,6 +12,7 @@ import dev.frost819.newbv.biliapi.entity.user.SpaceVideoData
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
 import dev.frost819.newbv.biliapi.entity.user.UpCollection
+import dev.frost819.newbv.biliapi.entity.user.UserFavFolder
 import dev.frost819.newbv.biliapi.grpc.utils.handleGrpcException
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.user.FollowAction
@@ -176,22 +177,77 @@ class UserRepository(
             .let { SpaceVideoData.fromAppSpaceVideoData(it) }
 
     /**
-     * 获取用户[mid]的合集与系列列表。
+     * 获取用户[mid]的合集或系列列表。
      *
      * 仅 Web 通道：polymer 接口没有 App/gRPC 对应端点，忽略 [preferApiType]。
+     *
+     * @param isSeason true=合集（seasons_series_list 的 seasons，翻完即止）
+     *                 false=系列（home/seasons_series 专用端点）
      */
     suspend fun getSpaceCollections(
         mid: Long,
+        isSeason: Boolean,
         page: SpaceCollectionPage = SpaceCollectionPage(),
         preferApiType: ApiType,
     ): SpaceCollectionData =
+        when (isSeason) {
+            true ->
+                BiliHttpApi
+                    .getWebUserSpaceSeasonsSeries(
+                        mid = mid,
+                        pageNumber = page.nextPageNumber,
+                        pageSize = page.pageSize,
+                    ).getResponseData()
+                    .let { SpaceCollectionData.fromWebSeasonsOnly(it) }
+
+            false ->
+                BiliHttpApi
+                    .getWebUserSpaceSeries(
+                        mid = mid,
+                        pageNumber = page.nextPageNumber,
+                        pageSize = page.pageSize,
+                    ).getResponseData()
+                    .let { SpaceCollectionData.fromWebSeriesOnly(it) }
+        }
+
+    /**
+     * 获取用户[mid]的公开收藏夹列表。
+     *
+     * 仅 Web 通道；list-all 一次全量返回（无分页），仅含公开夹。
+     * UP 没有任何（公开）收藏夹时接口返回 code=0 且 data=null，按空列表处理。
+     */
+    suspend fun getSpaceFavFolders(
+        mid: Long,
+        preferApiType: ApiType,
+    ): List<UserFavFolder> {
+        val response = BiliHttpApi.getWebUserFavFolders(mid = mid)
+        // 非 0 错误码仍走统一异常；code=0 且 data=null 是"没有收藏夹"的正常形态
+        if (response.code != 0) response.getResponseData()
+        val folders = response.data ?: return emptyList()
+        return folders.list
+            .mapNotNull { folder ->
+                val title = folder.title?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                UserFavFolder(
+                    id = folder.id,
+                    title = title,
+                    mediaCount = folder.mediaCount ?: 0,
+                )
+            }
+    }
+
+    /** 获取收藏夹[folderId]的内容视频列表（Web，按收藏时间倒序）。 */
+    suspend fun getFavFolderVideos(
+        folderId: Long,
+        page: SpaceVideoPage = SpaceVideoPage(),
+        preferApiType: ApiType,
+    ): SpaceVideoData =
         BiliHttpApi
-            .getWebUserSpaceSeasonsSeries(
-                mid = mid,
-                pageNumber = page.nextPageNumber,
-                pageSize = page.pageSize,
+            .getWebUserFavResources(
+                mediaId = folderId,
+                pageNumber = page.nextWebPageNumber,
+                pageSize = page.nextWebPageSize,
             ).getResponseData()
-            .let { SpaceCollectionData.fromWebSeasonsSeries(it) }
+            .let { SpaceVideoData.fromWebFavResourceList(it, page.nextWebPageNumber, page.nextWebPageSize) }
 
     /**
      * 获取合集/系列[collection]内的视频列表。

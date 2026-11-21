@@ -32,6 +32,7 @@ import dev.frost819.newbv.app.ui.component.videoGridHSpacing
 import dev.frost819.newbv.app.ui.component.videoGridVSpacing
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
+import dev.frost819.newbv.app.ui.navigation.UserCollectionKind
 import dev.frost819.newbv.app.ui.navigation.UserCollectionRoute
 import dev.frost819.newbv.app.ui.navigation.navigateFromVideoCard
 import dev.frost819.newbv.app.util.formatHourMinSec
@@ -43,9 +44,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
 /**
- * UP 主合集/系列视频列表页。
+ * UP 主合集/系列/收藏夹视频列表页。
  *
- * 从用户空间页的合集/系列网格进入，展示该合集或系列内的全部视频。
+ * 从用户空间页的合集/系列/收藏网格进入，展示对应内容内的全部视频。
  */
 fun NavGraphBuilder.userCollectionScreen(navController: NavController) {
     composable<UserCollectionRoute> { backStackEntry ->
@@ -54,7 +55,7 @@ fun NavGraphBuilder.userCollectionScreen(navController: NavController) {
         UserCollectionScreen(
             mid = route.mid,
             collectionId = route.collectionId,
-            isSeason = route.isSeason,
+            kind = route.kind,
             title = route.title,
             cover = route.cover,
             viewModel = viewModel,
@@ -67,7 +68,7 @@ fun NavGraphBuilder.userCollectionScreen(navController: NavController) {
 private fun UserCollectionScreen(
     mid: Long,
     collectionId: Long,
-    isSeason: Boolean,
+    kind: UserCollectionKind,
     title: String,
     cover: String,
     viewModel: UserCollectionViewModel,
@@ -80,8 +81,8 @@ private fun UserCollectionScreen(
 
     CollectWatchLaterEffects(watchLaterViewModel)
 
-    LaunchedEffect(mid, collectionId) {
-        viewModel.init(mid, collectionId, isSeason, title, cover)
+    LaunchedEffect(mid, collectionId, kind) {
+        viewModel.init(mid, collectionId, kind, title, cover)
     }
 
     focusSaver.RestoreFocus()
@@ -117,7 +118,12 @@ private fun UserCollectionScreen(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = if (isSeason) "合集" else "系列",
+                    text =
+                        when (kind) {
+                            UserCollectionKind.Season -> "合集"
+                            UserCollectionKind.Series -> "系列"
+                            UserCollectionKind.Fav -> "收藏夹"
+                        },
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -145,7 +151,7 @@ private fun UserCollectionScreen(
                         playString = video.play.takeIf { it != -1 }.toWanString(),
                         danmakuString = video.danmaku.takeIf { it != -1 }.toWanString(),
                         timeString = durationMs.formatHourMinSec(),
-                        upName = video.author.ifEmpty { state.collection?.title ?: "" },
+                        upName = video.author.ifEmpty { title },
                         upMid = mid,
                         pubTime = video.pubTime,
                         progress = progressRatio,

@@ -10,6 +10,7 @@ import dev.frost819.newbv.biliapi.entity.user.SpaceVideoData
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
 import dev.frost819.newbv.biliapi.entity.user.UpCollection
+import dev.frost819.newbv.biliapi.entity.user.UserFavFolder
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
@@ -103,6 +104,12 @@ class UserSpaceViewModelTest {
         collections = collections,
         page = SpaceCollectionPage(hasNext = hasNext, nextPageNumber = 2, pageSize = 20),
     )
+
+    private fun fakeFavFolder(
+        id: Long,
+        title: String,
+        mediaCount: Int,
+    ) = UserFavFolder(id = id, title = title, mediaCount = mediaCount)
 
     // ------------------------------------------------------------------
     // init
@@ -328,7 +335,7 @@ class UserSpaceViewModelTest {
     fun `selectOrder is ignored outside Videos section`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
-            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
+            coEvery { userRepository.getSpaceCollections(any(), any(), any(), any()) } returns
                 fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = false)
 
             viewModel = createViewModel()
@@ -346,7 +353,7 @@ class UserSpaceViewModelTest {
             assertThat(viewModel.uiState.value.section).isEqualTo(UserSpaceSection.Seasons)
             assertThat(viewModel.uiState.value.collections).isSameInstanceAs(collectionsBefore)
             coVerify(exactly = 1) { userRepository.getSpaceVideos(any(), any(), any(), any()) }
-            coVerify(exactly = 1) { userRepository.getSpaceCollections(any(), any(), any()) }
+            coVerify(exactly = 1) { userRepository.getSpaceCollections(any(), any(), any(), any()) }
         }
 
     @Test
@@ -373,13 +380,13 @@ class UserSpaceViewModelTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun `selectSection to Seasons loads collections`() =
+    fun `selectSection to Seasons loads seasons from dedicated endpoint`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
             coEvery {
-                userRepository.getSpaceCollections(mid = 1L, page = any(), preferApiType = BiliApiType.Web)
+                userRepository.getSpaceCollections(mid = 1L, isSeason = true, page = any(), preferApiType = BiliApiType.Web)
             } returns fakeCollectionData(
-                collections = listOf(fakeCollection(10), fakeCollection(11, isSeason = false)),
+                collections = listOf(fakeCollection(10)),
                 hasNext = false,
             )
 
@@ -393,18 +400,94 @@ class UserSpaceViewModelTest {
             val state = viewModel.uiState.value
             assertThat(state.section).isEqualTo(UserSpaceSection.Seasons)
             assertThat(state.videos).isEmpty()
-            assertThat(state.collections).hasSize(2)
+            assertThat(state.collections).hasSize(1)
             assertThat(state.collections[0].isSeason).isTrue()
-            assertThat(state.collections[1].isSeason).isFalse()
             assertThat(state.hasMore).isFalse()
             assertThat(state.error).isFalse()
+        }
+
+    @Test
+    fun `selectSection to Series requests series endpoint`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+            coEvery {
+                userRepository.getSpaceCollections(mid = 1L, isSeason = false, page = any(), preferApiType = BiliApiType.Web)
+            } returns fakeCollectionData(
+                collections = listOf(fakeCollection(370368, isSeason = false)),
+                hasNext = false,
+            )
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectSection(1L, UserSpaceSection.Series)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.section).isEqualTo(UserSpaceSection.Series)
+            assertThat(state.collections).hasSize(1)
+            assertThat(state.collections[0].isSeason).isFalse()
+            coVerify {
+                userRepository.getSpaceCollections(mid = 1L, isSeason = false, page = any(), preferApiType = any())
+            }
+        }
+
+    @Test
+    fun `selectSection to Fav loads fav folders without pagination`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+            coEvery {
+                userRepository.getSpaceFavFolders(mid = 1L, preferApiType = BiliApiType.Web)
+            } returns listOf(fakeFavFolder(100, "AI调用", 129), fakeFavFolder(101, "狸粮", 255))
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectSection(1L, UserSpaceSection.Fav)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.section).isEqualTo(UserSpaceSection.Fav)
+            assertThat(state.collections).isEmpty()
+            assertThat(state.favFolders).hasSize(2)
+            assertThat(state.favFolders[0].title).isEqualTo("AI调用")
+            // list-all 一次全量返回，没有下一页
+            assertThat(state.hasMore).isFalse()
+            assertThat(state.error).isFalse()
+
+            // 滚动触发的 loadMore 不应再发请求
+            viewModel.loadMore(1L)
+            advanceUntilIdle()
+            coVerify(exactly = 1) { userRepository.getSpaceFavFolders(any(), any()) }
+        }
+
+    @Test
+    fun `selectSection to Fav with no public folders shows empty state`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+            coEvery { userRepository.getSpaceFavFolders(any(), any()) } returns emptyList()
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectSection(1L, UserSpaceSection.Fav)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.favFolders).isEmpty()
+            assertThat(state.loading).isFalse()
+            assertThat(state.error).isFalse()
+            assertThat(state.hasMore).isFalse()
         }
 
     @Test
     fun `loadMore appends collections pages on Seasons section`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
-            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returnsMany
+            coEvery { userRepository.getSpaceCollections(any(), any(), any(), any()) } returnsMany
                 listOf(
                     fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = true),
                     fakeCollectionData(collections = listOf(fakeCollection(12)), hasNext = false),
@@ -432,7 +515,7 @@ class UserSpaceViewModelTest {
             coEvery {
                 userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.Click, page = any(), preferApiType = BiliApiType.Web)
             } returns fakeVideoData(videos = listOf(fakeVideo(1)))
-            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
+            coEvery { userRepository.getSpaceCollections(any(), any(), any(), any()) } returns
                 fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = false)
 
             viewModel = createViewModel()
@@ -460,35 +543,12 @@ class UserSpaceViewModelTest {
         }
 
     @Test
-    fun `selectSection to Series loads series collections`() =
-        runTest(testDispatcher) {
-            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
-            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
-                fakeCollectionData(
-                    collections = listOf(fakeCollection(370368, isSeason = false)),
-                    hasNext = false,
-                )
-
-            viewModel = createViewModel()
-            viewModel.init(1L, "测试UP")
-            advanceUntilIdle()
-
-            viewModel.selectSection(1L, UserSpaceSection.Series)
-            advanceUntilIdle()
-
-            val state = viewModel.uiState.value
-            assertThat(state.section).isEqualTo(UserSpaceSection.Series)
-            assertThat(state.collections).hasSize(1)
-            assertThat(state.collections[0].isSeason).isFalse()
-        }
-
-    @Test
     fun `selectSection resets error state before reload`() =
         runTest(testDispatcher) {
             coEvery {
                 userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.PubDate, page = any(), preferApiType = BiliApiType.Web)
             } throws IOException("network error")
-            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
+            coEvery { userRepository.getSpaceCollections(any(), any(), any(), any()) } returns
                 fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = false)
 
             viewModel = createViewModel()
@@ -507,7 +567,7 @@ class UserSpaceViewModelTest {
     fun `init resets section and order when mid changes`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
-            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
+            coEvery { userRepository.getSpaceCollections(any(), any(), any(), any()) } returns
                 fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = false)
 
             viewModel = createViewModel()

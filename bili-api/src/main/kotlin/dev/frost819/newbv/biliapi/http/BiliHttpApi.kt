@@ -36,10 +36,12 @@ import dev.frost819.newbv.biliapi.http.entity.user.FollowActionSource
 import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
 import dev.frost819.newbv.biliapi.http.entity.user.RelationData
 import dev.frost819.newbv.biliapi.http.entity.user.UserFollowData
+import dev.frost819.newbv.biliapi.http.entity.user.WebFavResourceList
 import dev.frost819.newbv.biliapi.http.entity.user.WebSeasonArchivesData
 import dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData
 import dev.frost819.newbv.biliapi.http.entity.user.WebSeriesArchivesData
 import dev.frost819.newbv.biliapi.http.entity.user.WebSpaceVideoData
+import dev.frost819.newbv.biliapi.http.entity.user.WebUserFavFolders
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.CollectedFavoriteFoldersData
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteFolderInfoListData
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavSeasonContentData
@@ -1403,6 +1405,66 @@ object BiliHttpApi {
                 parameter("sort", "desc")
                 parameter("pn", pageNumber)
                 parameter("ps", pageSize)
+                header("referer", "https://space.bilibili.com")
+            }.body()
+
+    /**
+     * 获取用户[mid]的系列列表（Web，仅系列不含合集）
+     *
+     * 端点：GET /x/polymer/web-space/home/seasons_series（无需 WBI 签名）
+     *
+     * 注意：该端点 page.total 为总页数语义（与 seasons_series_list 的总条数不同）
+     */
+    suspend fun getWebUserSpaceSeries(
+        mid: Long,
+        pageNumber: Int = 1,
+        pageSize: Int = 20,
+    ): BiliResponse<WebSeasonsSeriesData> =
+        client
+            .get("/x/polymer/web-space/home/seasons_series") {
+                parameter("mid", mid)
+                parameter("page_num", pageNumber)
+                parameter("page_size", pageSize)
+                header("referer", "https://space.bilibili.com")
+            }.body()
+
+    /**
+     * 获取用户[mid]的公开收藏夹列表（Web）
+     *
+     * 端点：GET /x/v3/fav/folder/created/list-all（匿名可访问，仅返回公开夹，一次全量无分页）
+     */
+    suspend fun getWebUserFavFolders(
+        mid: Long,
+    ): BiliResponse<WebUserFavFolders> =
+        client
+            .get("/x/v3/fav/folder/created/list-all") {
+                parameter("up_mid", mid)
+                parameter("type", 0)
+                header("referer", "https://space.bilibili.com")
+            }.body()
+
+    /**
+     * 获取收藏夹[mediaId]的内容列表（Web）
+     *
+     * 端点：GET /x/v3/fav/resource/list（匿名可访问；返回含已失效/非视频条目，由调用方过滤）
+     *
+     * @param pageNumber 页码
+     * @param pageSize 每页项数
+     */
+    suspend fun getWebUserFavResources(
+        mediaId: Long,
+        pageNumber: Int = 1,
+        pageSize: Int = 20,
+    ): BiliResponse<WebFavResourceList> =
+        client
+            .get("/x/v3/fav/resource/list") {
+                parameter("media_id", mediaId)
+                parameter("pn", pageNumber)
+                parameter("ps", pageSize)
+                parameter("order", "mtime")
+                parameter("type", 0)
+                parameter("tid", 0)
+                parameter("platform", "web")
                 header("referer", "https://space.bilibili.com")
             }.body()
 

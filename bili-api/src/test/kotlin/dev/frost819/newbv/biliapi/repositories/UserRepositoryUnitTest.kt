@@ -585,7 +585,7 @@ class UserRepositoryUnitTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun `getSpaceCollections maps seasons and series with pagination`() =
+    fun `getSpaceCollections seasons uses dedicated endpoint and stops when seasons exhausted`() =
         runTest {
             coEvery { BiliHttpApi.getWebUserSpaceSeasonsSeries(any(), any(), any()) } returns
                 BiliResponse(
@@ -597,8 +597,9 @@ class UserRepositoryUnitTest {
                                 dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.ItemsLists(
                                     page =
                                         dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.ItemsLists.Page(
-                                            pageNumber = 1,
+                                            pageNumber = 2,
                                             pageSize = 5,
+                                            // 混合分页的总条数（合集+系列）
                                             total = 32,
                                         ),
                                     seasonsList =
@@ -614,6 +615,44 @@ class UserRepositoryUnitTest {
                                                     ),
                                             ),
                                         ),
+                                    seriesList = emptyList(),
+                                ),
+                        ),
+                )
+
+            val result =
+                repository.getSpaceCollections(mid = MID, isSeason = true, preferApiType = ApiType.Web)
+
+            // 只取 seasons，系列条目不进入合集栏目
+            assertThat(result.collections).hasSize(1)
+            assertThat(result.collections[0].id).isEqualTo(2046621L)
+            assertThat(result.collections[0].isSeason).isTrue()
+            // 标题优先取去掉"合集·"前缀的 title
+            assertThat(result.collections[0].title).isEqualTo("样片日记")
+            // 2 * 5 < 32 → 还有下一页
+            assertThat(result.page.hasNext).isTrue()
+            assertThat(result.page.nextPageNumber).isEqualTo(3)
+            coVerify { BiliHttpApi.getWebUserSpaceSeasonsSeries(MID, 1, 20) }
+        }
+
+    @Test
+    fun `getSpaceCollections seasons stops early when a page has no seasons`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebUserSpaceSeasonsSeries(any(), any(), any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "",
+                    data =
+                        dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData(
+                            itemsLists =
+                                dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.ItemsLists(
+                                    page =
+                                        dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.ItemsLists.Page(
+                                            pageNumber = 6,
+                                            pageSize = 5,
+                                            total = 32,
+                                        ),
+                                    seasonsList = emptyList(),
                                     seriesList =
                                         listOf(
                                             dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.Item(
@@ -629,20 +668,169 @@ class UserRepositoryUnitTest {
                         ),
                 )
 
-            val result = repository.getSpaceCollections(mid = MID, preferApiType = ApiType.Web)
+            val result =
+                repository.getSpaceCollections(mid = MID, isSeason = true, preferApiType = ApiType.Web)
 
-            assertThat(result.collections).hasSize(2)
-            // 合集在前，标题优先取去掉"合集·"前缀的 title
-            assertThat(result.collections[0].id).isEqualTo(2046621L)
-            assertThat(result.collections[0].isSeason).isTrue()
-            assertThat(result.collections[0].title).isEqualTo("样片日记")
-            assertThat(result.collections[1].id).isEqualTo(370368L)
-            assertThat(result.collections[1].isSeason).isFalse()
-            assertThat(result.collections[1].title).isEqualTo("我的系列")
-            // 1 * 5 < 32 → 还有下一页
+            // 合集排在系列之前：本页已无 seasons 即合集翻完，提前终止
+            assertThat(result.collections).isEmpty()
+            assertThat(result.page.hasNext).isFalse()
+        }
+
+    @Test
+    fun `getSpaceCollections series uses seasons_series endpoint with page-count semantics`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebUserSpaceSeries(any(), any(), any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "",
+                    data =
+                        dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData(
+                            itemsLists =
+                                dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.ItemsLists(
+                                    page =
+                                        dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.ItemsLists.Page(
+                                            pageNumber = 1,
+                                            pageSize = 5,
+                                            // 该端点 total 为总页数语义
+                                            total = 3,
+                                        ),
+                                    seasonsList = emptyList(),
+                                    seriesList =
+                                        listOf(
+                                            dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.Item(
+                                                meta =
+                                                    dev.frost819.newbv.biliapi.http.entity.user.WebCollectionMeta(
+                                                        seriesId = 370368L,
+                                                        name = "我的系列",
+                                                        total = 19,
+                                                    ),
+                                            ),
+                                        ),
+                                ),
+                        ),
+                )
+
+            val result =
+                repository.getSpaceCollections(mid = MID, isSeason = false, preferApiType = ApiType.Web)
+
+            assertThat(result.collections).hasSize(1)
+            assertThat(result.collections[0].id).isEqualTo(370368L)
+            assertThat(result.collections[0].isSeason).isFalse()
+            assertThat(result.collections[0].title).isEqualTo("我的系列")
+            // 第 1 页 / 共 3 页 → 还有下一页
             assertThat(result.page.hasNext).isTrue()
             assertThat(result.page.nextPageNumber).isEqualTo(2)
-            coVerify { BiliHttpApi.getWebUserSpaceSeasonsSeries(MID, 1, 20) }
+            coVerify { BiliHttpApi.getWebUserSpaceSeries(MID, 1, 20) }
+        }
+
+    @Test
+    fun `getSpaceFavFolders maps public folders only`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebUserFavFolders(any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "",
+                    data =
+                        dev.frost819.newbv.biliapi.http.entity.user.WebUserFavFolders(
+                            count = 3,
+                            list =
+                                listOf(
+                                    dev.frost819.newbv.biliapi.http.entity.user.WebUserFavFolders.FolderItem(
+                                        id = 4058080750L,
+                                        title = "AI调用",
+                                        mediaCount = 129,
+                                    ),
+                                    dev.frost819.newbv.biliapi.http.entity.user.WebUserFavFolders.FolderItem(
+                                        id = 1212612050L,
+                                        title = "狸粮",
+                                        mediaCount = 255,
+                                    ),
+                                    dev.frost819.newbv.biliapi.http.entity.user.WebUserFavFolders.FolderItem(
+                                        id = 999L,
+                                        title = null,
+                                        mediaCount = 1,
+                                    ),
+                                ),
+                        ),
+                )
+
+            val result = repository.getSpaceFavFolders(mid = MID, preferApiType = ApiType.Web)
+
+            // 标题缺失的条目被过滤
+            assertThat(result).hasSize(2)
+            assertThat(result[0].id).isEqualTo(4058080750L)
+            assertThat(result[0].title).isEqualTo("AI调用")
+            assertThat(result[0].mediaCount).isEqualTo(129)
+            coVerify { BiliHttpApi.getWebUserFavFolders(MID) }
+        }
+
+    @Test
+    fun `getSpaceFavFolders returns empty when data is null`() =
+        runTest {
+            // UP 没有公开收藏夹时接口返回 code=0 且 data=null
+            coEvery { BiliHttpApi.getWebUserFavFolders(any()) } returns
+                BiliResponse(code = 0, message = "", data = null)
+
+            val result = repository.getSpaceFavFolders(mid = MID, preferApiType = ApiType.Web)
+
+            assertThat(result).isEmpty()
+        }
+
+    @Test
+    fun `getFavFolderVideos maps videos and filters non-video items`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebUserFavResources(any(), any(), any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "",
+                    data =
+                        dev.frost819.newbv.biliapi.http.entity.user.WebFavResourceList(
+                            info =
+                                dev.frost819.newbv.biliapi.http.entity.user.WebFavResourceList.Info(
+                                    id = 4058080750L,
+                                    title = "AI调用",
+                                    mediaCount = 129,
+                                ),
+                            medias =
+                                listOf(
+                                    dev.frost819.newbv.biliapi.http.entity.user.WebFavResourceList.MediaItem(
+                                        id = 117618300161145L,
+                                        bvid = "BV19jsE66EKh",
+                                        title = "靠三桶油分红",
+                                        cover = "https://example.com/pic.jpg",
+                                        duration = 198,
+                                        type = 2,
+                                        pubtime = 1794713239L,
+                                        cntInfo =
+                                            dev.frost819.newbv.biliapi.http.entity.user.WebFavResourceList.MediaItem.CntInfo(
+                                                play = 80432L,
+                                                danmaku = 9,
+                                            ),
+                                    ),
+                                    // 非视频条目（type != 2）应被过滤
+                                    dev.frost819.newbv.biliapi.http.entity.user.WebFavResourceList.MediaItem(
+                                        id = 1L,
+                                        bvid = null,
+                                        title = "已失效视频",
+                                        type = 12,
+                                    ),
+                                ),
+                            hasMore = true,
+                        ),
+                )
+
+            val result = repository.getFavFolderVideos(folderId = 4058080750L, preferApiType = ApiType.Web)
+
+            assertThat(result.videos).hasSize(1)
+            assertThat(result.videos[0].aid).isEqualTo(117618300161145L)
+            assertThat(result.videos[0].bvid).isEqualTo("BV19jsE66EKh")
+            assertThat(result.videos[0].play).isEqualTo(80432)
+            assertThat(result.videos[0].danmaku).isEqualTo(9)
+            // has_more = true → 还有下一页，页码推进
+            assertThat(result.page.hasNext).isTrue()
+            assertThat(result.page.nextWebPageNumber).isEqualTo(2)
+            assertThat(result.page.nextWebPageSize).isEqualTo(20)
+            coVerify { BiliHttpApi.getWebUserFavResources(4058080750L, 1, 20) }
         }
 
     @Test

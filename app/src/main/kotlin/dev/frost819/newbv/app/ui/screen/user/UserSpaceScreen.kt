@@ -1,12 +1,15 @@
 package dev.frost819.newbv.app.ui.screen.user
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,7 +18,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.runtime.Composable
@@ -38,10 +43,13 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.FilterChip
 import androidx.tv.material3.FilterChipDefaults
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import dev.frost819.newbv.app.ui.component.FocusSaver
@@ -57,6 +65,7 @@ import dev.frost819.newbv.app.ui.component.videocard.SeasonCard
 import dev.frost819.newbv.app.ui.component.videocard.SeasonCardData
 import dev.frost819.newbv.app.ui.component.videocard.SmallVideoCard
 import dev.frost819.newbv.app.ui.component.videocard.VideoCardData
+import dev.frost819.newbv.app.ui.navigation.UserCollectionKind
 import dev.frost819.newbv.app.ui.navigation.UserCollectionRoute
 import dev.frost819.newbv.app.ui.navigation.UserSpaceRoute
 import dev.frost819.newbv.app.ui.navigation.navigateFromVideoCard
@@ -70,7 +79,10 @@ import dev.frost819.newbv.app.viewmodel.user.UserSpaceUiEffect
 import dev.frost819.newbv.app.viewmodel.user.UserSpaceUiState
 import dev.frost819.newbv.app.viewmodel.user.UserSpaceViewModel
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
+import dev.frost819.newbv.biliapi.entity.user.UserFavFolder
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.focusShakeTarget
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -131,7 +143,11 @@ private fun UserSpaceScreen(
     }
 
     val displayedItemCount =
-        if (state.section == UserSpaceSection.Videos) state.videos.size else state.collections.size
+        when (state.section) {
+            UserSpaceSection.Videos -> state.videos.size
+            UserSpaceSection.Seasons, UserSpaceSection.Series -> state.collections.size
+            UserSpaceSection.Fav -> state.favFolders.size
+        }
 
     LaunchedEffect(gridState, displayedItemCount) {
         snapshotFlow {
@@ -180,55 +196,100 @@ private fun UserSpaceScreen(
             }
         }
 
-        if (state.section != UserSpaceSection.Videos) {
-            itemsIndexed(
-                items = state.collections,
-                // season_id 与 series_id 是两套 ID 空间，加前缀防 key 冲突
-                key = { _, collection ->
-                    if (collection.isSeason) "season_${collection.id}" else "series_${collection.id}"
-                },
-            ) { index, collection ->
-                SeasonCard(
-                    data =
-                        SeasonCardData(
-                            seasonId = collection.id.toInt(),
-                            title = collection.title,
-                            subTitle = "共${collection.total}个视频",
-                            cover = collection.cover,
-                            badge = if (collection.isSeason) "合集" else "系列",
-                        ),
-                    onClick = {
-                        navController.navigate(
-                            UserCollectionRoute(
-                                mid = mid,
-                                collectionId = collection.id,
-                                isSeason = collection.isSeason,
-                                title = collection.title,
-                                cover = collection.cover,
-                            ),
-                        )
+        when (state.section) {
+            UserSpaceSection.Seasons, UserSpaceSection.Series -> {
+                itemsIndexed(
+                    items = state.collections,
+                    // season_id 与 series_id 是两套 ID 空间，加前缀防 key 冲突
+                    key = { _, collection ->
+                        if (collection.isSeason) "season_${collection.id}" else "series_${collection.id}"
                     },
-                    modifier = Modifier.focusSaverItem(focusSaver, "user_space_collection_$index"),
-                )
-            }
-            if (!state.loading && !state.error && state.collections.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 96.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = if (state.section == UserSpaceSection.Seasons) "TA还没有合集" else "TA还没有系列",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                ) { index, collection ->
+                    val kind =
+                        if (collection.isSeason) UserCollectionKind.Season else UserCollectionKind.Series
+                    SeasonCard(
+                        data =
+                            SeasonCardData(
+                                seasonId = collection.id.toInt(),
+                                title = collection.title,
+                                subTitle = "共${collection.total}个视频",
+                                cover = collection.cover,
+                                badge = if (collection.isSeason) "合集" else "系列",
+                            ),
+                        onClick = {
+                            navController.navigate(
+                                UserCollectionRoute(
+                                    mid = mid,
+                                    collectionId = collection.id,
+                                    kind = kind,
+                                    title = collection.title,
+                                    cover = collection.cover,
+                                ),
+                            )
+                        },
+                        modifier = Modifier.focusSaverItem(focusSaver, "user_space_collection_$index"),
+                    )
+                }
+                if (!state.loading && !state.error && state.collections.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 96.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = if (state.section == UserSpaceSection.Seasons) "TA还没有合集" else "TA还没有系列",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
-        } else {
+
+            UserSpaceSection.Fav -> {
+                itemsIndexed(
+                    items = state.favFolders,
+                    key = { _, folder -> "fav_${folder.id}" },
+                ) { index, folder ->
+                    FavFolderCard(
+                        folder = folder,
+                        onClick = {
+                            navController.navigate(
+                                UserCollectionRoute(
+                                    mid = mid,
+                                    collectionId = folder.id,
+                                    kind = UserCollectionKind.Fav,
+                                    title = folder.title,
+                                    cover = "",
+                                ),
+                            )
+                        },
+                        modifier = Modifier.focusSaverItem(focusSaver, "user_space_fav_$index"),
+                    )
+                }
+                if (!state.loading && !state.error && state.favFolders.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 96.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "TA还没有公开收藏夹",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            UserSpaceSection.Videos -> {
             itemsIndexed(
                 items = state.videos,
                 key = { _, item -> item.aid },
@@ -266,6 +327,7 @@ private fun UserSpaceScreen(
                     onGoToUpPage = {},
                     onAddWatchLater = { watchLaterViewModel.addToView(aid = video.aid) },
                 )
+            }
             }
         }
 
@@ -399,6 +461,70 @@ private fun UserSpaceSortRow(
                             },
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 公开收藏夹卡片（无封面：收藏夹列表接口不返回封面，用图标块占位）。
+ */
+@Composable
+private fun FavFolderCard(
+    folder: UserFavFolder,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier =
+            modifier
+                .focusShakeTarget()
+                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .touchClickable(onClick = onClick),
+        onClick = onClick,
+        colors = ControlFocusDefaults.surfaceColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp, horizontal = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.75f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
+            Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)) {
+                Text(
+                    text = folder.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "共${folder.mediaCount}个内容",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

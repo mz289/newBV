@@ -1,11 +1,11 @@
 package dev.frost819.newbv.app.viewmodel.user
 
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.app.ui.navigation.UserCollectionKind
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideo
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoData
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
-import dev.frost819.newbv.biliapi.entity.user.UpCollection
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
@@ -29,7 +29,7 @@ import dev.frost819.newbv.biliapi.entity.ApiType as BiliApiType
 /**
  * [UserCollectionViewModel] 的单元测试。
  *
- * 验证合集（season）/系列（series）视频列表的分页加载、去重与错误处理。
+ * 验证合集（season）/系列（series）/收藏夹（fav）视频列表的分页加载、去重与错误处理。
  */
 class UserCollectionViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
@@ -76,46 +76,44 @@ class UserCollectionViewModelTest {
         page = SpaceVideoPage(hasNext = hasNext),
     )
 
-    private fun initSeason(viewModel: UserCollectionViewModel) {
-        viewModel.init(mid = 1L, collectionId = 2046621L, isSeason = true, title = "样片日记", cover = "")
-    }
-
     // ------------------------------------------------------------------
-    // init
+    // init：三种 kind 的路由
     // ------------------------------------------------------------------
 
     @Test
-    fun `init loads season videos`() =
+    fun `init routes season to getCollectionVideos with isSeason true`() =
         runTest(testDispatcher) {
-            coEvery {
-                userRepository.getCollectionVideos(
-                    mid = 1L,
-                    collection = any(),
-                    page = any(),
-                    preferApiType = BiliApiType.Web,
-                )
-            } returns fakeVideoData(listOf(fakeVideo(1), fakeVideo(2)))
+            coEvery { userRepository.getCollectionVideos(any(), any(), any(), any()) } returns
+                fakeVideoData(listOf(fakeVideo(1), fakeVideo(2)))
 
             viewModel = createViewModel()
-            initSeason(viewModel)
+            viewModel.init(mid = 1L, collectionId = 2046621L, kind = UserCollectionKind.Season, title = "样片日记", cover = "")
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertThat(state.collection?.id).isEqualTo(2046621L)
-            assertThat(state.collection?.isSeason).isTrue()
+            assertThat(state.collectionId).isEqualTo(2046621L)
+            assertThat(state.kind).isEqualTo(UserCollectionKind.Season)
             assertThat(state.videos).hasSize(2)
             assertThat(state.loading).isFalse()
             assertThat(state.hasMore).isTrue()
+            coVerify {
+                userRepository.getCollectionVideos(
+                    mid = 1L,
+                    collection = match { it.id == 2046621L && it.isSeason },
+                    page = any(),
+                    preferApiType = any(),
+                )
+            }
         }
 
     @Test
-    fun `init routes series by isSeason flag`() =
+    fun `init routes series to getCollectionVideos with isSeason false`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getCollectionVideos(any(), any(), any(), any()) } returns
                 fakeVideoData(listOf(fakeVideo(1)))
 
             viewModel = createViewModel()
-            viewModel.init(mid = 1L, collectionId = 370368L, isSeason = false, title = "系列", cover = "")
+            viewModel.init(mid = 1L, collectionId = 370368L, kind = UserCollectionKind.Series, title = "系列", cover = "")
             advanceUntilIdle()
 
             coVerify {
@@ -129,19 +127,39 @@ class UserCollectionViewModelTest {
         }
 
     @Test
+    fun `init routes fav to getFavFolderVideos`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getFavFolderVideos(any(), any(), any()) } returns
+                fakeVideoData(listOf(fakeVideo(1), fakeVideo(2), fakeVideo(3)))
+
+            viewModel = createViewModel()
+            viewModel.init(mid = 1L, collectionId = 4058080750L, kind = UserCollectionKind.Fav, title = "AI调用", cover = "")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.collectionId).isEqualTo(4058080750L)
+            assertThat(state.kind).isEqualTo(UserCollectionKind.Fav)
+            assertThat(state.videos).hasSize(3)
+            coVerify {
+                userRepository.getFavFolderVideos(folderId = 4058080750L, page = any(), preferApiType = any())
+            }
+            coVerify(exactly = 0) { userRepository.getCollectionVideos(any(), any(), any(), any()) }
+        }
+
+    @Test
     fun `init is idempotent for same collection`() =
         runTest(testDispatcher) {
-            coEvery { userRepository.getCollectionVideos(any(), any(), any(), any()) } returns
+            coEvery { userRepository.getFavFolderVideos(any(), any(), any()) } returns
                 fakeVideoData(listOf(fakeVideo(1)))
 
             viewModel = createViewModel()
-            initSeason(viewModel)
+            viewModel.init(mid = 1L, collectionId = 4058080750L, kind = UserCollectionKind.Fav, title = "AI调用", cover = "")
             advanceUntilIdle()
 
-            initSeason(viewModel)
+            viewModel.init(mid = 1L, collectionId = 4058080750L, kind = UserCollectionKind.Fav, title = "AI调用", cover = "")
             advanceUntilIdle()
 
-            coVerify(exactly = 1) { userRepository.getCollectionVideos(any(), any(), any(), any()) }
+            coVerify(exactly = 1) { userRepository.getFavFolderVideos(any(), any(), any()) }
         }
 
     // ------------------------------------------------------------------
@@ -151,14 +169,14 @@ class UserCollectionViewModelTest {
     @Test
     fun `loadMore appends next page and stops when hasMore is false`() =
         runTest(testDispatcher) {
-            coEvery { userRepository.getCollectionVideos(any(), any(), any(), any()) } returnsMany
+            coEvery { userRepository.getFavFolderVideos(any(), any(), any()) } returnsMany
                 listOf(
                     fakeVideoData(listOf(fakeVideo(1)), hasNext = true),
                     fakeVideoData(listOf(fakeVideo(2)), hasNext = false),
                 )
 
             viewModel = createViewModel()
-            initSeason(viewModel)
+            viewModel.init(mid = 1L, collectionId = 4058080750L, kind = UserCollectionKind.Fav, title = "AI调用", cover = "")
             advanceUntilIdle()
             assertThat(viewModel.uiState.value.videos).hasSize(1)
 
@@ -170,7 +188,7 @@ class UserCollectionViewModelTest {
 
             viewModel.loadMore(1L)
             advanceUntilIdle()
-            coVerify(exactly = 2) { userRepository.getCollectionVideos(any(), any(), any(), any()) }
+            coVerify(exactly = 2) { userRepository.getFavFolderVideos(any(), any(), any()) }
         }
 
     @Test
@@ -183,7 +201,7 @@ class UserCollectionViewModelTest {
                 )
 
             viewModel = createViewModel()
-            initSeason(viewModel)
+            viewModel.init(mid = 1L, collectionId = 2046621L, kind = UserCollectionKind.Season, title = "样片日记", cover = "")
             advanceUntilIdle()
 
             viewModel.loadMore(1L)
@@ -195,17 +213,17 @@ class UserCollectionViewModelTest {
     @Test
     fun `refresh clears videos and reloads`() =
         runTest(testDispatcher) {
-            coEvery { userRepository.getCollectionVideos(any(), any(), any(), any()) } returns
+            coEvery { userRepository.getFavFolderVideos(any(), any(), any()) } returns
                 fakeVideoData(listOf(fakeVideo(1)))
 
             viewModel = createViewModel()
-            initSeason(viewModel)
+            viewModel.init(mid = 1L, collectionId = 4058080750L, kind = UserCollectionKind.Fav, title = "AI调用", cover = "")
             advanceUntilIdle()
 
             viewModel.refresh(1L)
             advanceUntilIdle()
 
-            coVerify(exactly = 2) { userRepository.getCollectionVideos(any(), any(), any(), any()) }
+            coVerify(exactly = 2) { userRepository.getFavFolderVideos(any(), any(), any()) }
             assertThat(viewModel.uiState.value.videos).hasSize(1)
             assertThat(viewModel.uiState.value.error).isFalse()
         }
@@ -220,7 +238,7 @@ class UserCollectionViewModelTest {
             coEvery { userRepository.getCollectionVideos(any(), any(), any(), any()) } throws IOException("network error")
 
             viewModel = createViewModel()
-            initSeason(viewModel)
+            viewModel.init(mid = 1L, collectionId = 2046621L, kind = UserCollectionKind.Season, title = "样片日记", cover = "")
             advanceUntilIdle()
 
             val state = viewModel.uiState.value

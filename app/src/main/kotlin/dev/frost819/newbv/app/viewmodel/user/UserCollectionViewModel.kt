@@ -3,11 +3,11 @@ package dev.frost819.newbv.app.viewmodel.user
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.frost819.newbv.app.ui.navigation.UserCollectionKind
 import dev.frost819.newbv.app.viewmodel.common.LOAD_TIMEOUT_MS
 import dev.frost819.newbv.app.viewmodel.common.rethrowUnlessTimeout
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideo
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
-import dev.frost819.newbv.biliapi.entity.user.UpCollection
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.core.log.Loggers
 import dev.frost819.newbv.data.datastore.Prefs
@@ -20,11 +20,13 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 /**
- * UP 主合集/系列视频列表页 UiState。
+ * UP 主合集/系列/收藏夹视频列表页 UiState。
  */
 data class UserCollectionUiState(
     val mid: Long = 0L,
-    val collection: UpCollection? = null,
+    val collectionId: Long = 0L,
+    val kind: UserCollectionKind = UserCollectionKind.Season,
+    val title: String = "",
     val videos: List<SpaceVideo> = emptyList(),
     val loading: Boolean = false,
     val error: Boolean = false,
@@ -32,9 +34,10 @@ data class UserCollectionUiState(
 )
 
 /**
- * UP 主合集/系列视频列表页 ViewModel。
+ * UP 主合集/系列/收藏夹视频列表页 ViewModel。
  *
- * 合集走 polymer seasons_archives_list、系列走 x/series/archives，按页码分页。
+ * 合集走 polymer seasons_archives_list、系列走 x/series/archives、
+ * 收藏夹走 x/v3/fav/resource/list，均按页码分页。
  *
  * @param userRepository 用户数据仓库。
  */
@@ -54,36 +57,33 @@ class UserCollectionViewModel
         /**
          * 初始化并加载第一页。
          *
-         * 标题/封面由路由参数传入（来自合集列表页），不重新拉取元数据。
+         * 标题/封面由路由参数传入（来自栏目网格页），不重新拉取元数据。
          *
          * @param mid UP 主 MID
-         * @param collectionId 合集（seasonId）或系列（seriesId）
-         * @param isSeason true=合集 false=系列
+         * @param collectionId 合集（seasonId）/系列（seriesId）/收藏夹（media_id）
+         * @param kind 内容类型
          * @param title 标题（路由传入，可空）
          * @param cover 封面（路由传入，可空）
          */
         fun init(
             mid: Long,
             collectionId: Long,
-            isSeason: Boolean,
+            kind: UserCollectionKind,
             title: String,
             cover: String,
         ) {
             val sameCollection =
-                _uiState.value.collection?.id == collectionId && _uiState.value.mid == mid
+                _uiState.value.collectionId == collectionId &&
+                    _uiState.value.kind == kind &&
+                    _uiState.value.mid == mid
             if (sameCollection && _uiState.value.videos.isNotEmpty()) return
 
             _uiState.update {
                 it.copy(
                     mid = mid,
-                    collection =
-                        UpCollection(
-                            id = collectionId,
-                            title = title,
-                            cover = cover,
-                            total = 0,
-                            isSeason = isSeason,
-                        ),
+                    collectionId = collectionId,
+                    kind = kind,
+                    title = title,
                     videos = emptyList(),
                     loading = false,
                     error = false,
@@ -107,20 +107,50 @@ class UserCollectionViewModel
         }
 
         private fun loadVideos(mid: Long) {
-            val collection = _uiState.value.collection ?: return
-            if (_uiState.value.loading || !_uiState.value.hasMore) return
+            val state = _uiState.value
+            if (state.loading || !state.hasMore || state.collectionId == 0L) return
 
             _uiState.update { it.copy(loading = true, error = false) }
 
             viewModelScope.launch {
                 runCatching {
                     withTimeout(LOAD_TIMEOUT_MS) {
-                        userRepository.getCollectionVideos(
-                            mid = mid,
-                            collection = collection,
-                            page = page,
-                            preferApiType = Prefs.apiType,
-                        )
+                        when (state.kind) {
+                            UserCollectionKind.Fav ->
+                                userRepository.getFavFolderVideos(
+                                    folderId = state.collectionId,
+                                    page = page,
+                                    preferApiType = Prefs.apiType,
+                                )
+
+                            UserCollectionKind.Season ->
+                                userRepository.getCollectionVideos(
+                                    mid = mid,
+                                    collection = dev.frost819.newbv.biliapi.entity.user.UpCollection(
+                                        id = state.collectionId,
+                                        title = state.title,
+                                        cover = "",
+                                        total = 0,
+                                        isSeason = true,
+                                    ),
+                                    page = page,
+                                    preferApiType = Prefs.apiType,
+                                )
+
+                            UserCollectionKind.Series ->
+                                userRepository.getCollectionVideos(
+                                    mid = mid,
+                                    collection = dev.frost819.newbv.biliapi.entity.user.UpCollection(
+                                        id = state.collectionId,
+                                        title = state.title,
+                                        cover = "",
+                                        total = 0,
+                                        isSeason = false,
+                                    ),
+                                    page = page,
+                                    preferApiType = Prefs.apiType,
+                                )
+                        }
                     }
                 }.onSuccess { data ->
                     _uiState.update {
