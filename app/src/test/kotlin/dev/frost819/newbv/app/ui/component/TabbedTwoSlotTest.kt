@@ -64,6 +64,7 @@ class TabbedTwoSlotTest {
     private val scrollTargets = mutableMapOf<String, Int>()
     private val scrolledOnce = mutableSetOf<String>()
     private val selectedLog = mutableListOf<String>()
+    private val tabSelectedLog = mutableListOf<String>()
     private val disposeSnapshots = mutableMapOf<String, Pair<Int, Int>>()
 
     @Composable
@@ -117,6 +118,7 @@ class TabbedTwoSlotTest {
                 displayName = { it },
                 onRefresh = {},
                 animated = animated,
+                onTabSelected = { tab -> tabSelectedLog.add(tab) },
             ) { tab ->
                 selectedLog.add(tab)
                 PageContent(tab)
@@ -129,6 +131,9 @@ class TabbedTwoSlotTest {
 
     private fun press(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
+        // 冲刷帧时钟：冷装载延迟提交（下一帧组合内容）与预热 30 帧节拍都要帧驱动，
+        // 不能赌 waitForIdle 对 withFrameNanos 挂起协程的语义
+        compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()
     }
 
@@ -314,5 +319,49 @@ class TabbedTwoSlotTest {
         press(Key.DirectionRight) // → D
         assertEquals("D 的实例身份不因槽位角色交换而改变", dIdentity, identity["D"])
         assertEquals(1, creations["D"])
+    }
+
+    /**
+     * 冷切换壳优先：切到未装载的 Tab（C 永不预热），焦点/选中先落地，重内容经
+     * delay(16) 延迟提交——最终内容恰好组合一次，不卡白屏。
+     *
+     * 注意：Robolectric 的 advanceTimeBy 是全量排空（一次推进把帧回调与协程 delay
+     * 一并跑完，实测 1ms 推进连跑 3 帧并提交内容），壳帧/提交帧的时间切片在 JVM
+     * 测试里原则上不可观察——时序正确性由模拟器 TabPerf 探针 + gfxinfo 验证，
+     * 这里只钉「延迟路径最终提交且恰好一次」与热路径行为。
+     */
+    @Test
+    fun coldSwitch_contentCommittedExactlyOnceAfterDelay() {
+        setUpShell()
+        press(Key.DirectionRight) // A→B（冲刷到稳态；C 永不预热）
+        assertFalse("前置：C 尚未装载", "C" in liveTabs)
+
+        press(Key.DirectionRight) // B→C（冷装载：壳帧 → delay(16) → 内容帧）
+        assertTrue("冷装载内容必须最终提交；live=$liveTabs", "C" in liveTabs)
+        assertEquals("延迟提交只组合一次", 1, creations["C"])
+        assertEquals(setOf("B", "C"), liveTabs)
+    }
+
+    /** 热切换（预热命中的复用路径）零改动：选中当帧内容已在组合里存活，无壳帧、无重建。 */
+    @Test
+    fun warmSwitch_contentAlreadyLiveAtSelectionFrame() {
+        setUpShell()
+        // 推进帧时钟让预热的 30 帧节拍走完，把 B 装入备用槽（内容当帧组合，无壳帧）
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        assertTrue("前置：预热应装载 B；live=$liveTabs", "B" in liveTabs)
+        val bBefore = creations["B"]!!
+
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) } // A→B（复用）
+            compose.mainClock.advanceTimeBy(1)
+            assertEquals("选中应已发生", "B", tabSelectedLog.lastOrNull())
+            assertTrue("复用选中帧内容必须已就绪（无壳帧）；live=$liveTabs", "B" in liveTabs)
+            assertEquals("复用不得重建 B", bBefore, creations["B"])
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
     }
 }
