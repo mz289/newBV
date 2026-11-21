@@ -581,6 +581,224 @@ class UserRepositoryUnitTest {
         }
 
     // ------------------------------------------------------------------
+    // getSpaceCollections / getCollectionVideos（合集与系列，仅 Web 通道）
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `getSpaceCollections maps seasons and series with pagination`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebUserSpaceSeasonsSeries(any(), any(), any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "",
+                    data =
+                        dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData(
+                            itemsLists =
+                                dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.ItemsLists(
+                                    page =
+                                        dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.ItemsLists.Page(
+                                            pageNumber = 1,
+                                            pageSize = 5,
+                                            total = 32,
+                                        ),
+                                    seasonsList =
+                                        listOf(
+                                            dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.Item(
+                                                meta =
+                                                    dev.frost819.newbv.biliapi.http.entity.user.WebCollectionMeta(
+                                                        seasonId = 2046621L,
+                                                        name = "合集·样片日记",
+                                                        title = "样片日记",
+                                                        cover = "https://example.com/cover.jpg",
+                                                        total = 26,
+                                                    ),
+                                            ),
+                                        ),
+                                    seriesList =
+                                        listOf(
+                                            dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData.Item(
+                                                meta =
+                                                    dev.frost819.newbv.biliapi.http.entity.user.WebCollectionMeta(
+                                                        seriesId = 370368L,
+                                                        name = "我的系列",
+                                                        total = 19,
+                                                    ),
+                                            ),
+                                        ),
+                                ),
+                        ),
+                )
+
+            val result = repository.getSpaceCollections(mid = MID, preferApiType = ApiType.Web)
+
+            assertThat(result.collections).hasSize(2)
+            // 合集在前，标题优先取去掉"合集·"前缀的 title
+            assertThat(result.collections[0].id).isEqualTo(2046621L)
+            assertThat(result.collections[0].isSeason).isTrue()
+            assertThat(result.collections[0].title).isEqualTo("样片日记")
+            assertThat(result.collections[1].id).isEqualTo(370368L)
+            assertThat(result.collections[1].isSeason).isFalse()
+            assertThat(result.collections[1].title).isEqualTo("我的系列")
+            // 1 * 5 < 32 → 还有下一页
+            assertThat(result.page.hasNext).isTrue()
+            assertThat(result.page.nextPageNumber).isEqualTo(2)
+            coVerify { BiliHttpApi.getWebUserSpaceSeasonsSeries(MID, 1, 20) }
+        }
+
+    @Test
+    fun `getCollectionVideos routes season to seasons_archives_list`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebUserSeasonArchives(any(), any(), any(), any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "",
+                    data =
+                        dev.frost819.newbv.biliapi.http.entity.user.WebSeasonArchivesData(
+                            archives =
+                                listOf(
+                                    dev.frost819.newbv.biliapi.http.entity.user.WebCollectionArchiveItem(
+                                        aid = 238588630L,
+                                        bvid = "BV1be41127ft",
+                                        title = "零下26度的新疆",
+                                        pic = "https://example.com/pic.jpg",
+                                        duration = 974,
+                                        pubdate = 1704877200L,
+                                        stat =
+                                            dev.frost819.newbv.biliapi.http.entity.user.WebCollectionArchiveItem.Stat(
+                                                view = 3300769L,
+                                                danmaku = 15316,
+                                            ),
+                                    ),
+                                ),
+                            page =
+                                dev.frost819.newbv.biliapi.http.entity.user.WebSeasonArchivesData.Page(
+                                    pageNumber = 1,
+                                    pageSize = 20,
+                                    total = 26,
+                                ),
+                        ),
+                )
+
+            val collection =
+                dev.frost819.newbv.biliapi.entity.user.UpCollection(
+                    id = 2046621L,
+                    title = "样片日记",
+                    cover = "",
+                    total = 26,
+                    isSeason = true,
+                )
+            val result = repository.getCollectionVideos(mid = MID, collection = collection, preferApiType = ApiType.Web)
+
+            assertThat(result.videos).hasSize(1)
+            assertThat(result.videos[0].aid).isEqualTo(238588630L)
+            assertThat(result.videos[0].bvid).isEqualTo("BV1be41127ft")
+            assertThat(result.videos[0].play).isEqualTo(3300769)
+            assertThat(result.page.hasNext).isTrue()
+            assertThat(result.page.nextWebPageNumber).isEqualTo(2)
+            coVerify { BiliHttpApi.getWebUserSeasonArchives(MID, 2046621L, 1, 20) }
+        }
+
+    @Test
+    fun `getCollectionVideos routes series to x_series_archives`() =
+        runTest {
+            coEvery { BiliHttpApi.getWebUserSeriesArchives(any(), any(), any(), any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "",
+                    data =
+                        dev.frost819.newbv.biliapi.http.entity.user.WebSeriesArchivesData(
+                            archives =
+                                listOf(
+                                    dev.frost819.newbv.biliapi.http.entity.user.WebCollectionArchiveItem(
+                                        aid = 798106709L,
+                                        bvid = "BV1Dy4y1S7i1",
+                                        title = "收复失地运动",
+                                        pic = "https://example.com/pic.jpg",
+                                        duration = 12267,
+                                        pubdate = 1607832019L,
+                                    ),
+                                ),
+                            page =
+                                dev.frost819.newbv.biliapi.http.entity.user.WebSeriesArchivesData.Page(
+                                    num = 1,
+                                    size = 20,
+                                    total = 19,
+                                ),
+                        ),
+                )
+
+            val collection =
+                dev.frost819.newbv.biliapi.entity.user.UpCollection(
+                    id = 370368L,
+                    title = "我的系列",
+                    cover = "",
+                    total = 19,
+                    isSeason = false,
+                )
+            val result = repository.getCollectionVideos(mid = MID, collection = collection, preferApiType = ApiType.Web)
+
+            assertThat(result.videos).hasSize(1)
+            assertThat(result.videos[0].aid).isEqualTo(798106709L)
+            // stat 缺省时 play 记为 -1（卡片不显示播放数）
+            assertThat(result.videos[0].play).isEqualTo(-1)
+            assertThat(result.page.hasNext).isFalse()
+            coVerify { BiliHttpApi.getWebUserSeriesArchives(MID, 370368L, 1, 20) }
+        }
+
+    @Test
+    fun `getSpaceVideos App falls back to Web when App rejects non-default order`() =
+        runTest {
+            coEvery { BiliHttpApi.getAppUserSpaceVideos(any(), any(), any(), any(), any()) } returns
+                BiliResponse(code = -400, message = "请求错误", data = null)
+            coEvery { BiliHttpApi.getWebUserSpaceVideos(any(), any(), any(), any(), any(), any()) } returns
+                BiliResponse(
+                    code = 0,
+                    message = "",
+                    data =
+                        dev.frost819.newbv.biliapi.http.entity.user.WebSpaceVideoData(
+                            list =
+                                dev.frost819.newbv.biliapi.http.entity.user.WebSpaceVideoData.SpaceVideoListItem(
+                                    tlist = null,
+                                    vlist = listOf(fakeVListItem(aid = 2L, title = "stow-video")),
+                                ),
+                            page =
+                                dev.frost819.newbv.biliapi.http.entity.user.WebSpaceVideoData.Page(
+                                    pageNumber = 1,
+                                    pageSize = 20,
+                                    count = 1,
+                                ),
+                        ),
+                )
+
+            val result =
+                repository.getSpaceVideos(
+                    mid = MID,
+                    order = dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder.Stow,
+                    preferApiType = ApiType.App,
+                )
+
+            assertThat(result.videos).hasSize(1)
+            assertThat(result.videos[0].title).isEqualTo("stow-video")
+            coVerify { BiliHttpApi.getAppUserSpaceVideos(eq(MID), any(), eq("stow"), any(), any()) }
+            coVerify { BiliHttpApi.getWebUserSpaceVideos(mid = MID, order = "stow", pageNumber = 1, pageSize = 20) }
+        }
+
+    @Test
+    fun `getSpaceVideos App does not fall back to Web for pubdate failure`() =
+        runTest {
+            coEvery { BiliHttpApi.getAppUserSpaceVideos(any(), any(), any(), any(), any()) } returns
+                BiliResponse(code = -400, message = "请求错误", data = null)
+
+            val error =
+                runCatching {
+                    repository.getSpaceVideos(mid = MID, preferApiType = ApiType.App)
+                }.exceptionOrNull()
+
+            assertThat(error).isInstanceOf(IllegalStateException::class.java)
+            coVerify(exactly = 0) { BiliHttpApi.getWebUserSpaceVideos(any(), any(), any(), any(), any(), any()) }
+        }
+
+    // ------------------------------------------------------------------
     // getDynamicVideos (Web)
     // ------------------------------------------------------------------
 

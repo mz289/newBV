@@ -3,10 +3,13 @@ package dev.frost819.newbv.app.viewmodel.user
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import dev.frost819.newbv.biliapi.entity.ApiType
+import dev.frost819.newbv.biliapi.entity.user.SpaceCollectionData
+import dev.frost819.newbv.biliapi.entity.user.SpaceCollectionPage
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideo
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoData
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
+import dev.frost819.newbv.biliapi.entity.user.UpCollection
 import dev.frost819.newbv.biliapi.repositories.UserRepository
 import dev.frost819.newbv.data.datastore.Prefs
 import io.mockk.coEvery
@@ -80,6 +83,25 @@ class UserSpaceViewModelTest {
     ) = SpaceVideoData(
         videos = videos,
         page = SpaceVideoPage(hasNext = hasNext),
+    )
+
+    private fun fakeCollection(
+        id: Long,
+        isSeason: Boolean = true,
+    ) = UpCollection(
+        id = id,
+        title = "合集$id",
+        cover = "https://example.com/c$id.jpg",
+        total = 3,
+        isSeason = isSeason,
+    )
+
+    private fun fakeCollectionData(
+        collections: List<UpCollection>,
+        hasNext: Boolean = true,
+    ) = SpaceCollectionData(
+        collections = collections,
+        page = SpaceCollectionPage(hasNext = hasNext, nextPageNumber = 2, pageSize = 20),
     )
 
     // ------------------------------------------------------------------
@@ -252,6 +274,199 @@ class UserSpaceViewModelTest {
             coVerify(exactly = 2) { userRepository.getSpaceVideos(any(), any(), any(), any()) }
             assertThat(viewModel.uiState.value.videos).hasSize(2)
             assertThat(viewModel.uiState.value.error).isFalse()
+        }
+
+    // ------------------------------------------------------------------
+    // selectTab
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `selectTab to MostPlayed clears videos and reloads with click order`() =
+        runTest(testDispatcher) {
+            coEvery {
+                userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.PubDate, page = any(), preferApiType = BiliApiType.Web)
+            } returns fakeVideoData(videos = listOf(fakeVideo(1)))
+            coEvery {
+                userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.Click, page = any(), preferApiType = BiliApiType.Web)
+            } returns fakeVideoData(videos = listOf(fakeVideo(2)))
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+            assertThat(viewModel.uiState.value.tab).isEqualTo(UserSpaceTab.Latest)
+            assertThat(viewModel.uiState.value.videos.map { it.aid }).containsExactly(1L)
+
+            viewModel.selectTab(1L, UserSpaceTab.MostPlayed)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.tab).isEqualTo(UserSpaceTab.MostPlayed)
+            // 旧排序的视频已清空，只剩新排序内容
+            assertThat(state.videos.map { it.aid }).containsExactly(2L)
+            coVerify(exactly = 1) {
+                userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.Click, page = any(), preferApiType = any())
+            }
+        }
+
+    @Test
+    fun `selectTab same tab is no-op`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectTab(1L, UserSpaceTab.Latest)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { userRepository.getSpaceVideos(any(), any(), any(), any()) }
+            assertThat(viewModel.uiState.value.videos).hasSize(2)
+        }
+
+    @Test
+    fun `selectTab filters duplicate aids on overlapping pages`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returnsMany
+                listOf(
+                    fakeVideoData(videos = listOf(fakeVideo(1), fakeVideo(2)), hasNext = true),
+                    fakeVideoData(videos = listOf(fakeVideo(2), fakeVideo(3)), hasNext = false),
+                )
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.loadVideos(1L)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.videos.map { it.aid }).containsExactly(1L, 2L, 3L).inOrder()
+        }
+
+    // ------------------------------------------------------------------
+    // collections（合集/系列）
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `selectTab to Seasons loads collections`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+            coEvery {
+                userRepository.getSpaceCollections(mid = 1L, page = any(), preferApiType = BiliApiType.Web)
+            } returns fakeCollectionData(
+                collections = listOf(fakeCollection(10), fakeCollection(11, isSeason = false)),
+                hasNext = false,
+            )
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectTab(1L, UserSpaceTab.Seasons)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.tab).isEqualTo(UserSpaceTab.Seasons)
+            assertThat(state.videos).isEmpty()
+            assertThat(state.collections).hasSize(2)
+            assertThat(state.collections[0].isSeason).isTrue()
+            assertThat(state.collections[1].isSeason).isFalse()
+            assertThat(state.hasMore).isFalse()
+            assertThat(state.error).isFalse()
+        }
+
+    @Test
+    fun `loadMore appends collections pages on Seasons tab`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returnsMany
+                listOf(
+                    fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = true),
+                    fakeCollectionData(collections = listOf(fakeCollection(12)), hasNext = false),
+                )
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectTab(1L, UserSpaceTab.Seasons)
+            advanceUntilIdle()
+            assertThat(viewModel.uiState.value.collections).hasSize(1)
+            assertThat(viewModel.uiState.value.hasMore).isTrue()
+
+            viewModel.loadMore(1L)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.collections.map { it.id }).containsExactly(10L, 12L).inOrder()
+            assertThat(viewModel.uiState.value.hasMore).isFalse()
+        }
+
+    @Test
+    fun `selectTab back to Latest reloads videos`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData(videos = listOf(fakeVideo(1)))
+            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
+                fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = false)
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectTab(1L, UserSpaceTab.Seasons)
+            advanceUntilIdle()
+            assertThat(viewModel.uiState.value.collections).isNotEmpty()
+
+            viewModel.selectTab(1L, UserSpaceTab.Latest)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.tab).isEqualTo(UserSpaceTab.Latest)
+            assertThat(state.collections).isEmpty()
+            assertThat(state.videos).isNotEmpty()
+        }
+
+    @Test
+    fun `selectTab to Series loads series collections`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
+                fakeCollectionData(
+                    collections = listOf(fakeCollection(370368, isSeason = false)),
+                    hasNext = false,
+                )
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectTab(1L, UserSpaceTab.Series)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.tab).isEqualTo(UserSpaceTab.Series)
+            assertThat(state.collections).hasSize(1)
+            assertThat(state.collections[0].isSeason).isFalse()
+        }
+
+    @Test
+    fun `selectTab resets error state before reload`() =
+        runTest(testDispatcher) {
+            coEvery {
+                userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.PubDate, page = any(), preferApiType = BiliApiType.Web)
+            } throws IOException("network error")
+            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
+                fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = false)
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+            assertThat(viewModel.uiState.value.error).isTrue()
+
+            viewModel.selectTab(1L, UserSpaceTab.Seasons)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.error).isFalse()
+            assertThat(viewModel.uiState.value.collections).isNotEmpty()
         }
 
     // ------------------------------------------------------------------

@@ -45,6 +45,40 @@ data class SpaceVideoData(
                     ),
             )
 
+        /** 合集内视频列表（polymer seasons_archives_list）转换。 */
+        fun fromWebSeasonArchives(webSeasonArchivesData: dev.frost819.newbv.biliapi.http.entity.user.WebSeasonArchivesData) =
+            SpaceVideoData(
+                videos = webSeasonArchivesData.archives.map { SpaceVideo.fromCollectionArchiveItem(it) },
+                page =
+                    SpaceVideoPage(
+                        hasNext = pageHasNext(webSeasonArchivesData.page?.pageNumber, webSeasonArchivesData.page?.pageSize, webSeasonArchivesData.page?.total),
+                        nextWebPageSize = webSeasonArchivesData.page?.pageSize ?: 20,
+                        nextWebPageNumber = (webSeasonArchivesData.page?.pageNumber ?: 0) + 1,
+                    ),
+            )
+
+        /** 系列内视频列表（x/series/archives）转换。 */
+        fun fromWebSeriesArchives(webSeriesArchivesData: dev.frost819.newbv.biliapi.http.entity.user.WebSeriesArchivesData) =
+            SpaceVideoData(
+                videos = webSeriesArchivesData.archives.map { SpaceVideo.fromCollectionArchiveItem(it) },
+                page =
+                    SpaceVideoPage(
+                        hasNext = pageHasNext(webSeriesArchivesData.page?.num, webSeriesArchivesData.page?.size, webSeriesArchivesData.page?.total),
+                        nextWebPageSize = webSeriesArchivesData.page?.size ?: 20,
+                        nextWebPageNumber = (webSeriesArchivesData.page?.num ?: 0) + 1,
+                    ),
+            )
+
+        /** 页码×页宽小于总数即还有下一页（两个归档接口的分页对象字段名不同，统一按三要素判断）。 */
+        private fun pageHasNext(
+            pageNumber: Int?,
+            pageSize: Int?,
+            total: Int?,
+        ): Boolean {
+            val num = pageNumber ?: 0
+            val size = pageSize ?: 0
+            return size > 0 && num * size < (total ?: 0)
+        }
     }
 }
 
@@ -103,6 +137,31 @@ data class SpaceVideo(
             danmaku = spaceVideoItem.danmaku,
             pubTime = spaceVideoItem.ctime.smartDate,
         )
+
+        /** 合集/系列内视频稿件（polymer 归档对象）转换。 */
+        fun fromCollectionArchiveItem(
+            archiveItem: dev.frost819.newbv.biliapi.http.entity.user.WebCollectionArchiveItem,
+        ) = SpaceVideo(
+            aid = archiveItem.aid,
+            bvid = archiveItem.bvid,
+            title = archiveItem.title,
+            cover = archiveItem.pic,
+            author = "",
+            duration = archiveItem.duration,
+            play =
+                when (val view = archiveItem.stat?.view) {
+                    null -> -1
+                    else ->
+                        if (view > Int.MAX_VALUE) {
+                            Int.MAX_VALUE
+                        } else {
+                            view.toInt()
+                        }
+                },
+            danmaku = archiveItem.stat?.danmaku ?: -1,
+            pubTime = archiveItem.pubdate?.toSmartDate(),
+            playbackPosition = archiveItem.playbackPosition,
+        )
     }
 }
 
@@ -118,7 +177,93 @@ enum class SpaceVideoOrder(
 ) {
     PubDate("pubdate"),
     Click("click"),
+    Stow("stow"),
 }
+
+/**
+ * UP 主空间合集/系列条目。
+ *
+ * @param id 合集（seasonId）或系列（seriesId）的 ID
+ * @param title 展示标题（合集优先取去掉"合集·"前缀的 title）
+ * @param cover 封面 URL
+ * @param total 内含视频总数
+ * @param isSeason true=合集（season）false=系列（series）
+ */
+data class UpCollection(
+    val id: Long,
+    val title: String,
+    val cover: String,
+    val total: Int,
+    val isSeason: Boolean,
+)
+
+/**
+ * UP 主空间合集/系列列表数据。
+ */
+data class SpaceCollectionData(
+    val collections: List<UpCollection>,
+    val page: SpaceCollectionPage,
+) {
+    companion object {
+        /** 由 Web polymer seasons_series_list 响应转换；分页按合集在前、系列在后的总条数推进。 */
+        fun fromWebSeasonsSeries(
+            webSeasonsSeriesData: dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData,
+        ): SpaceCollectionData {
+            val itemsLists = webSeasonsSeriesData.itemsLists
+            val page = itemsLists?.page
+            val pageNumber = page?.pageNumber ?: 1
+            val pageSize = page?.pageSize ?: 0
+            val total = page?.total ?: 0
+            val seasons =
+                itemsLists?.seasonsList
+                    .orEmpty()
+                    .mapNotNull { it.meta?.toUpCollection(isSeason = true) }
+            val series =
+                itemsLists?.seriesList
+                    .orEmpty()
+                    .mapNotNull { it.meta?.toUpCollection(isSeason = false) }
+            return SpaceCollectionData(
+                collections = seasons + series,
+                page =
+                    SpaceCollectionPage(
+                        hasNext = pageSize > 0 && pageNumber * pageSize < total,
+                        nextPageNumber = pageNumber + 1,
+                        pageSize = if (pageSize > 0) pageSize else DEFAULT_PAGE_SIZE,
+                    ),
+            )
+        }
+
+        private fun dev.frost819.newbv.biliapi.http.entity.user.WebCollectionMeta.toUpCollection(
+            isSeason: Boolean,
+        ): UpCollection? {
+            val id = seasonId ?: seriesId ?: return null
+            val displayTitle =
+                title?.takeIf { it.isNotBlank() }
+                    ?: name?.takeIf { it.isNotBlank() }
+                    ?: return null
+            return UpCollection(
+                id = id,
+                title = displayTitle,
+                cover = cover ?: "",
+                total = total ?: 0,
+                isSeason = isSeason,
+            )
+        }
+
+        const val DEFAULT_PAGE_SIZE = 20
+    }
+}
+
+/**
+ * UP 主空间合集/系列分页游标。
+ *
+ * 仅 Web 通道（polymer/x/series 接口均为 Web 专用），按页码分页。
+ */
+data class SpaceCollectionPage(
+    val hasNext: Boolean = true,
+    val nextPageNumber: Int = 1,
+    val pageSize: Int = SpaceCollectionData.DEFAULT_PAGE_SIZE,
+)
 
 data class SpaceVideoPage(
     val hasNext: Boolean = true,

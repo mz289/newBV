@@ -6,9 +6,12 @@ import bilibili.app.dynamic.v2.dynVideoReq
 import dev.frost819.newbv.biliapi.entity.ApiType
 import dev.frost819.newbv.biliapi.entity.user.DynamicVideoData
 import dev.frost819.newbv.biliapi.entity.user.FollowedUser
+import dev.frost819.newbv.biliapi.entity.user.SpaceCollectionData
+import dev.frost819.newbv.biliapi.entity.user.SpaceCollectionPage
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoData
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.biliapi.entity.user.SpaceVideoPage
+import dev.frost819.newbv.biliapi.entity.user.UpCollection
 import dev.frost819.newbv.biliapi.grpc.utils.handleGrpcException
 import dev.frost819.newbv.biliapi.http.BiliHttpApi
 import dev.frost819.newbv.biliapi.http.entity.user.FollowAction
@@ -132,30 +135,95 @@ class UserRepository(
         preferApiType: ApiType,
     ): SpaceVideoData =
         when (authRepository.effectiveApiType(preferApiType, "user")) {
-            ApiType.Web -> {
-                val webSpaceVideoData =
-                    BiliHttpApi
-                        .getWebUserSpaceVideos(
-                            mid = mid,
-                            order = order.value,
-                            pageNumber = page.nextWebPageNumber,
-                            pageSize = page.nextWebPageSize,
-                        ).getResponseData()
-                SpaceVideoData.fromWebSpaceVideoData(webSpaceVideoData)
-            }
+            ApiType.Web -> getWebSpaceVideos(mid, order, page)
 
-            ApiType.App -> {
-                val appSpaceVideoData =
-                    BiliHttpApi
-                        .getAppUserSpaceVideos(
-                            mid = mid,
-                            lastAvid = page.lastAvid,
-                            order = order.value,
-                            ts = System.currentTimeMillis(),
-                            accessKey = authRepository.accessToken ?: "",
-                        ).getResponseData()
-                SpaceVideoData.fromAppSpaceVideoData(appSpaceVideoData)
-            }
+            ApiType.App ->
+                runCatching { getAppSpaceVideos(mid, order, page) }.getOrElse { appError ->
+                    // App cursor 接口对"最多收藏"（stow）的支持未在公开文档确认：
+                    // 非默认排序失败时回退 Web 通道重试；默认排序原样抛出，避免掩盖真实错误
+                    if (order == SpaceVideoOrder.PubDate) throw appError
+                    getWebSpaceVideos(mid, order, page)
+                }
+        }
+
+    private suspend fun getWebSpaceVideos(
+        mid: Long,
+        order: SpaceVideoOrder,
+        page: SpaceVideoPage,
+    ): SpaceVideoData =
+        BiliHttpApi
+            .getWebUserSpaceVideos(
+                mid = mid,
+                order = order.value,
+                pageNumber = page.nextWebPageNumber,
+                pageSize = page.nextWebPageSize,
+            ).getResponseData()
+            .let { SpaceVideoData.fromWebSpaceVideoData(it) }
+
+    private suspend fun getAppSpaceVideos(
+        mid: Long,
+        order: SpaceVideoOrder,
+        page: SpaceVideoPage,
+    ): SpaceVideoData =
+        BiliHttpApi
+            .getAppUserSpaceVideos(
+                mid = mid,
+                lastAvid = page.lastAvid,
+                order = order.value,
+                ts = System.currentTimeMillis(),
+                accessKey = authRepository.accessToken ?: "",
+            ).getResponseData()
+            .let { SpaceVideoData.fromAppSpaceVideoData(it) }
+
+    /**
+     * 获取用户[mid]的合集与系列列表。
+     *
+     * 仅 Web 通道：polymer 接口没有 App/gRPC 对应端点，忽略 [preferApiType]。
+     */
+    suspend fun getSpaceCollections(
+        mid: Long,
+        page: SpaceCollectionPage = SpaceCollectionPage(),
+        preferApiType: ApiType,
+    ): SpaceCollectionData =
+        BiliHttpApi
+            .getWebUserSpaceSeasonsSeries(
+                mid = mid,
+                pageNumber = page.nextPageNumber,
+                pageSize = page.pageSize,
+            ).getResponseData()
+            .let { SpaceCollectionData.fromWebSeasonsSeries(it) }
+
+    /**
+     * 获取合集/系列[collection]内的视频列表。
+     *
+     * 合集走 polymer seasons_archives_list，系列走 x/series/archives，均为 Web 通道。
+     */
+    suspend fun getCollectionVideos(
+        mid: Long,
+        collection: UpCollection,
+        page: SpaceVideoPage = SpaceVideoPage(),
+        preferApiType: ApiType,
+    ): SpaceVideoData =
+        when (collection.isSeason) {
+            true ->
+                BiliHttpApi
+                    .getWebUserSeasonArchives(
+                        mid = mid,
+                        seasonId = collection.id,
+                        pageNumber = page.nextWebPageNumber,
+                        pageSize = page.nextWebPageSize,
+                    ).getResponseData()
+                    .let { SpaceVideoData.fromWebSeasonArchives(it) }
+
+            false ->
+                BiliHttpApi
+                    .getWebUserSeriesArchives(
+                        mid = mid,
+                        seriesId = collection.id,
+                        pageNumber = page.nextWebPageNumber,
+                        pageSize = page.nextWebPageSize,
+                    ).getResponseData()
+                    .let { SpaceVideoData.fromWebSeriesArchives(it) }
         }
 
     suspend fun getDynamicVideos(

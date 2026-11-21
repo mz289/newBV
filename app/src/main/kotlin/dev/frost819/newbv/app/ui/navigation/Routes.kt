@@ -99,6 +99,18 @@ data class UserSpaceRoute(
     val face: String? = null,
 )
 
+/** UP 主空间合集/系列视频列表页。 */
+@Serializable
+data class UserCollectionRoute(
+    val mid: Long,
+    /** 合集（seasonId）或系列（seriesId）的 ID。 */
+    val collectionId: Long,
+    /** true=合集（season）false=系列（series）。 */
+    val isSeason: Boolean,
+    val title: String = "",
+    val cover: String = "",
+)
+
 /** 关注列表页。 */
 @Serializable
 data class FollowRoute(

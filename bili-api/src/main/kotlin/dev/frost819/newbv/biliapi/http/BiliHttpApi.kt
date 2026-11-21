@@ -36,6 +36,9 @@ import dev.frost819.newbv.biliapi.http.entity.user.FollowActionSource
 import dev.frost819.newbv.biliapi.http.entity.user.MyInfoData
 import dev.frost819.newbv.biliapi.http.entity.user.RelationData
 import dev.frost819.newbv.biliapi.http.entity.user.UserFollowData
+import dev.frost819.newbv.biliapi.http.entity.user.WebSeasonArchivesData
+import dev.frost819.newbv.biliapi.http.entity.user.WebSeasonsSeriesData
+import dev.frost819.newbv.biliapi.http.entity.user.WebSeriesArchivesData
 import dev.frost819.newbv.biliapi.http.entity.user.WebSpaceVideoData
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.CollectedFavoriteFoldersData
 import dev.frost819.newbv.biliapi.http.entity.user.favorite.FavoriteFolderInfoListData
@@ -1332,6 +1335,75 @@ object BiliHttpApi {
                 parameter("order", order)
                 parameter("ts", ts)
                 parameter("access_key", accessKey)
+            }.body()
+
+    /**
+     * 获取用户[mid]的合集与系列列表（Web）
+     *
+     * 端点：GET /x/polymer/web-space/seasons_series_list（无需 WBI 签名，仅需浏览器 UA + Referer）
+     *
+     * @param pageNumber 页码（合集在前、系列在后连续分页）
+     * @param pageSize 每页项数
+     */
+    suspend fun getWebUserSpaceSeasonsSeries(
+        mid: Long,
+        pageNumber: Int = 1,
+        pageSize: Int = 20,
+    ): BiliResponse<WebSeasonsSeriesData> =
+        client
+            .get("/x/polymer/web-space/seasons_series_list") {
+                parameter("mid", mid)
+                parameter("page_num", pageNumber)
+                parameter("page_size", pageSize)
+                header("referer", "https://space.bilibili.com")
+            }.body()
+
+    /**
+     * 获取合集[seasonId]内的视频列表（Web）
+     *
+     * 端点：GET /x/polymer/web-space/seasons_archives_list
+     *
+     * @param pageNumber 页码
+     * @param pageSize 每页项数
+     */
+    suspend fun getWebUserSeasonArchives(
+        mid: Long,
+        seasonId: Long,
+        pageNumber: Int = 1,
+        pageSize: Int = 20,
+    ): BiliResponse<WebSeasonArchivesData> =
+        client
+            .get("/x/polymer/web-space/seasons_archives_list") {
+                parameter("mid", mid)
+                parameter("season_id", seasonId)
+                parameter("page_num", pageNumber)
+                parameter("page_size", pageSize)
+                header("referer", "https://space.bilibili.com")
+            }.body()
+
+    /**
+     * 获取系列[seriesId]内的视频列表（Web）
+     *
+     * 端点：GET /x/series/archives
+     *
+     * @param pageNumber 页码
+     * @param pageSize 每页项数
+     */
+    suspend fun getWebUserSeriesArchives(
+        mid: Long,
+        seriesId: Long,
+        pageNumber: Int = 1,
+        pageSize: Int = 20,
+    ): BiliResponse<WebSeriesArchivesData> =
+        client
+            .get("/x/series/archives") {
+                parameter("mid", mid)
+                parameter("series_id", seriesId)
+                parameter("only_normal", "true")
+                parameter("sort", "desc")
+                parameter("pn", pageNumber)
+                parameter("ps", pageSize)
+                header("referer", "https://space.bilibili.com")
             }.body()
 
     /**
