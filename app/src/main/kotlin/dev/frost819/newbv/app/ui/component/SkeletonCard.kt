@@ -16,11 +16,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.State
 import androidx.tv.material3.MaterialTheme
+
+/**
+ * 页面是否处于激活槽位（由 TabbedContent 双槽位壳提供）。
+ * 骨架屏等每帧动画据此门控：非激活页（备用槽/不可见）零动画器、零每帧唤醒。
+ */
+val LocalPageActive = staticCompositionLocalOf { true }
 
 /**
  * 骨架屏卡片（P0-4，参照 wiliwili 的同构灰块占位）。
@@ -38,18 +49,25 @@ fun SkeletonCard(
     coverAspectRatio: Float,
     modifier: Modifier = Modifier,
 ) {
-    val transition = rememberInfiniteTransition(label = "skeleton-pulse")
-    // 呼吸幅度 0.6 ~ 0.95：深色底下低点仍清晰可辨（实测 0.45 过暗）
-    val alpha by transition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.95f,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = 900),
-                repeatMode = RepeatMode.Reverse,
-            ),
-        label = "skeleton-alpha",
-    )
+    // 页面不在激活槽位时不创建无限动画器：备用页的骨架屏保持静态，
+    // 不产生每帧唤醒（数据未返回且页面隐藏时会长时间停留骨架态）。
+    val alpha: State<Float> =
+        if (LocalPageActive.current) {
+            val transition = rememberInfiniteTransition(label = "skeleton-pulse")
+            // 呼吸幅度 0.6 ~ 0.95：深色底下低点仍清晰可辨（实测 0.45 过暗）
+            transition.animateFloat(
+                initialValue = 0.6f,
+                targetValue = 0.95f,
+                animationSpec =
+                    infiniteRepeatable(
+                        animation = tween(durationMillis = 900),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                label = "skeleton-alpha",
+            )
+        } else {
+            remember { mutableFloatStateOf(0.6f) }
+        }
     val blockColor = MaterialTheme.colorScheme.surfaceVariant
     val coverShape = RoundedCornerShape(8.dp)
 
@@ -62,7 +80,7 @@ fun SkeletonCard(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(coverAspectRatio)
-                    .graphicsLayer { this.alpha = alpha }
+                    .graphicsLayer { this.alpha = alpha.value }
                     .clip(coverShape)
                     .background(blockColor),
         )
@@ -74,7 +92,7 @@ fun SkeletonCard(
                     Modifier
                         .fillMaxWidth(0.85f)
                         .height(16.dp)
-                        .graphicsLayer { this.alpha = alpha }
+                        .graphicsLayer { this.alpha = alpha.value }
                         .clip(RoundedCornerShape(4.dp))
                         .background(blockColor),
             )
@@ -84,7 +102,7 @@ fun SkeletonCard(
                     Modifier
                         .fillMaxWidth(0.55f)
                         .height(12.dp)
-                        .graphicsLayer { this.alpha = alpha }
+                        .graphicsLayer { this.alpha = alpha.value }
                         .clip(RoundedCornerShape(4.dp))
                         .background(blockColor),
             )

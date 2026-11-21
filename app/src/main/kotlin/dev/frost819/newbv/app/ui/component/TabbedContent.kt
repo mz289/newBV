@@ -4,10 +4,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.SaveableStateHolder
@@ -28,7 +28,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.zIndex
 import androidx.compose.material3.Scaffold as Material3Scaffold
-import kotlinx.coroutines.delay
 
 /**
  * 顶部 Tab 内容壳（[TopNav] + 内容区 + 菜单键刷新）。
@@ -140,25 +139,27 @@ private fun <T> TwoSlotPageBuffer(
     content: @Composable (T) -> Unit,
 ) {
     val slots = remember { List(2) { PageSlot<T>(it) } }
-    // 切换代次：每次真实切换 +1，守卫初始预热不覆盖"上一页"备用槽
-    var switchGeneration by remember { mutableIntStateOf(0) }
+    // 用户是否已实际切换过：初始装载不计入；
+    // 预热仅在尚无用户切换时执行（否则会挤掉刚离开的上一页）
+    var userSwitched by remember { mutableStateOf(false) }
 
     // 槽位指派（同步跟随 selectedTab 收敛）：
     // 目标已在某槽 → 只翻转 active（备用槽直接复用）；不在任何槽 → 替换非激活槽（冷启动时装载空槽）
     val current = slots.firstOrNull { it.tab == selectedTab }
     if (current == null) {
         (slots.firstOrNull { !it.active } ?: slots.first()).tab = selectedTab
-        switchGeneration++
     }
     slots.forEach { it.active = it.tab == selectedTab }
 
-    // 初始备用槽预热：装载"下一个" Tab。仅在用户尚未切换时执行，
-    // 否则会把刚离开的上一页挤出备用槽（快速往返 A↔B 就得重建）。
+    // 初始备用槽预热：等首屏渲染稳定（30 帧 ≈ 500ms）后装载"下一个" Tab。
+    // 仅在用户尚未切换时执行，否则会把刚离开的上一页挤出备用槽（快速往返 A↔B 就得重建）。
+    // 按帧计数而非 delay：随帧时钟推进，测试时钟下确定性快进。
     LaunchedEffect(reorderedTabs) {
+        println("PROBE prewarm effect enter")
         if (reorderedTabs.size <= 1) return@LaunchedEffect
-        withFrameNanos {}
-        delay(400)
-        if (switchGeneration > 0) return@LaunchedEffect
+        repeat(30) { withFrameNanos {} }
+        println("PROBE prewarm frames done userSwitched=$userSwitched")
+        if (userSwitched) return@LaunchedEffect
         val next = reorderedTabs[1]
         if (slots.none { it.tab == next }) {
             slots.firstOrNull { !it.active }?.tab = next
@@ -211,17 +212,19 @@ private fun <T> KeptTabPage(
     content: @Composable () -> Unit,
 ) {
     slot.tab ?: return
-    Box(
-        Modifier
-            .fillMaxSize()
-            .focusProperties { if (!slot.active) canFocus = false }
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints)
-                layout(placeable.width, placeable.height) {
-                    if (slot.active) placeable.place(0, 0)
-                }
-            },
-    ) {
-        content()
+    CompositionLocalProvider(LocalPageActive provides slot.active) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .focusProperties { if (!slot.active) canFocus = false }
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    layout(placeable.width, placeable.height) {
+                        if (slot.active) placeable.place(0, 0)
+                    }
+                },
+        ) {
+            content()
+        }
     }
 }

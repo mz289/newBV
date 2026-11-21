@@ -275,6 +275,35 @@ class TabbedTwoSlotTest {
         assertEquals(setOf("A"), liveTabs)
     }
 
+    /** 初始预热必须把"下一个"Tab 装入备用槽（守卫 bug 曾使预热永不生效）。 */
+    @Test
+    fun prewarmLoadsNextTabIntoBackupSlot() {
+        setUpShell()
+        // 推进帧时钟让预热的 30 帧节拍走完
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        assertTrue(
+            "预热应装载下一个 Tab；live=$liveTabs",
+            "B" in liveTabs,
+        )
+        assertEquals(1, creations["B"]) // 预热组合一次
+    }
+
+    /** 预热后首次切换走备用槽复用路径：无整页重组（creations 不增长）。 */
+    @Test
+    fun firstSwitchAfterPrewarm_reusesPrewarmedPage() {
+        setUpShell()
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        val bBefore = creations["B"] ?: 0
+
+        press(Key.DirectionRight) // → B（预热命中）
+        compose.waitForIdle()
+
+        assertEquals("预热命中不得重建页面", bBefore, creations["B"])
+        assertEquals(setOf("A", "B"), liveTabs)
+    }
+
     /** key(tab) 作用域抽查：SaveableStateProvider 键为 Tab 身份，内容 lambda 重组不串位。 */
     @Test
     fun pageIdentityBoundToTabNotSlot() {
