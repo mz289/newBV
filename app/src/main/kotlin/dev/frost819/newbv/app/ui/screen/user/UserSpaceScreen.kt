@@ -65,10 +65,11 @@ import dev.frost819.newbv.app.util.formatHourMinSec
 import dev.frost819.newbv.app.util.toWanString
 import dev.frost819.newbv.app.viewmodel.common.CollectWatchLaterEffects
 import dev.frost819.newbv.app.viewmodel.common.WatchLaterViewModel
-import dev.frost819.newbv.app.viewmodel.user.UserSpaceTab
+import dev.frost819.newbv.app.viewmodel.user.UserSpaceSection
 import dev.frost819.newbv.app.viewmodel.user.UserSpaceUiEffect
 import dev.frost819.newbv.app.viewmodel.user.UserSpaceUiState
 import dev.frost819.newbv.app.viewmodel.user.UserSpaceViewModel
+import dev.frost819.newbv.biliapi.entity.user.SpaceVideoOrder
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
 import dev.frost819.newbv.core.focus.touchClickable
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -77,7 +78,7 @@ import kotlinx.coroutines.flow.filter
 /**
  * 用户空间页。
  *
- * 展示用户信息（头像、昵称、关注按钮）、内容标签行（最新发布/最多播放/最多收藏/合集/系列）
+ * 展示用户信息（头像、昵称、关注按钮）、内容栏目行（投稿/合集/系列，投稿下含排序行）
  * 和对应内容网格。用户名和头像由路由参数传入，不单独调用 API 获取（与原版 BV 行为一致）。
  */
 fun NavGraphBuilder.userSpaceScreen(navController: NavController) {
@@ -124,13 +125,13 @@ private fun UserSpaceScreen(
 
     focusSaver.RestoreFocus()
 
-    // 切换标签时回到网格顶部，避免停留在旧内容的滚动位置
-    LaunchedEffect(gridState, state.tab) {
+    // 切换栏目/排序时回到网格顶部，避免停留在旧内容的滚动位置
+    LaunchedEffect(gridState, state.section, state.order) {
         gridState.scrollToItem(0)
     }
 
     val displayedItemCount =
-        if (state.tab.isCollectionTab) state.collections.size else state.videos.size
+        if (state.section == UserSpaceSection.Videos) state.videos.size else state.collections.size
 
     LaunchedEffect(gridState, displayedItemCount) {
         snapshotFlow {
@@ -161,14 +162,25 @@ private fun UserSpaceScreen(
         }
 
         item(span = { GridItemSpan(maxLineSpan) }) {
-            UserSpaceTabRow(
-                selectedTab = state.tab,
+            UserSpaceSectionRow(
+                selectedSection = state.section,
                 focusSaver = focusSaver,
-                onSelectTab = { viewModel.selectTab(mid, it) },
+                onSelectSection = { viewModel.selectSection(mid, it) },
             )
         }
 
-        if (state.tab.isCollectionTab) {
+        // 排序行仅投稿栏目显示（合集/系列没有排序维度）
+        if (state.section == UserSpaceSection.Videos) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                UserSpaceSortRow(
+                    selectedOrder = state.order,
+                    focusSaver = focusSaver,
+                    onSelectOrder = { viewModel.selectOrder(mid, it) },
+                )
+            }
+        }
+
+        if (state.section != UserSpaceSection.Videos) {
             itemsIndexed(
                 items = state.collections,
                 // season_id 与 series_id 是两套 ID 空间，加前缀防 key 冲突
@@ -209,7 +221,7 @@ private fun UserSpaceScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = if (state.tab == UserSpaceTab.Seasons) "TA还没有合集" else "TA还没有系列",
+                            text = if (state.section == UserSpaceSection.Seasons) "TA还没有合集" else "TA还没有系列",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -270,14 +282,17 @@ private fun UserSpaceScreen(
 }
 
 /**
- * 内容标签行：最新发布 / 最多播放 / 最多收藏 / 合集 / 系列。
+ * 内容栏目行：投稿 / 合集 / 系列。
+ *
+ * 排序维度收纳在「投稿」栏目下（见 [UserSpaceSortRow]），与 B 站空间
+ * 「投稿 → 排序」「合集和列表」的信息层级一致。
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun UserSpaceTabRow(
-    selectedTab: UserSpaceTab,
+private fun UserSpaceSectionRow(
+    selectedSection: UserSpaceSection,
     focusSaver: FocusSaver,
-    onSelectTab: (UserSpaceTab) -> Unit,
+    onSelectSection: (UserSpaceSection) -> Unit,
 ) {
     LazyRow(
         modifier =
@@ -289,29 +304,101 @@ private fun UserSpaceTabRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
     ) {
-        items(UserSpaceTab.entries.size, key = { index -> index }) { index ->
-            val tab = UserSpaceTab.entries[index]
+        items(UserSpaceSection.entries.size, key = { index -> index }) { index ->
+            val section = UserSpaceSection.entries[index]
             FilterChip(
-                selected = tab == selectedTab,
-                onClick = { onSelectTab(tab) },
+                selected = section == selectedSection,
+                onClick = { onSelectSection(section) },
                 modifier =
                     Modifier
-                        .touchClickable(onClick = { onSelectTab(tab) })
-                        .focusSaverItem(focusSaver, "user_space_tab_$index"),
+                        .touchClickable(onClick = { onSelectSection(section) })
+                        .focusSaverItem(focusSaver, "user_space_section_$index"),
                 shape = FilterChipDefaults.shape(shape = ControlFocusDefaults.shape),
                 scale = FilterChipDefaults.scale(focusedScale = 1f),
                 colors = ControlFocusDefaults.filterColors(),
                 border = ControlFocusDefaults.filterBorder(),
             ) {
                 Text(
-                    text = tab.label,
+                    text = section.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
                     color =
-                        if (tab == selectedTab) {
+                        if (section == selectedSection) {
                             MaterialTheme.colorScheme.onPrimaryContainer
                         } else {
                             MaterialTheme.colorScheme.onSurface
                         },
                 )
+            }
+        }
+    }
+}
+
+/**
+ * 投稿排序行：最新发布 / 最多播放 / 最多收藏（仅投稿栏目显示）。
+ *
+ * 行首"排序"维度标签与番剧索引筛选行同款，标明这一行从属于上方选中的「投稿」。
+ */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun UserSpaceSortRow(
+    selectedOrder: SpaceVideoOrder,
+    focusSaver: FocusSaver,
+    onSelectOrder: (SpaceVideoOrder) -> Unit,
+) {
+    val orders =
+        remember {
+            listOf(
+                SpaceVideoOrder.PubDate to "最新发布",
+                SpaceVideoOrder.Click to "最多播放",
+                SpaceVideoOrder.Stow to "最多收藏",
+            )
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 40.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            modifier = Modifier.width(56.dp),
+            text = "排序",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LazyRow(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .focusRestorer(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+        ) {
+            items(orders.size, key = { index -> orders[index].first }) { index ->
+                val (order, label) = orders[index]
+                FilterChip(
+                    selected = order == selectedOrder,
+                    onClick = { onSelectOrder(order) },
+                    modifier =
+                        Modifier
+                            .touchClickable(onClick = { onSelectOrder(order) })
+                            .focusSaverItem(focusSaver, "user_space_sort_${order.value}"),
+                    shape = FilterChipDefaults.shape(shape = ControlFocusDefaults.shape),
+                    scale = FilterChipDefaults.scale(focusedScale = 1f),
+                    colors = ControlFocusDefaults.filterColors(),
+                    border = ControlFocusDefaults.filterBorder(),
+                ) {
+                    Text(
+                        text = label,
+                        color =
+                            if (order == selectedOrder) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                    )
+                }
             }
         }
     }

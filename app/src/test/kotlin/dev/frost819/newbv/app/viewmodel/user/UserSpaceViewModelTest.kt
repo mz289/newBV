@@ -277,11 +277,11 @@ class UserSpaceViewModelTest {
         }
 
     // ------------------------------------------------------------------
-    // selectTab
+    // selectOrder（投稿排序）
     // ------------------------------------------------------------------
 
     @Test
-    fun `selectTab to MostPlayed clears videos and reloads with click order`() =
+    fun `selectOrder to Click clears videos and reloads with click order`() =
         runTest(testDispatcher) {
             coEvery {
                 userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.PubDate, page = any(), preferApiType = BiliApiType.Web)
@@ -293,14 +293,14 @@ class UserSpaceViewModelTest {
             viewModel = createViewModel()
             viewModel.init(1L, "测试UP")
             advanceUntilIdle()
-            assertThat(viewModel.uiState.value.tab).isEqualTo(UserSpaceTab.Latest)
+            assertThat(viewModel.uiState.value.order).isEqualTo(SpaceVideoOrder.PubDate)
             assertThat(viewModel.uiState.value.videos.map { it.aid }).containsExactly(1L)
 
-            viewModel.selectTab(1L, UserSpaceTab.MostPlayed)
+            viewModel.selectOrder(1L, SpaceVideoOrder.Click)
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertThat(state.tab).isEqualTo(UserSpaceTab.MostPlayed)
+            assertThat(state.order).isEqualTo(SpaceVideoOrder.Click)
             // 旧排序的视频已清空，只剩新排序内容
             assertThat(state.videos.map { it.aid }).containsExactly(2L)
             coVerify(exactly = 1) {
@@ -309,7 +309,7 @@ class UserSpaceViewModelTest {
         }
 
     @Test
-    fun `selectTab same tab is no-op`() =
+    fun `selectOrder same order is no-op`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
 
@@ -317,7 +317,7 @@ class UserSpaceViewModelTest {
             viewModel.init(1L, "测试UP")
             advanceUntilIdle()
 
-            viewModel.selectTab(1L, UserSpaceTab.Latest)
+            viewModel.selectOrder(1L, SpaceVideoOrder.PubDate)
             advanceUntilIdle()
 
             coVerify(exactly = 1) { userRepository.getSpaceVideos(any(), any(), any(), any()) }
@@ -325,7 +325,32 @@ class UserSpaceViewModelTest {
         }
 
     @Test
-    fun `selectTab filters duplicate aids on overlapping pages`() =
+    fun `selectOrder is ignored outside Videos section`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
+                fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = false)
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "测试UP")
+            advanceUntilIdle()
+
+            viewModel.selectSection(1L, UserSpaceSection.Seasons)
+            advanceUntilIdle()
+            val collectionsBefore = viewModel.uiState.value.collections
+
+            // 合集/系列栏目没有排序维度：切换排序不应触发任何请求
+            viewModel.selectOrder(1L, SpaceVideoOrder.Click)
+            advanceUntilIdle()
+
+            assertThat(viewModel.uiState.value.section).isEqualTo(UserSpaceSection.Seasons)
+            assertThat(viewModel.uiState.value.collections).isSameInstanceAs(collectionsBefore)
+            coVerify(exactly = 1) { userRepository.getSpaceVideos(any(), any(), any(), any()) }
+            coVerify(exactly = 1) { userRepository.getSpaceCollections(any(), any(), any()) }
+        }
+
+    @Test
+    fun `loadVideos filters duplicate aids on overlapping pages`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returnsMany
                 listOf(
@@ -344,11 +369,11 @@ class UserSpaceViewModelTest {
         }
 
     // ------------------------------------------------------------------
-    // collections（合集/系列）
+    // selectSection（合集/系列栏目）
     // ------------------------------------------------------------------
 
     @Test
-    fun `selectTab to Seasons loads collections`() =
+    fun `selectSection to Seasons loads collections`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
             coEvery {
@@ -362,11 +387,11 @@ class UserSpaceViewModelTest {
             viewModel.init(1L, "测试UP")
             advanceUntilIdle()
 
-            viewModel.selectTab(1L, UserSpaceTab.Seasons)
+            viewModel.selectSection(1L, UserSpaceSection.Seasons)
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertThat(state.tab).isEqualTo(UserSpaceTab.Seasons)
+            assertThat(state.section).isEqualTo(UserSpaceSection.Seasons)
             assertThat(state.videos).isEmpty()
             assertThat(state.collections).hasSize(2)
             assertThat(state.collections[0].isSeason).isTrue()
@@ -376,7 +401,7 @@ class UserSpaceViewModelTest {
         }
 
     @Test
-    fun `loadMore appends collections pages on Seasons tab`() =
+    fun `loadMore appends collections pages on Seasons section`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
             coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returnsMany
@@ -389,7 +414,7 @@ class UserSpaceViewModelTest {
             viewModel.init(1L, "测试UP")
             advanceUntilIdle()
 
-            viewModel.selectTab(1L, UserSpaceTab.Seasons)
+            viewModel.selectSection(1L, UserSpaceSection.Seasons)
             advanceUntilIdle()
             assertThat(viewModel.uiState.value.collections).hasSize(1)
             assertThat(viewModel.uiState.value.hasMore).isTrue()
@@ -402,9 +427,11 @@ class UserSpaceViewModelTest {
         }
 
     @Test
-    fun `selectTab back to Latest reloads videos`() =
+    fun `selectSection back to Videos reloads videos and keeps order`() =
         runTest(testDispatcher) {
-            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData(videos = listOf(fakeVideo(1)))
+            coEvery {
+                userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.Click, page = any(), preferApiType = BiliApiType.Web)
+            } returns fakeVideoData(videos = listOf(fakeVideo(1)))
             coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
                 fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = false)
 
@@ -412,21 +439,28 @@ class UserSpaceViewModelTest {
             viewModel.init(1L, "测试UP")
             advanceUntilIdle()
 
-            viewModel.selectTab(1L, UserSpaceTab.Seasons)
+            // 先切到最多播放，再去合集，再回投稿：排序应保留
+            viewModel.selectOrder(1L, SpaceVideoOrder.Click)
+            advanceUntilIdle()
+            viewModel.selectSection(1L, UserSpaceSection.Seasons)
             advanceUntilIdle()
             assertThat(viewModel.uiState.value.collections).isNotEmpty()
 
-            viewModel.selectTab(1L, UserSpaceTab.Latest)
+            viewModel.selectSection(1L, UserSpaceSection.Videos)
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertThat(state.tab).isEqualTo(UserSpaceTab.Latest)
+            assertThat(state.section).isEqualTo(UserSpaceSection.Videos)
+            assertThat(state.order).isEqualTo(SpaceVideoOrder.Click)
             assertThat(state.collections).isEmpty()
             assertThat(state.videos).isNotEmpty()
+            coVerify {
+                userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.Click, page = any(), preferApiType = any())
+            }
         }
 
     @Test
-    fun `selectTab to Series loads series collections`() =
+    fun `selectSection to Series loads series collections`() =
         runTest(testDispatcher) {
             coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
             coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
@@ -439,17 +473,17 @@ class UserSpaceViewModelTest {
             viewModel.init(1L, "测试UP")
             advanceUntilIdle()
 
-            viewModel.selectTab(1L, UserSpaceTab.Series)
+            viewModel.selectSection(1L, UserSpaceSection.Series)
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
-            assertThat(state.tab).isEqualTo(UserSpaceTab.Series)
+            assertThat(state.section).isEqualTo(UserSpaceSection.Series)
             assertThat(state.collections).hasSize(1)
             assertThat(state.collections[0].isSeason).isFalse()
         }
 
     @Test
-    fun `selectTab resets error state before reload`() =
+    fun `selectSection resets error state before reload`() =
         runTest(testDispatcher) {
             coEvery {
                 userRepository.getSpaceVideos(mid = 1L, order = SpaceVideoOrder.PubDate, page = any(), preferApiType = BiliApiType.Web)
@@ -462,11 +496,37 @@ class UserSpaceViewModelTest {
             advanceUntilIdle()
             assertThat(viewModel.uiState.value.error).isTrue()
 
-            viewModel.selectTab(1L, UserSpaceTab.Seasons)
+            viewModel.selectSection(1L, UserSpaceSection.Seasons)
             advanceUntilIdle()
 
             assertThat(viewModel.uiState.value.error).isFalse()
             assertThat(viewModel.uiState.value.collections).isNotEmpty()
+        }
+
+    @Test
+    fun `init resets section and order when mid changes`() =
+        runTest(testDispatcher) {
+            coEvery { userRepository.getSpaceVideos(any(), any(), any(), any()) } returns fakeVideoData()
+            coEvery { userRepository.getSpaceCollections(any(), any(), any()) } returns
+                fakeCollectionData(collections = listOf(fakeCollection(10)), hasNext = false)
+
+            viewModel = createViewModel()
+            viewModel.init(1L, "UP1")
+            advanceUntilIdle()
+            viewModel.selectOrder(1L, SpaceVideoOrder.Click)
+            advanceUntilIdle()
+            viewModel.selectSection(1L, UserSpaceSection.Series)
+            advanceUntilIdle()
+
+            viewModel.init(2L, "UP2")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertThat(state.mid).isEqualTo(2L)
+            assertThat(state.section).isEqualTo(UserSpaceSection.Videos)
+            assertThat(state.order).isEqualTo(SpaceVideoOrder.PubDate)
+            assertThat(state.collections).isEmpty()
+            assertThat(state.videos).isNotEmpty()
         }
 
     // ------------------------------------------------------------------

@@ -27,25 +27,16 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 /**
- * UP 主空间内容标签。
+ * UP 主空间内容栏目。
  *
- * 三个投稿排序（对应 [SpaceVideoOrder]）+ 合集/系列两个聚合内容页。
+ * 投稿（Videos）支持三种排序（见 [UserSpaceUiState.order]）；合集/系列为聚合内容页。
  */
-enum class UserSpaceTab(
+enum class UserSpaceSection(
     val label: String,
-    /** 投稿排序；合集/系列标签为 null。 */
-    val order: SpaceVideoOrder?,
 ) {
-    Latest("最新发布", SpaceVideoOrder.PubDate),
-    MostPlayed("最多播放", SpaceVideoOrder.Click),
-    MostFavorited("最多收藏", SpaceVideoOrder.Stow),
-    Seasons("合集", null),
-    Series("系列", null),
-    ;
-
-    /** 是否为合集/系列标签。 */
-    val isCollectionTab: Boolean
-        get() = order == null
+    Videos("投稿"),
+    Seasons("合集"),
+    Series("系列"),
 }
 
 /**
@@ -53,8 +44,8 @@ enum class UserSpaceTab(
  *
  * 与原版 BV 一致：用户名和头像由来源页通过路由传入，不单独调用 API 获取。
  *
- * [videos]（投稿）与 [collections]（合集/系列）按 [tab] 二选一展示；
- * loading/error/hasMore 三个字段描述当前标签内容的首载/翻页/出错状态。
+ * [videos]（投稿）与 [collections]（合集/系列）按 [section] 二选一展示；
+ * loading/error/hasMore 三个字段描述当前栏目内容的首载/翻页/出错状态。
  */
 data class UserSpaceUiState(
     val mid: Long = 0L,
@@ -62,7 +53,9 @@ data class UserSpaceUiState(
     val face: String = "",
     val videos: List<SpaceVideo> = emptyList(),
     val collections: List<UpCollection> = emptyList(),
-    val tab: UserSpaceTab = UserSpaceTab.Latest,
+    val section: UserSpaceSection = UserSpaceSection.Videos,
+    /** 投稿排序（仅 [UserSpaceSection.Videos] 生效）。 */
+    val order: SpaceVideoOrder = SpaceVideoOrder.PubDate,
     val loading: Boolean = false,
     val error: Boolean = false,
     val hasMore: Boolean = true,
@@ -106,7 +99,7 @@ class UserSpaceViewModel
         private var collectionPage = SpaceCollectionPage()
 
         /**
-         * 初始化：设置用户信息（由路由传入），按当前标签加载内容。
+         * 初始化：设置用户信息（由路由传入），按当前栏目加载内容。
          *
          * @param mid 用户 MID
          * @param name 用户名（从详情页/播放器/卡片传入）
@@ -126,9 +119,15 @@ class UserSpaceViewModel
                         mid = mid,
                         name = name,
                         face = face ?: "",
-                        // 切换到其他用户时先清空关注状态与内容标签，等待本次查询返回
+                        // 切换到其他用户时先清空关注状态、内容栏目与旧列表，等待本次查询返回
                         isFollowing = if (sameMid) it.isFollowing else false,
-                        tab = if (sameMid) it.tab else UserSpaceTab.Latest,
+                        section = if (sameMid) it.section else UserSpaceSection.Videos,
+                        order = if (sameMid) it.order else SpaceVideoOrder.PubDate,
+                        videos = if (sameMid) it.videos else emptyList(),
+                        collections = if (sameMid) it.collections else emptyList(),
+                        loading = false,
+                        hasMore = true,
+                        error = false,
                     )
                 }
                 loadContent(mid)
@@ -139,21 +138,21 @@ class UserSpaceViewModel
         }
 
         /**
-         * 切换内容标签：清空当前列表并按新标签重新加载。
+         * 切换内容栏目（投稿/合集/系列）：清空当前列表并按新栏目重新加载。
          *
-         * 同一标签重复点击不触发刷新（重载走 [refresh]）。
+         * 同一栏目重复点击不触发刷新（重载走 [refresh]）。
          */
-        fun selectTab(
+        fun selectSection(
             mid: Long,
-            tab: UserSpaceTab,
+            section: UserSpaceSection,
         ) {
-            if (_uiState.value.tab == tab) return
+            if (_uiState.value.section == section) return
 
             videoPage = SpaceVideoPage()
             collectionPage = SpaceCollectionPage()
             _uiState.update {
                 it.copy(
-                    tab = tab,
+                    section = section,
                     videos = emptyList(),
                     collections = emptyList(),
                     loading = false,
@@ -164,12 +163,37 @@ class UserSpaceViewModel
             loadContent(mid)
         }
 
-        /** 加载当前标签下一页内容（网格滚动到底部时触发）。 */
+        /**
+         * 切换投稿排序（最新发布/最多播放/最多收藏），清空投稿列表并重新加载。
+         *
+         * 仅投稿栏目生效；同一排序重复点击不触发刷新。
+         */
+        fun selectOrder(
+            mid: Long,
+            order: SpaceVideoOrder,
+        ) {
+            if (_uiState.value.section != UserSpaceSection.Videos) return
+            if (_uiState.value.order == order) return
+
+            videoPage = SpaceVideoPage()
+            _uiState.update {
+                it.copy(
+                    order = order,
+                    videos = emptyList(),
+                    loading = false,
+                    hasMore = true,
+                    error = false,
+                )
+            }
+            loadVideos(mid)
+        }
+
+        /** 加载当前栏目下一页内容（网格滚动到底部时触发）。 */
         fun loadMore(mid: Long) {
             loadContent(mid)
         }
 
-        /** 重新加载当前标签第一页（重试）。 */
+        /** 重新加载当前栏目第一页（重试）。 */
         fun refresh(mid: Long) {
             videoPage = SpaceVideoPage()
             collectionPage = SpaceCollectionPage()
@@ -186,13 +210,17 @@ class UserSpaceViewModel
 
         private fun hasDisplayedContent(): Boolean {
             val state = _uiState.value
-            return if (state.tab.isCollectionTab) state.collections.isNotEmpty() else state.videos.isNotEmpty()
+            return if (state.section == UserSpaceSection.Videos) {
+                state.videos.isNotEmpty()
+            } else {
+                state.collections.isNotEmpty()
+            }
         }
 
         private fun loadContent(mid: Long) {
-            when (_uiState.value.tab.order) {
-                null -> loadCollections(mid)
-                else -> loadVideos(mid)
+            when (_uiState.value.section) {
+                UserSpaceSection.Videos -> loadVideos(mid)
+                UserSpaceSection.Seasons, UserSpaceSection.Series -> loadCollections(mid)
             }
         }
 
@@ -268,11 +296,11 @@ class UserSpaceViewModel
             }
         }
 
-        /** 按当前标签的排序拉取投稿视频下一页。 */
+        /** 按当前排序拉取投稿视频下一页。 */
         fun loadVideos(mid: Long) {
             if (_uiState.value.loading || !_uiState.value.hasMore) return
 
-            val order = _uiState.value.tab.order ?: SpaceVideoOrder.PubDate
+            val order = _uiState.value.order
             _uiState.update { it.copy(loading = true, error = false) }
 
             viewModelScope.launch {
