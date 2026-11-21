@@ -8,13 +8,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -40,19 +43,24 @@ import kotlinx.coroutines.delay
  * Tab 按首选项把 [initialTab] 旋转到首位；内容区获得焦点后 TopNav 收紧内边距；
  * 菜单键刷新当前 Tab 并把焦点交还 TopNav。
  *
- * 内容保持采用"常驻组合"（Telegram ViewPagerFixed 思想）：已访问过的 Tab 页面
- * 常驻组合树、切换仅做绘制层过渡（graphicsLayer alpha/位移——零内容重组、零布局），
- * 切回即原位（滚动位置、焦点记忆、缩略图缓存天然保留）；未访问的 Tab 首帧后按帧
- * 空闲预热组合（同一帧内一次只组合一页，保首屏不抖），首个切换不再现场组合整页。
- * 隐藏页"只测量不放置"整体移出焦点搜索——[focusProperties] canFocus=false 会被页内的
- * focusGroup()/tv-material Card 等中间 FocusTarget 截断，单靠它挡不住卡片子项；
- * 未放置节点由 Compose 的 isEligibleForFocusSearch 直接排除，是硬保证。
+ * 内容采用"双槽位页面缓冲"（参考 Telegram Dialogs 文件夹切换）：
+ * - 固定两个页面槽位，常驻 Composition ≤ 2，不随访问过的 Tab 数增长；
+ * - 页面身份 = Tab 本身（经 [SaveableStateHolder] 按 Tab 稳定 key 保存/恢复），
+ *   槽位只是容器，角色交换只翻转 active 标志、页面实例不搬家；
+ * - 目标 Tab 已在备用槽位 → 直接复用（零内容重组）；不在任何槽位 → 替换备用槽位
+ *   （旧 Tab 的 saveable 状态入 Holder，重进时恢复滚动位/焦点 key）；
+ * - 切换动画复用 150ms 定长 alpha + 10% 轻位移（graphicsLayer，仅绘制期读取）；
+ * - 焦点隔离：可见页不写 canFocus（父级属性会覆盖子级 focusGroup 的 Never），
+ *   只对非激活页写 canFocus=false；页面"始终测量、按需放置"，未放置节点被
+ *   isEligibleForFocusSearch 排除；退出动画中的页面以屏外布局偏移停放、
+ *   graphicsLayer 视觉补偿——参与退出动画但不参与焦点搜索、不抢焦点；
+ * - 初始备用槽位预热装载"下一个" Tab（用户尚未切换时），首个切换零重建。
  *
  * @param tabs 全部 Tab 项。
  * @param initialTab 初始（上次记住的）Tab。
  * @param displayName Tab 显示名称。
  * @param onRefresh 点击 Tab 或按菜单键时的刷新回调。
- * @param animated Tab 是否为多子页壳（true：常驻叠放切换；false：单内容直接组合）。
+ * @param animated Tab 是否为多子页壳（true：双槽位缓冲 + 切换动画；false：单内容直接组合）。
  * @param onTabSelected Tab 切换回调（如懒加载），同 Tab 重复聚焦不触发。
  * @param content Tab 内容。
  */
@@ -76,26 +84,7 @@ fun <T> TabbedContent(
             val startIndex = tabs.indexOf(initialTab)
             if (startIndex == -1) tabs else tabs.drop(startIndex) + tabs.take(startIndex)
         }
-
-    // 已访问 Tab：常驻组合树（切回零重建）。首屏只组合当前页，其余页在首帧后预热。
-    val visitedTabs = remember { mutableStateListOf<T>(initialTab) }
-    if (selectedTab !in visitedTabs) visitedTabs.add(selectedTab)
-
-    // 预热未访问页：等首帧稳定后逐页组合（每页占一帧 + 小间隔，避免连帧抖动）。
-    // 预热页只测量不放置——不进焦点搜索、不绘制，但网格会完成组合与首屏项测量，
-    // 之后切换只做放置 + alpha 过渡，"第一次切换卡一下"随之消失。
-    LaunchedEffect(animated, reorderedTabs) {
-        if (!animated || reorderedTabs.size <= 1) return@LaunchedEffect
-        withFrameNanos { }
-        delay(400)
-        reorderedTabs.forEach { tab ->
-            if (tab !in visitedTabs) {
-                visitedTabs.add(tab)
-                withFrameNanos { }
-                delay(60)
-            }
-        }
-    }
+    val stateHolder = rememberSaveableStateHolder()
 
     Material3Scaffold(
         topBar = {
@@ -108,7 +97,6 @@ fun <T> TabbedContent(
                 onSelectedChanged = { tab ->
                     if (tab != selectedTab) {
                         selectedTab = tab
-                        if (tab !in visitedTabs) visitedTabs.add(tab)
                         onTabSelected(tab)
                     }
                 },
@@ -131,15 +119,13 @@ fun <T> TabbedContent(
                     },
         ) {
             if (animated) {
-                reorderedTabs.forEach { tab ->
-                    if (tab in visitedTabs) {
-                        key(tab) {
-                            Box(Modifier.zIndex(if (tab == selectedTab) 1f else 0f)) {
-                                KeptTabPage(visible = tab == selectedTab) { content(tab) }
-                            }
-                        }
-                    }
-                }
+                TwoSlotPageBuffer(
+                    selectedTab = selectedTab,
+                    tabs = tabs,
+                    reorderedTabs = reorderedTabs,
+                    stateHolder = stateHolder,
+                    content = content,
+                )
             } else {
                 content(selectedTab)
             }
@@ -148,59 +134,151 @@ fun <T> TabbedContent(
 }
 
 /**
- * 常驻 Tab 页：叠放于同一 Box，切换只做绘制层过渡（alpha + 轻位移）。
- * - 动画值仅经 graphicsLayer lambda 读取：只触发绘制阶段，无重组/布局开销；
- * - 隐藏页 canFocus=false 挡住直接焦点请求；但页内容的中间 FocusTarget
- *   （focusGroup()/tv-material Card）会截断祖先 focusProperties，卡片子项仍可聚焦；
- * - 因此隐藏页在退出动画结束后"只测量不放置"：未放置节点被
- *   isEligibleForFocusSearch 排除，焦点搜索与方向键永远进不去隐藏页；
- * - 稳态隐藏仍保留组合与测量（预热/状态存活），切回只需重新放置。
+ * 双槽位页面缓冲。槽位身份固定（index 0/1），页面身份 = Tab：
+ * 切换只是翻转两个槽位的 active 标志，页面实例不搬家，Composition identity 随 Tab 保持。
  */
 @Composable
-private fun KeptTabPage(
-    visible: Boolean,
+private fun <T> TwoSlotPageBuffer(
+    selectedTab: T,
+    tabs: List<T>,
+    reorderedTabs: List<T>,
+    stateHolder: SaveableStateHolder,
     modifier: Modifier = Modifier,
+    content: @Composable (T) -> Unit,
+) {
+    val slots = remember { List(2) { PageSlot<T>(it) } }
+    // 切换代次：每次真实切换 +1，守卫初始预热不覆盖"上一页"备用槽
+    var switchGeneration by remember { mutableIntStateOf(0) }
+
+    // 槽位指派（同步跟随 selectedTab 收敛）：
+    // 目标已在某槽 → 只翻转 active（备用槽直接复用）；不在任何槽 → 替换非激活槽（冷启动时装载空槽）
+    val current = slots.firstOrNull { it.tab == selectedTab }
+    if (current == null) {
+        (slots.firstOrNull { !it.active } ?: slots.first()).let { target ->
+            target.tab = selectedTab
+            target.revision++
+        }
+        switchGeneration++
+    }
+    slots.forEach { it.active = it.tab == selectedTab }
+
+    // 初始备用槽预热：装载"下一个" Tab。仅在用户尚未切换时执行，
+    // 否则会把刚离开的上一页挤出备用槽（快速往返 A↔B 就得重建）。
+    LaunchedEffect(reorderedTabs) {
+        if (reorderedTabs.size <= 1) return@LaunchedEffect
+        withFrameNanos {}
+        delay(400)
+        if (switchGeneration > 0) return@LaunchedEffect
+        val next = reorderedTabs[1]
+        if (slots.none { it.tab == next }) {
+            slots.firstOrNull { !it.active }?.tab = next
+        }
+    }
+
+    Box(modifier.fillMaxSize()) {
+        slots.forEach { slot ->
+            val tab = slot.tab ?: return@forEach
+            key(slot.index) {
+                Box(Modifier.zIndex(if (slot.active) 1f else 0f)) {
+                    KeptTabPage(slot = slot) {
+                        stateHolder.SaveableStateProvider(pageKey(tabs, tab)) { content(tab) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 页面身份 key：Tab 在原始列表中的下标（稳定、可保存）。 */
+private fun <T> pageKey(
+    tabs: List<T>,
+    tab: T,
+): Int = tabs.indexOf(tab)
+
+/**
+ * 页面槽位状态。槽位身份固定（index），页面身份 = [tab]；[revision] 随装载递增，
+ * 作为"页面身份变化"信号（Alpha 归零等）——槽位下标绝不充当页面身份。
+ */
+private class PageSlot<T>(
+    val index: Int,
+) {
+    var tab by mutableStateOf<T?>(null)
+    var active by mutableStateOf(false)
+    var placed by mutableStateOf(false)
+    var revision by mutableIntStateOf(0)
+    val alpha = Animatable(0f)
+}
+
+/**
+ * 槽位页面：切换只做绘制层过渡（alpha + 10% 轻位移）。
+ *
+ * - [PageSlot.alpha] 仅经 graphicsLayer/layout lambda 读取：动画只触发绘制，稳态零重组/零布局；
+ * - 页面身份变化（备用槽装载新 Tab，revision 递增）时 Alpha 归零，不沿用上一页动画值；
+ * - 非激活页只写 canFocus=false（可见页不碰 canFocus——父级属性覆盖子级，会把 grid item
+ *   focusGroup 的 Focusability.Never 提升为可聚焦，方向键停在无视觉组节点上）；
+ * - 布局放置门：每次恰好测量一次、按需放置——未放置节点被 isEligibleForFocusSearch 排除；
+ *   退出动画中的页面以屏外布局偏移停放、graphicsLayer 反向补偿（绘制位置不变、焦点矩形
+ *   落在屏外）——参与退出动画但不参与焦点搜索、不抢焦点；
+ * - 稳态隐藏保留组合与测量（预热/状态存活），切回只需重新放置。
+ */
+@Composable
+private fun <T> KeptTabPage(
+    slot: PageSlot<T>,
     content: @Composable () -> Unit,
 ) {
-    val alpha = remember { Animatable(if (visible) 1f else 0f) }
-    // 本页是否参与放置：可见页 + 退出动画中的旧页。动画结束即摘除内容放置。
-    var placed by remember { mutableStateOf(visible) }
-    if (visible) placed = true
+    val tab = slot.tab ?: return
+    val visible = slot.active
+    if (visible && !slot.placed) slot.placed = true
+
+    // 页面身份变化（备用槽装载新 Tab）：Alpha 归零。先于可见性动画效果执行。
+    LaunchedEffect(slot.revision) {
+        slot.alpha.snapTo(0f)
+    }
 
     LaunchedEffect(visible) {
         if (visible) {
-            alpha.animateTo(
+            slot.alpha.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(150, easing = LinearOutSlowInEasing),
             )
         } else {
-            alpha.animateTo(
+            slot.alpha.animateTo(
                 targetValue = 0f,
                 animationSpec = tween(150, easing = FastOutSlowInEasing),
             )
-            placed = false
+            slot.placed = false
+        }
+    }
+    DisposableEffect(tab) {
+        onDispose {
+            // 槽位被替换（页面身份离场）：清掉退场标记，槽位可安全装载下一页
+            slot.placed = false
         }
     }
     Box(
-        modifier
+        Modifier
             .fillMaxSize()
-            // 只对隐藏页关闭焦点；可见页不要写 canFocus=true —— 父级属性会覆盖子级，
-            // 把 grid item 的 focusGroup()(Focusability.Never) 变成可聚焦目标，
-            // 方向键会停在看不见的组节点上。
             .focusProperties { if (!visible) canFocus = false }
             .graphicsLayer {
-                this.alpha = alpha.value
+                this.alpha = slot.alpha.value
+                // 退出动画中的页面被停放到屏外布局偏移（见下方 layout），此处反向补偿：
+                // 继续参与退出动画（轻位移 + 淡出），但焦点矩形在屏外、不进焦点搜索。
+                val exiting = !visible && slot.placed
+                val park = if (exiting) size.width else 0f
                 // Telegram 式轻位移：进入页自右侧 10% 屏宽滑入，退出页反向滑出
-                val slide = (1f - alpha.value) * size.width * 0.1f
-                translationX = if (visible) slide else -slide
+                val slide = (1f - slot.alpha.value) * size.width * 0.1f
+                translationX = -park + (if (visible) slide else -slide)
             }
             .layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints)
                 layout(placeable.width, placeable.height) {
-                    if (placed) placeable.place(0, 0)
+                    if (slot.placed) {
+                        val exiting = !slot.active
+                        placeable.place(x = if (exiting) constraints.maxWidth else 0, y = 0)
+                    }
                 }
             }
-            .drawWithContent { if (alpha.value > 0.01f) drawContent() },
+            .drawWithContent { if (slot.alpha.value > 0.01f) drawContent() },
     ) {
         content()
     }
