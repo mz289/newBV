@@ -1,5 +1,6 @@
 package dev.frost819.newbv.app.ui.screen.settings.content
 
+import java.util.Locale
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
@@ -115,7 +116,7 @@ fun InfoSetting(
             Text(text = "厂商：${Build.MANUFACTURER}")
             Text(text = "型号：${Build.MODEL} (${Build.PRODUCT})")
             Text(text = "系统：Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-            Text(text = "屏幕：${screenInfo.first}x${screenInfo.second} @ ${String.format("%.1f", screenInfo.third)}fps")
+            Text(text = "屏幕：${screenInfo.first}x${screenInfo.second} @ ${String.format(Locale.ROOT, "%.1f", screenInfo.third)}fps")
             if (Build.VERSION.SDK_INT >= 31) {
                 Text(text = "SOC：${Build.SOC_MANUFACTURER} ${Build.SOC_MODEL}")
             }

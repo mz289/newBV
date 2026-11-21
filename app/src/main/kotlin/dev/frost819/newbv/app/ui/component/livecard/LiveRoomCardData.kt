@@ -1,5 +1,6 @@
 package dev.frost819.newbv.app.ui.component.livecard
 
+import java.util.Locale
 import dev.frost819.newbv.biliapi.http.entity.live.FollowLiveRoom
 import dev.frost819.newbv.biliapi.http.entity.live.LiveRoomItem
 
@@ -34,8 +35,8 @@ data class LiveRoomCardData(
 
 fun formatOnlineCount(online: Int): String =
     when {
-        online >= 10_000_000 -> String.format("%.1f亿", online / 10_000_000.0)
-        online >= 10_000 -> String.format("%.1f万", online / 10_000.0)
+        online >= 10_000_000 -> String.format(Locale.ROOT, "%.1f亿", online / 10_000_000.0)
+        online >= 10_000 -> String.format(Locale.ROOT, "%.1f万", online / 10_000.0)
         else -> online.toString()
     }
 

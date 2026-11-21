@@ -1,5 +1,6 @@
 package dev.frost819.newbv.player
 
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -12,6 +13,7 @@ fun Long.formatMinSec(): String =
         "..."
     } else {
         String.format(
+            Locale.ROOT,
             "%02d:%02d",
             TimeUnit.MILLISECONDS.toMinutes(this),
             TimeUnit.MILLISECONDS.toSeconds(this) -

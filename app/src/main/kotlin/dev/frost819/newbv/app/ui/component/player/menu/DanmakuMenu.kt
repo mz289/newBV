@@ -1,5 +1,6 @@
 package dev.frost819.newbv.app.ui.component.player.menu
 
+import java.util.Locale
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.frost819.newbv.app.ui.component.player.menu.component.CheckBoxMenuList
@@ -126,7 +127,7 @@ fun DanmakuMenuList(
                     value = currentSpeedFactor,
                     step = 0.1f,
                     range = 0.2f..5f,
-                    text = "${String.format("%.1f", currentSpeedFactor)}x",
+                    text = "${String.format(Locale.ROOT, "%.1f", currentSpeedFactor)}x",
                     onValueChange = onDanmakuSpeedFactorChange,
                     onFocusBackToParent = backToMenu,
                 )

@@ -97,10 +97,6 @@ android {
     }
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-}
-
 dependencies {
     // === Project modules ===
     implementation(project(":bili-api"))
@@ -138,9 +134,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.util)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material)
     implementation(libs.androidx.compose.material.icons)
-    implementation(libs.androidx.compose.tv.foundation)
     implementation(libs.androidx.compose.tv.material)
     debugImplementation(libs.androidx.compose.ui.tooling)
 

@@ -1,5 +1,6 @@
 package dev.frost819.newbv.app.ui.screen.search
 
+import java.util.Locale
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -268,7 +269,7 @@ fun SearchResultContent(
                                             seasonId = p.seasonId,
                                             title = p.title.removeHtmlTags(),
                                             cover = p.cover,
-                                            rating = if (p.star > 0) String.format("%.1f", p.star) else null,
+                                            rating = if (p.star > 0) String.format(Locale.ROOT, "%.1f", p.star) else null,
                                             badge = p.badge,
                                         )
                                     },

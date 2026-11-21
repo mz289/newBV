@@ -22,7 +22,6 @@ compose = "1.8.2"
 compose-material3 = "1.4.0-alpha15"
 compose-material-icons = "1.7.8"
 compose-tv = "1.1.0-alpha01"
-compose-tv-foundation = "1.0.0-alpha12"
 
 # === Media3 ===
 media3 = "1.8.0"
@@ -101,7 +100,6 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "compose-material3" }
 androidx-compose-material = { group = "androidx.compose.material", name = "material", version.ref = "compose" }
 androidx-compose-material-icons = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "compose-material-icons" }
-androidx-compose-tv-foundation = { group = "androidx.tv", name = "tv-foundation", version.ref = "compose-tv-foundation" }
 androidx-compose-tv-material = { group = "androidx.tv", name = "tv-material", version.ref = "compose-tv" }
 
 # === Compose Testing ===

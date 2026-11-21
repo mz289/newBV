@@ -291,7 +291,7 @@ private fun MediaCodecDetails(
                                             "不支持"
                                         } else {
                                             String.format(
-                                                Locale.getDefault(),
+                                                Locale.ROOT,
                                                 "%.1f",
                                                 sfr.frameRate.upper,
                                             ) + "fps"
