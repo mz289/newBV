@@ -6,6 +6,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -36,6 +37,13 @@ class FocusSaver(
     private val requesters = mutableMapOf<String, FocusRequester>()
 
     /**
+     * 恢复窗口标志。窗口内 [saveFocusedKey] 丢弃写入：返回导航后框架会把焦点
+     * 落到首个可聚焦控件（如左侧栏头像），其 onFocusChanged 若在此刻覆写 key，
+     * 待恢复 key 就被污染，RestoreFocus 会把焦点恢复到那个默认控件上。
+     */
+    private var restoring = false
+
+    /**
      * 获取指定 key 的 [FocusRequester]。
      * 每个 key 独立一个 requester，在组合恢复后仍有效。
      */
@@ -43,8 +51,12 @@ class FocusSaver(
 
     /**
      * 保存当前聚焦的 key。
+     *
+     * 恢复窗口（[RestoreFocus] 进行中）内丢弃写入：此时框架默认聚焦产生的
+     * onFocusChanged 不能污染待恢复 key。
      */
     fun saveFocusedKey(key: String) {
+        if (restoring) return
         savedKey.value = key
     }
 
@@ -68,20 +80,47 @@ class FocusSaver(
      * 恢复焦点到之前保存的 key。
      *
      * 应在 composition 恢复后调用（通常在屏幕顶层调一次）。
-     * 内置 50ms 延迟，确保 LazyRow/LazyColumn 子项完成组合后再请求焦点。
+     *
+     * 时序：目标元素的 [FocusRequester] 由 Lazy 容器在测量期组合时才注册，
+     * 晚于本 effect 首跑；壳层冷装载（KeptTabPage deferContent）还会把内容
+     * 再推迟一帧。所以这里逐帧等待注册 + 请求，而不是一次性查表——
+     * 首跑查到 null 就静默放弃会让焦点落回框架默认控件（如左侧栏头像）。
+     *
+     * 返回导航后的框架默认聚焦（焦点落到首个可聚焦控件）可能在恢复窗口开启
+     * 之前就覆写 key，因此捕获 key 在挂载首帧冻结、每个实例只恢复一次：
+     * 后续 key 变化（默认聚焦、用户移动）不再触发恢复——那是新交互，
+     * 不是「回到原位」。恢复成功后回写捕获值，抹掉窗口前落下的污染。
+     *
+     * @param onRestoreFailed 重试用尽（key 已失效、目标元素不存在）后的兜底，
+     *   如 MainScreen 回退到聚焦顶部 Tab。
      */
     @Composable
-    fun RestoreFocus() {
-        LaunchedEffect(savedKey.value) {
-            val key = savedKey.value
-            if (key.isNotEmpty()) {
-                requesters[key]?.let {
-                    it.focusWhenReady()
+    fun RestoreFocus(onRestoreFailed: (() -> Unit)? = null) {
+        val capturedKey = remember { savedKey.value }
+        LaunchedEffect(capturedKey) {
+            if (capturedKey.isEmpty()) return@LaunchedEffect
+            restoring = true
+            try {
+                repeat(RESTORE_MAX_FRAMES) {
+                    val requester = requesters[capturedKey]
+                    if (requester != null && requester.focusWhenReady(maxFrames = 2)) {
+                        // 回写捕获值：抹掉恢复窗口开启前框架默认聚焦写下的 key，
+                        // 保证下一次「离开→返回」仍恢复到本次目标
+                        savedKey.value = capturedKey
+                        return@LaunchedEffect
+                    }
+                    withFrameNanos { }
                 }
+                onRestoreFailed?.invoke()
+            } finally {
+                restoring = false
             }
         }
     }
 }
+
+/** 恢复窗口上限（帧）：覆盖「壳帧 + Lazy 项注册 + 焦点请求」的正常时序，过期即兜底。 */
+private const val RESTORE_MAX_FRAMES = 12
 
 /**
  * 创建 [FocusSaver]，使用 [rememberSaveable] 持久化焦点 key。

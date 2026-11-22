@@ -72,10 +72,16 @@ fun MainScreen(
     val sidebarFocusRequester = remember { FocusRequester() }
     val focusSaver = rememberFocusSaver()
 
+    // 返回 true 表示已把焦点移入内容区入口；返回 false 时由左侧栏回退到
+    // 焦点系统的默认右向搜索（内容区入口被懒列表回收时，见 issue #287）。
+    val onFocusToContent: () -> Boolean = {
+        runCatching { homeFocusRequester.requestFocus() }.isSuccess
+    }
+
     // 仅"返回 MainScreen"时恢复焦点；首次进入不恢复，
     // 否则启动阶段系统自动聚焦左侧栏头像产生的 key 会把焦点抢回头像。
     if (focusInitialized) {
-        focusSaver.RestoreFocus()
+        focusSaver.RestoreFocus(onRestoreFailed = { onFocusToContent() })
     }
 
     val handleBack =
@@ -83,12 +89,6 @@ fun MainScreen(
             onExit = { (context as? android.app.Activity)?.finish() },
             message = "再按一次退出",
         )
-
-    // 返回 true 表示已把焦点移入内容区入口；返回 false 时由左侧栏回退到
-    // 焦点系统的默认右向搜索（内容区入口被懒列表回收时，见 issue #287）。
-    val onFocusToContent: () -> Boolean = {
-        runCatching { homeFocusRequester.requestFocus() }.isSuccess
-    }
 
     LaunchedEffect(Unit) {
         if (!focusInitialized) {
