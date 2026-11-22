@@ -12,13 +12,14 @@ import java.net.URI
  * - **已知 upgcxcode 主机池**：upos 系主机的签名不含主机，任意已知主机都可以服务
  *   任意 upgcxcode 签名地址，因此可以从 playinfo 与历史请求里学习主机池并在它们之间换宿
  *   （PR：「Every host a playinfo names becomes a candidate」）。
- * - **原生回退窗口**：一个 job 失败后 30s 内，同地址的直接请求不再竞速，走原始 URL
- *   （PR `NATIVE_RETRY_MS`：「After a failed job, the player's retry of the same range
- *   goes to the browser」）。
+ * - **原生回退窗口**：一个 job 失败后 30s 内，同地址的直接请求不再竞速，走非竞速单流；
+ *   单流失败时按候选序换宿重试（PR `NATIVE_RETRY_MS`：「After a failed job, the player's
+ *   retry of the same range goes to the browser」）。
  * - **连续失败熔断**：一分钟内 [MAX_JOB_FAILURES] 个 job 失败 → 竞速整体停用
  *   [TURN_OFF_MS]，全部走原生请求（PR `FAILURES_TO_TURN_OFF`）。
- * - **完整性熔断**：两个主机对同一段字节给出的内容不一致 → 视为链路被污染，
- *   本会话（[INTEGRITY_DISABLE_MS]）不再竞速（PR 的 byte-level cross-check）。
+ * - **内容分歧处理**：两个主机对同一段字节内容不一致 → 比对者按 UNUSABLE 排除出本视频
+ *   （由 [CdnHostModel] 持久排除），job 继续交付；不做全局停用——比对错位造成的假分歧
+ *   在起播第一片就会触发，全局熔断会让优选自废。
  *
  * 可靠性（冷却/排除/封禁）与速度样本仍由 [CdnHostModel] 维护，本类只做主机池与熔断。
  */
@@ -39,9 +40,6 @@ class CdnRacingRegistry(
 
     /** 熔断（连续失败）截止时间。 */
     private var turnedOffUntil = 0L
-
-    /** 完整性熔断截止时间。 */
-    private var integrityDisabledUntil = 0L
 
     private val lock = Any()
 
@@ -68,11 +66,11 @@ class CdnRacingRegistry(
     /** 是否为 B 站媒体域名（竞速只对站内媒体生效）。 */
     fun isBilibiliMediaUrl(url: String): Boolean = CdnClassify.hostOf(url)?.let(::isBilibiliMediaHost) == true
 
-    /** 竞速当前是否可用（未熔断、不在完整性禁用期）。 */
+    /** 竞速当前是否可用（未熔断）。 */
     fun racingAllowed(): Boolean {
         val now = nowMs()
         return synchronized(lock) {
-            now >= turnedOffUntil && now >= integrityDisabledUntil
+            now >= turnedOffUntil
         }
     }
 
@@ -95,13 +93,6 @@ class CdnRacingRegistry(
                 turnedOffUntil = now + TURN_OFF_MS
                 recentJobFailures.clear()
             }
-        }
-    }
-
-    /** 记录完整性失败：两个主机对同一段字节内容不一致，竞速整体停用一段时间。 */
-    fun noteIntegrityFailure() {
-        synchronized(lock) {
-            integrityDisabledUntil = nowMs() + INTEGRITY_DISABLE_MS
         }
     }
 
@@ -247,9 +238,6 @@ class CdnRacingRegistry(
 
         /** 连续失败熔断时长。 */
         const val TURN_OFF_MS = 30 * 1000L
-
-        /** 完整性熔断时长（PR 按页生效，这里按会话折算）。 */
-        const val INTEGRITY_DISABLE_MS = 30 * 60 * 1000L
 
         /** 从 upgcxcode 地址提取路径 key 的便捷入口（供 VM 播种与测试）。 */
         fun addressKeyOf(url: String): String = CdnClassify.mediaPathKey(url) ?: url

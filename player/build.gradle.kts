@@ -16,6 +16,11 @@ android {
         consumerProguardFiles("consumer-rules.pro")
     }
 
+    testOptions {
+        // 竞速层的观测日志走 android.util.Log，JVM 单测里置为 no-op 而非抛 not-mocked
+        unitTests.isReturnDefaultValues = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

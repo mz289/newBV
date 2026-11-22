@@ -94,15 +94,19 @@ class OkHttpTransport(
  *   队列，**先送出合法 206 字节的主机胜出**成为该片 leader，其余降为字节比对者（至多再读
  *   [LAGGARD_BYTES] 供交叉校验）；
  * - 起播窗口 [commitTimeoutMs] 内没有任何字节 → 记 job 失败并进入原生回退窗口（重试方据此
- *   直接走原始 URL，PR `NATIVE_RETRY_MS`：「goes to the browser」）；
+ *   走非竞速单流，PR `NATIVE_RETRY_MS`：「goes to the browser」）；原生路径失败时按候选序
+ *   换宿重试——原生窗口只放弃竞速调度，不放弃换宿自救（钉死原始主机会把不可达指派拖成
+ *   20~70s 加载黑窗，2026-11-22 E2E 实测）；
  * - leader 停滞超过 [stallMs] → 在**另一台主机**上为该片剩余区间增援，先送字节者接管
  *   （「a racer for a stuck request never goes to the same host」）；一片至多 [MAX_TRIES] 次尝试；
- * - 两个主机送出的同段字节内容不一致 → 完整性失败，竞速整体停用（PR byte-level cross-check）。
+ * - 两个主机送出的同段字节内容不一致 → 比对者按 UNUSABLE 排除出本视频、leader 记失败学习，
+ *   job 继续交付（PR byte-level cross-check）。不再全局停用竞速：比对错位造成的假分歧在
+ *   起播第一片就会触发，全局熔断会让优选在起播瞬间自废。
  *
  * 起播路径上**没有任何前置探测**：主机的 TTFB/吞吐在真实下载里测得（样本按视频 cid 隔离、
  * 可靠性由 [dev.frost819.newbv.player.CdnHostModel] 维护）。
  *
- * 非竞速模式（[racing] = false）：单流直连原始 URL（透明旁路，等价 PR 里「浏览器自己下载」）。
+ * 非竞速模式（[racing] = false）：单流直连原始 URL，失败按候选序换宿重试（原生回退窗口）。
  */
 class RacingJob(
     private val originalUrl: String,
@@ -139,16 +143,30 @@ class RacingJob(
     /** 开始下载；返回区间长度（未知时为 null）。 */
     fun open(): Long? {
         if (!racing) {
-            val response =
-                transport.open(originalUrl, position, length?.let { position + it - 1 })
-            if (response.code != 200 && response.code != 206) {
-                val outcome = classifyHttpCode(response.code)
-                CdnClassify.hostOf(originalUrl)?.let { registry.noteOutcome(it, outcome, videoKey, addressKey) }
-                response.close()
-                throw IOException("HTTP ${response.code} for $originalUrl")
+            val end = length?.let { position + it - 1 }
+            // 原生单流：先直连原始 URL，失败按候选序换宿（原生回退窗口 ≠ 钉死原始主机）
+            val hosts = listOfNotNull(CdnClassify.hostOf(originalUrl)) +
+                registry.candidateHosts(originalUrl, videoKey, addressKey)
+            var lastError: IOException? = null
+            for (host in hosts.distinct().take(NATIVE_HOST_WALK)) {
+                val url = swappedUrl(host)
+                try {
+                    val response = transport.open(url, position, end)
+                    if (response.code == 200 || response.code == 206) {
+                        currentLeaderUrl = url
+                        nativeResponse = response
+                        return length
+                    }
+                    val outcome = classifyHttpCode(response.code)
+                    registry.noteOutcome(host, outcome, videoKey, addressKey)
+                    response.close()
+                    lastError = IOException("HTTP ${response.code} for $url")
+                } catch (e: IOException) {
+                    registry.noteOutcome(host, CdnOutcome.CONNECT_FAIL, videoKey, addressKey)
+                    lastError = e
+                }
             }
-            nativeResponse = response
-            return length
+            throw lastError ?: IOException("Native open failed for $originalUrl")
         }
 
         registry.learnMediaUrl(originalUrl)
@@ -343,7 +361,6 @@ class RacingJob(
             pendingOffset = 0
         }
         currentLeaderUrl = att.url
-        att.delivered += copy
         piece.deliveredToPlayer += copy
         registry.noteDelivery(att.host, att.ttfbMs, null, videoKey)
         if (piece.deliveredToPlayer >= piece.pieceLength) {
@@ -522,6 +539,7 @@ class RacingJob(
                 return
             }
             val scratch = ByteArray(16 * 1024)
+            var streamPos = attempt.start
             var firstAt = 0L
             while (!attempt.canceled.get() && !closed) {
                 val n =
@@ -537,10 +555,14 @@ class RacingJob(
                     attempt.ttfbMs = (firstAt - attempt.startedAt).toDouble()
                 }
                 attempt.delivered += n
+                // 影子起始必须用泵线程本地的流位置：attempt.delivered 会被消费端 copyFrame
+                // 二次累加，拿它算绝对偏移会错位出假分歧（起播必触发完整性熔断的根因）
+                val chunkStart = streamPos
+                streamPos += n
                 if (attempt.isLaggard) {
                     // 比对者：影子字节封顶后停止读取，等待取消
                     if (attempt.shadow.size() < LAGGARD_BYTES) {
-                        if (attempt.shadowStartAbs < 0) attempt.shadowStartAbs = attempt.start + attempt.delivered - n
+                        if (attempt.shadowStartAbs < 0) attempt.shadowStartAbs = chunkStart
                         val cap = minOf(n, LAGGARD_BYTES - attempt.shadow.size())
                         attempt.shadow.write(scratch, 0, cap)
                     }
@@ -553,7 +575,7 @@ class RacingJob(
                 // leader 在场且有比对者：同步捕获自己的影子字节（记录绝对起点供对齐比对）
                 if (piece.attempts.any { it !== attempt && it.isLaggard && !it.canceled.get() }) {
                     if (attempt.shadow.size() < LAGGARD_BYTES) {
-                        if (attempt.shadowStartAbs < 0) attempt.shadowStartAbs = attempt.start + attempt.delivered - n
+                        if (attempt.shadowStartAbs < 0) attempt.shadowStartAbs = chunkStart
                         val cap = minOf(n, LAGGARD_BYTES - attempt.shadow.size())
                         attempt.shadow.write(scratch, 0, cap)
                     }
@@ -614,7 +636,12 @@ class RacingJob(
         pieces.removeFirst()
     }
 
-    /** 影子前缀比对（按绝对偏移对齐重叠区）：不一致 → 完整性失败（竞速整体停用）+ job 失败。 */
+    /**
+     * 影子前缀比对（按绝对偏移对齐重叠区）。不一致 = 比对者对这条视频提供的对象版本与
+     * leader 不同（边缘缓存未失效 / 版本漂移）：
+     * 把比对者按 UNUSABLE 排除出本视频、leader 记 60s 失败学习（若旧版本节点恰是 leader，
+     * 后续片自然避开），本片已按 leader 字节交付完成，job 继续——不全局停用竞速。
+     */
     private fun compareBytes(piece: Piece) {
         val leader = piece.leader ?: return
         if (piece.attempts.none { it !== leader && it.shadow.size() > 0 }) return
@@ -636,8 +663,12 @@ class RacingJob(
                 val a = leaderShadow[(pos - leader.shadowStartAbs).toInt()]
                 val b = otherShadow[(pos - other.shadowStartAbs).toInt()]
                 if (a != b) {
-                    registry.noteIntegrityFailure()
-                    failJob("integrity mismatch at ${pos - piece.start + piece.start}")
+                    android.util.Log.w(
+                        "CdnRacing",
+                        "integrity mismatch at $pos, excluding ${other.host} for video $videoKey",
+                    )
+                    registry.noteOutcome(other.host, CdnOutcome.UNUSABLE, videoKey, addressKey)
+                    registry.noteAttemptFailure(leader.host, videoKey)
                     return
                 }
             }
@@ -683,6 +714,9 @@ class RacingJob(
 
         /** 一片的最大尝试次数（PR `MAX_TRIES`）。 */
         const val MAX_TRIES = 6
+
+        /** 原生回退路径的换宿上限（原始主机 + 候选序前 N-1 台；全部不可达才交给播放器重试）。 */
+        const val NATIVE_HOST_WALK = 5
 
         /** 字节比对者缓存的字节数上限（PR `LAGGARD_BYTES`）。 */
         const val LAGGARD_BYTES = 64 * 1024
