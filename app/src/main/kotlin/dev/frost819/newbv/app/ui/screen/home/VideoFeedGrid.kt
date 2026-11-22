@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -16,6 +17,8 @@ import dev.frost819.newbv.app.ui.component.EmptyTip
 import dev.frost819.newbv.app.ui.component.FocusSaver
 import dev.frost819.newbv.app.ui.component.InfiniteScrollEffect
 import dev.frost819.newbv.app.ui.component.ListFooterTip
+import dev.frost819.newbv.app.ui.component.LocalContentSettled
+import dev.frost819.newbv.app.ui.component.LocalPageActive
 import dev.frost819.newbv.app.ui.component.SKELETON_FIRST_SCREEN_COUNT
 import dev.frost819.newbv.app.ui.component.SkeletonVideoCard
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
@@ -64,6 +67,14 @@ fun <T> VideoFeedGrid(
     val watchLaterViewModel: WatchLaterViewModel = hiltViewModel()
 
     CollectWatchLaterEffects(watchLaterViewModel)
+
+    // 内容稳态上报：加载完成/失败/空态即不再产生新可聚焦元素；骨架屏与重载中为非稳态。
+    // 仅激活页写入（备用槽页不覆盖激活页的声明），供屏幕顶层焦点恢复的稳态等待读取。
+    val pageActive = LocalPageActive.current
+    val contentSettled = LocalContentSettled.current
+    LaunchedEffect(pageActive, isLoading, isError, items.isEmpty()) {
+        if (pageActive) contentSettled.value = !isLoading
+    }
 
     val currentItems by rememberUpdatedState(items)
     InfiniteScrollEffect(

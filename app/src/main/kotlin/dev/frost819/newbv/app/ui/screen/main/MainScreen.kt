@@ -34,6 +34,7 @@ import androidx.navigation.NavController
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.rememberDrawerState
+import dev.frost819.newbv.app.ui.component.LocalContentSettled
 import dev.frost819.newbv.app.ui.component.LocalGridLeftExit
 import dev.frost819.newbv.app.ui.component.TAB_SHELL_DEBUG
 import dev.frost819.newbv.app.ui.component.rememberDoublePressExit
@@ -72,6 +73,7 @@ fun MainScreen(
     val homeFocusRequester = remember { FocusRequester() }
     val sidebarFocusRequester = remember { FocusRequester() }
     val focusSaver = rememberFocusSaver()
+    val contentSettled = remember { mutableStateOf(true) }
 
     // 返回 true 表示已把焦点移入内容区入口；返回 false 时由左侧栏回退到
     // 焦点系统的默认右向搜索（内容区入口被懒列表回收时，见 issue #287）。
@@ -91,6 +93,7 @@ fun MainScreen(
                 }
                 onFocusToContent()
             },
+            contentSteady = { contentSettled.value },
         )
     }
 
@@ -153,7 +156,10 @@ fun MainScreen(
                 }
             }
 
-            CompositionLocalProvider(LocalGridLeftExit provides sidebarFocusRequester) {
+            CompositionLocalProvider(
+                LocalGridLeftExit provides sidebarFocusRequester,
+                LocalContentSettled provides contentSettled,
+            ) {
                 AnimatedContent(
                     targetState = selectedDrawerItem,
                     label = "main-animated-content",

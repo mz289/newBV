@@ -39,10 +39,10 @@ import org.robolectric.annotation.Config
  * 时钟模型：停钟（autoAdvance=false）+ runOnUiThread 写状态 + advanceTimeBy 推帧。
  * ≥75ms 的推进才可靠跨帧（见 references/android-build-env.md）。
  *
- * 覆盖范围：覆盖「恢复等待延迟注册」「失效 key 兜底 + 窗口关闭后恢复保存」
- * 「恢复后正常保存」三条契约。框架默认聚焦在恢复窗口前/内覆写 key 的劫持路径
- * 依赖 main-looper 效应调度时序，停钟模型下无法确定性复现，由模拟器端到端验证
- * （热门 → 卡片 → 详情 → 返回，焦点须回原卡片且再次进出仍回原位）。
+ * 覆盖范围：「延迟注册恢复」「稳态下失效 key 兜底 + 恢复后正常保存」「用户接管
+ * 让位」「非稳态等待不兜底 + 列表就绪后迟到注册恢复」四条契约。框架默认聚焦在
+ * 静默期前覆写 key 的劫持路径依赖 main-looper 效应调度时序，停钟模型下无法
+ * 确定性复现，由模拟器端到端验证（热门 → 卡片 → 详情 → 返回，焦点须回原卡片）。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "w1280dp-h720dp-land")
@@ -61,6 +61,7 @@ class FocusSaverTest {
     private val savedKey = mutableStateOf("")
     private var mounted by mutableStateOf(false)
     private var itemsReady by mutableStateOf(true)
+    private var itemsSettled by mutableStateOf(true)
     private var restoreFailedCount by mutableStateOf(0)
     private var fsRef: FocusSaver? = null
 
@@ -86,7 +87,10 @@ class FocusSaverTest {
                     // savedKey 由外部持有（等价 rememberSaveable 存活）
                     val fs = remember { FocusSaver(savedKey) }
                     fsRef = fs
-                    fs.RestoreFocus(onRestoreFailed = { restoreFailedCount++ })
+                    fs.RestoreFocus(
+                        onRestoreFailed = { restoreFailedCount++ },
+                        contentSteady = { itemsSettled },
+                    )
                     TestItem(alwaysKey)
                     if (itemsReady) {
                         Row {
@@ -104,6 +108,7 @@ class FocusSaverTest {
         compose.runOnUiThread {
             mounted = true
             itemsReady = true
+            itemsSettled = true
         }
         compose.setContent { Screen() }
         compose.mainClock.advanceTimeBy(1_000)
@@ -121,25 +126,30 @@ class FocusSaverTest {
         compose.runOnUiThread {
             mounted = true
             itemsReady = false // 壳帧：网格内容延迟一帧组合
+            itemsSettled = false
         }
-        compose.mainClock.advanceTimeBy(128) // effect 首跑：查表 null → 进入逐帧等待
-        compose.runOnUiThread { itemsReady = true }
+        compose.mainClock.advanceTimeBy(128) // effect 首跑：查表 null → 进入稳态等待
+        compose.runOnUiThread {
+            itemsReady = true
+            itemsSettled = true
+        }
         compose.mainClock.advanceTimeBy(1_000)
         compose.onNodeWithTag(gridKey).assertIsFocused()
         assertEquals(gridKey, savedKey.value)
     }
 
-    /** key 失效：重试用尽 → 兜底回调一次；窗口关闭后正常保存恢复工作。 */
+    /** 稳态下 key 失效（目标不存在）→ 兜底回调一次；之后正常保存恢复工作。 */
     @Test
     fun failedRestoreFallsBackAndResumesSaving() {
         compose.mainClock.autoAdvance = false
         compose.runOnUiThread {
             mounted = true
             itemsReady = true
+            itemsSettled = true
             savedKey.value = ghostKey
         }
         compose.setContent { Screen() }
-        compose.mainClock.advanceTimeBy(2_000) // 冲刷 12 帧重试上限
+        compose.mainClock.advanceTimeBy(2_000) // 冲刷静默期 + 稳态判定
 
         assertEquals("失效 key 应恰好触发一次兜底", 1, restoreFailedCount)
         compose.runOnUiThread { fsRef!!.focusRequesterFor(alwaysKey).requestFocus() }
@@ -162,7 +172,7 @@ class FocusSaverTest {
     }
 
     /**
-     * 接管窗口让位：恢复窗口内用户真实移动焦点（接管窗口阶段 key 变化）→
+     * 用户接管让位：等待期间真实焦点移动写入新 key（≠ 挂载帧基线）→
      * 立即放弃恢复且不触发兜底，用户导航不被恢复抢夺。
      */
     @Test
@@ -170,28 +180,52 @@ class FocusSaverTest {
         setupFocusedThenNavigateAway()
         compose.runOnUiThread {
             mounted = true
-            itemsReady = false // 目标始终未注册：窗口会持续等待
+            itemsReady = false // 目标始终未注册：恢复持续等待
+            itemsSettled = false
         }
-        compose.mainClock.advanceTimeBy(400) // 越过静默窗口（12 帧 ≈192ms）进入接管窗口
+        compose.mainClock.advanceTimeBy(400) // 越过静默期（12 帧 ≈192ms）
         // 用户接管：真实焦点移动写入新 key（白盒注入，等价 onFocusChanged）
         compose.runOnUiThread { fsRef!!.saveFocusedKey(alwaysKey) }
-        compose.mainClock.advanceTimeBy(2_000) // 冲刷整个窗口（72 帧 ≈1.15s）
+        compose.mainClock.advanceTimeBy(2_000)
         assertEquals("用户接管后恢复须让位且不触发兜底", 0, restoreFailedCount)
         assertEquals("用户接管写入的 key 须保留", alwaysKey, savedKey.value)
     }
 
-    /** 接管窗口内目标终于注册（列表重载完成场景）→ 恢复仍落到 gridKey。 */
+    /** 非稳态等待期间列表终于就绪（骨架→卡片）→ 恢复落到 gridKey。 */
     @Test
-    fun restoreSucceedsInTakeoverWindow() {
+    fun restoreSucceedsWhenContentSettlesLate() {
         setupFocusedThenNavigateAway()
         compose.runOnUiThread {
             mounted = true
             itemsReady = false // 模拟返回时列表还在骨架/重载
+            itemsSettled = false
         }
-        compose.mainClock.advanceTimeBy(400) // 越过静默窗口（列表尚未就绪）
-        compose.runOnUiThread { itemsReady = true } // 列表重载完成，目标注册
+        compose.mainClock.advanceTimeBy(400) // 静默期结束，列表仍未就绪
+        compose.runOnUiThread {
+            itemsReady = true // 列表重载完成，目标注册
+            itemsSettled = true
+        }
         compose.mainClock.advanceTimeBy(2_000)
         compose.onNodeWithTag(gridKey).assertIsFocused()
-        assertEquals("接管窗口内的迟到注册仍须恢复", gridKey, savedKey.value)
+        assertEquals("列表就绪后的迟到注册仍须恢复", gridKey, savedKey.value)
+    }
+
+    /** 非稳态等待不触发兜底：列表重载多久就等多久，兜底只在稳态后判定。 */
+    @Test
+    fun nonSettledContentDoesNotFallBack() {
+        setupFocusedThenNavigateAway()
+        compose.runOnUiThread {
+            mounted = true
+            itemsReady = false
+            itemsSettled = false // 一直处于骨架/重载
+        }
+        compose.mainClock.advanceTimeBy(3_000)
+        assertEquals("非稳态期间不得触发兜底", 0, restoreFailedCount)
+        compose.runOnUiThread {
+            itemsReady = true
+            itemsSettled = true
+        }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithTag(gridKey).assertIsFocused()
     }
 }
