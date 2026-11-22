@@ -37,6 +37,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,8 +48,10 @@ import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
+import dev.frost819.newbv.app.ui.component.LocalUserFocusIntent
 import dev.frost819.newbv.app.ui.component.TvLazyVerticalGrid
 import dev.frost819.newbv.app.ui.component.focusSaverItem
+import dev.frost819.newbv.app.ui.component.isDirectionalKeyDown
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.videocard.BadgeChip
 import dev.frost819.newbv.app.ui.component.videocard.parseHexColorOrNull
@@ -96,6 +99,9 @@ internal fun SeasonEpisodeDialog(
     val gridState = rememberLazyGridState(initialIndex % EPISODES_PER_GROUP)
     val rangeState = rememberLazyListState(group)
     val focusSaver = rememberFocusSaver()
+    // Dialog 是独立窗口，按键不经 MainActivity.dispatchKeyEvent——内容根自行
+    // 挂方向键钩子，向同一信号实例上报用户按键（组合本地继承自调用点）。
+    val userFocusIntent = LocalUserFocusIntent.current
     var pendingIndex by remember { mutableStateOf<Int?>(initialIndex.takeIf { episodes.isNotEmpty() }) }
     var focusRequest by remember { mutableIntStateOf(0) }
     focusSaver.RestoreFocus()
@@ -125,6 +131,11 @@ internal fun SeasonEpisodeDialog(
     ) {
         BoxWithConstraints(
             Modifier
+                .onPreviewKeyEvent { keyEvent ->
+                    // 纯观测不消费：向恢复链路声明「用户按过方向键」
+                    if (keyEvent.isDirectionalKeyDown()) userFocusIntent.noteDirectionalKey()
+                    false
+                }
                 .fillMaxWidth(0.94f)
                 .fillMaxHeight(0.94f)
                 .clip(RoundedCornerShape(20.dp))

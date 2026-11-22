@@ -12,11 +12,51 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import dev.frost819.newbv.core.log.Loggers
 
 /** 焦点恢复链路诊断日志开关（排查「返回后焦点不回原位」用，定位后关闭）。 */
 private const val FOCUS_RESTORE_DEBUG = true
 private val logger = Loggers.get("FocusSaver")
+
+/**
+ * 用户方向键信号：MainActivity（覆盖全部普通页面）与 Dialog 内容根（独立窗口，
+ * 组合本地可继承）的按键钩子写入，FocusSaver 恢复链路读取。
+ *
+ * 一次自增 = 用户真实按下一次方向键。恢复等待据此以**因果**区分两类焦点写入：
+ * 无按键期间的写入 = 框架默认聚焦噪声（拦截，不代表用户意图）；按键之后的
+ * 写入 = 用户接管（立即让位）。判据是「期间是否有过用户按键」，不是「是否
+ * 落在挂载头几帧」——慢设备上框架默认聚焦晚到多久都不会被误判成接管，
+ * 全链路没有任何帧数/时长常量。
+ */
+class UserFocusIntentSignal {
+    /** 已观测到的方向键按下次数；单调递增，恢复以快照差值判定「期间有过按键」。 */
+    var keyStrokeCount: Int = 0
+        private set
+
+    /** 按键钩子调用：观测到一次方向键按下。 */
+    fun noteDirectionalKey() {
+        keyStrokeCount++
+    }
+}
+
+/**
+ * [UserFocusIntentSignal] 的组合传入入口。应用根（MainActivity）提供单一实例；
+ * Dialog 内容在独立窗口但继承组合本地，读写同一实例。
+ */
+val LocalUserFocusIntent = compositionLocalOf { UserFocusIntentSignal() }
+
+/** 方向键按下（D-pad 四向）判定，供用户意图信号钩子统一口径。 */
+fun KeyEvent.isDirectionalKeyDown(): Boolean =
+    type == KeyEventType.KeyDown &&
+        (key == Key.DirectionUp ||
+            key == Key.DirectionDown ||
+            key == Key.DirectionLeft ||
+            key == Key.DirectionRight)
 
 /**
  * 焦点恢复器。
@@ -39,15 +79,24 @@ private val logger = Loggers.get("FocusSaver")
  */
 class FocusSaver(
     private val savedKey: MutableState<String>,
+    private val userIntent: UserFocusIntentSignal? = null,
 ) {
     private val requesters = mutableMapOf<String, FocusRequester>()
 
     /**
-     * 恢复窗口标志。窗口内 [saveFocusedKey] 丢弃写入：返回导航后框架会把焦点
-     * 落到首个可聚焦控件（如左侧栏头像），其 onFocusChanged 若在此刻覆写 key，
-     * 待恢复 key 就被污染，RestoreFocus 会把焦点恢复到那个默认控件上。
+     * 恢复等待标志。等待期间 [saveFocusedKey] 丢弃「无按键写入」：返回导航后
+     * 框架会把焦点落到首个可聚焦控件（如左侧栏头像），其 onFocusChanged 不代表
+     * 用户意图，不能污染待恢复 key。拦截持续到恢复终结（成功/稳态失效）或观测到
+     * 用户按键——没有时间窗口或帧数上限。
      */
     private var restoring = false
+
+    /** 恢复开始时的按键快照；之后的按键即「用户接管」信号。 */
+    private var intentBaseline = 0
+
+    /** 恢复开始后是否观测到用户方向键。 */
+    private fun userKeystrokeSeen(): Boolean =
+        userIntent != null && userIntent.keyStrokeCount > intentBaseline
 
     /**
      * 获取指定 key 的 [FocusRequester]。
@@ -58,11 +107,11 @@ class FocusSaver(
     /**
      * 保存当前聚焦的 key。
      *
-     * 恢复窗口（[RestoreFocus] 进行中）内丢弃写入：此时框架默认聚焦产生的
-     * onFocusChanged 不能污染待恢复 key。
+     * 恢复等待期内丢弃「无按键写入」：框架默认聚焦产生的 onFocusChanged 不能
+     * 污染待恢复 key。用户按过方向键之后的写入代表真实导航，照常保存。
      */
     fun saveFocusedKey(key: String) {
-        if (restoring) {
+        if (restoring && !userKeystrokeSeen()) {
             if (FOCUS_RESTORE_DEBUG && key != savedKey.value) {
                 logger.info { "[SAVE] suppressed key='$key' (restoring, saved='${savedKey.value}')" }
             }
@@ -105,14 +154,15 @@ class FocusSaver(
      * 后续 key 变化（默认聚焦、用户移动）不再触发恢复——那是新交互，
      * 不是「回到原位」。恢复成功后回写捕获值，抹掉窗口前落下的污染。
      *
-     * 等待终止于**状态**而非帧数预算：
+     * 等待终止于**状态**，全程无帧数/时长上限，也没有静默期窗口：
      * - 目标注册并成功聚焦 → 完成（回写捕获值）；
-     * - [contentSteady] 声明内容到达稳态（不再会有新元素注册）且目标仍未注册
+     * - [contentSteady] 声明内容稳态（不再会有新元素注册）且目标仍未注册
      *   → 目标已不存在，走 [onRestoreFailed] 兜底；
-     * - savedKey 被真实焦点移动改写（≠ 挂载帧基线）→ 用户已接管，立刻让位，
-     *   不恢复也不兜底。
-     * 唯一的帧数宽限是 [RESTORE_SETTLE_FRAMES]：静默期上限，覆盖「框架默认聚焦
-     * 在挂载头几帧落点」这一固定时序；期间写入被拦截。观测到首次写入即提前结束。
+     * - 用户方向键（[UserFocusIntentSignal]）之后焦点写入其他 key → 用户已
+     *   接管，立即让位，不恢复也不兜底。无按键期间的同类写入是框架默认聚焦
+     *   噪声，被 [saveFocusedKey] 拦截且不改变等待。
+     * 挂载帧先行尝试，首帧之后才开始稳态采样：Lazy 项在测量期才注册，
+     * 稳态判定必须晚于第一次测量——这是测量边界，不是时间预算。
      *
      * @param onRestoreFailed 稳态下目标不存在的兜底，如 MainScreen 回退到聚焦顶部 Tab。
      * @param contentSteady 内容稳态判定：false 表示页面仍在骨架/重载（目标可能稍后
@@ -130,37 +180,25 @@ class FocusSaver(
                 logger.info { "[RESTORE] start captured='$capturedKey' current='${savedKey.value}'" }
             }
             if (capturedKey.isEmpty()) return@LaunchedEffect
+            intentBaseline = userIntent?.keyStrokeCount ?: 0
             try {
-                // 挂载帧先行：Lazy 项注册发生在测量期，稳态判断在首帧测量前不可信
+                restoring = true
+                // 挂载帧先行：非懒内容在组合期即注册，立刻可恢复；Lazy 项注册
+                // 发生在测量期，稳态采样推迟到首帧之后（见 KDoc 测量边界说明）
                 if (restoreAttempt(capturedKey)) return@LaunchedEffect
                 withFrameNanos { }
 
-                // 静默期：框架默认聚焦（返回后落首个可聚焦控件）在挂载头几帧写入，
-                // 其 onFocusChanged 不代表用户意图，拦截；观测到首次写入即提前结束
-                restoring = true
-                var settled = false
-                var settleFrames = 0
-                while (!settled && settleFrames < RESTORE_SETTLE_FRAMES) {
-                    if (restoreAttempt(capturedKey)) return@LaunchedEffect
-                    if (savedKey.value != capturedKey) {
-                        settled = true // 默认聚焦已落点，静默期使命完成
-                    } else {
-                        withFrameNanos { }
-                        settleFrames++
-                    }
-                }
-                restoring = false
-
-                // 稳态驱动等待：无帧数预算，终止于状态
-                val baseline = savedKey.value
+                // 稳态驱动等待：终止于状态，无帧数预算
                 while (true) {
-                    if (restoreAttempt(capturedKey)) return@LaunchedEffect
-                    if (savedKey.value != baseline) {
+                    // 用户接管先于恢复判定：按键后写入的 key 已通过保存口径，
+                    // 即使目标此刻注册也不得从用户手里抢回焦点
+                    if (userKeystrokeSeen() && savedKey.value != capturedKey) {
                         if (FOCUS_RESTORE_DEBUG) {
                             logger.info { "[RESTORE] abandoned key='$capturedKey' userMovedTo='${savedKey.value}'" }
                         }
-                        return@LaunchedEffect // 用户接管，让位：不恢复、不兜底
+                        return@LaunchedEffect
                     }
+                    if (restoreAttempt(capturedKey)) return@LaunchedEffect
                     if (contentSteady() && capturedKey !in requesters) {
                         if (FOCUS_RESTORE_DEBUG) {
                             logger.info { "[RESTORE] exhausted key='$capturedKey' registered=${requesters.keys}" }
@@ -191,17 +229,14 @@ class FocusSaver(
 }
 
 /**
- * 静默期帧数宽限：框架默认聚焦（返回后焦点落首个可聚焦控件）发生在挂载头几帧，
- * 其写入需被拦截。观测到首次写入即提前结束；无默认聚焦时以此上限收尾。
- */
-private const val RESTORE_SETTLE_FRAMES = 12
-
-/**
  * 页面内容稳态：当前激活页声明其内容不再会产生新的可聚焦元素
  * （加载完成/失败/空态均算稳态；骨架屏、分页重载中为非稳态）。
  *
  * 数据驱动屏幕在内容壳内写入（仅激活页写），RestoreFocus 所在的屏幕顶层读取——
- * 焦点恢复的等待时长因此由加载实际耗时决定，而非固定帧数预算。
+ * 焦点恢复的等待时长由加载实际耗时决定，而非固定帧数预算。
+ * 注意：持有状态的屏幕初始值必须为「未声明」（false）——稳态采样发生在首帧
+ * 测量之后，若初始即稳态，测量前的一次采样会把「内容尚未组合」误判成
+ * 「目标不存在」，造成返回即兜底。
  */
 val LocalContentSettled = compositionLocalOf { mutableStateOf(true) }
 
@@ -213,7 +248,8 @@ val LocalContentSettled = compositionLocalOf { mutableStateOf(true) }
 @Composable
 fun rememberFocusSaver(): FocusSaver {
     val savedKey = rememberSaveable { mutableStateOf("") }
-    return remember { FocusSaver(savedKey) }
+    val userIntent = LocalUserFocusIntent.current
+    return remember { FocusSaver(savedKey, userIntent) }
 }
 
 // region Modifier 扩展

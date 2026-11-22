@@ -15,6 +15,8 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import dagger.hilt.android.AndroidEntryPoint
 import dev.frost819.newbv.app.ui.navigation.AppNavHost
 import dev.frost819.newbv.app.ui.navigation.HomeRoute
+import dev.frost819.newbv.app.ui.component.LocalUserFocusIntent
+import dev.frost819.newbv.app.ui.component.UserFocusIntentSignal
 import dev.frost819.newbv.core.focus.DpadDirection
 import dev.frost819.newbv.core.focus.FocusShakeController
 import dev.frost819.newbv.core.interaction.InteractionTracker
@@ -41,6 +43,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var interactionTracker: InteractionTracker
 
+    /** 用户方向键信号：供 FocusSaver 焦点恢复区分框架噪声写入与用户接管。 */
+    private val userFocusIntentSignal = UserFocusIntentSignal()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -58,6 +63,7 @@ class MainActivity : ComponentActivity() {
                 SystemBarsEffect()
                 CompositionLocalProvider(
                     LocalInteractionTracker provides interactionTracker,
+                    LocalUserFocusIntent provides userFocusIntentSignal,
                 ) {
                     Surface(modifier = Modifier.fillMaxSize()) {
                         AppNavHost(startDestination = HomeRoute)
@@ -76,6 +82,16 @@ class MainActivity : ComponentActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             interactionTracker.onDpadKey()
+            // 用户方向键意图信号：在 super 之前计数，被页面消费的方向键同样是
+            // 用户意图。FocusSaver 以「恢复期间是否有过按键」区分框架默认聚焦
+            // 噪声与用户接管，不设时间窗口（详见 FocusSaver.UserFocusIntentSignal）。
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+                -> userFocusIntentSignal.noteDirectionalKey()
+            }
         }
         val consumed = super.dispatchKeyEvent(event)
         // 撞墙抖动：方向键未被 Compose 焦点系统与任何节点消费（super 返回 false），

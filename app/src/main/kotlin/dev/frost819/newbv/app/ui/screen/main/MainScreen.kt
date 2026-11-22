@@ -73,7 +73,10 @@ fun MainScreen(
     val homeFocusRequester = remember { FocusRequester() }
     val sidebarFocusRequester = remember { FocusRequester() }
     val focusSaver = rememberFocusSaver()
-    val contentSettled = remember { mutableStateOf(true) }
+    // 稳态状态初始为「未声明」：RestoreFocus 的稳态采样发生在首帧测量之后，
+    // 初始即 true 会把「内容尚未组合」误判成「目标不存在」，返回即兜底。
+    // 由激活页内容（VideoFeedGrid 等）在加载完成/失败/空态时写入 true。
+    val contentSettled = remember { mutableStateOf(false) }
 
     // 返回 true 表示已把焦点移入内容区入口；返回 false 时由左侧栏回退到
     // 焦点系统的默认右向搜索（内容区入口被懒列表回收时，见 issue #287）。
