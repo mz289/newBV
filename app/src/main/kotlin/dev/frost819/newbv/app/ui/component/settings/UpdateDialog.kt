@@ -51,6 +51,8 @@ import java.io.File
  *
  * 打开后自动检查最新版本，支持下载 APK 并调起安装。
  * 下载进度通过 [LinearProgressIndicator] 实时显示。
+ * 下载完成后不再显示“更新已下载”确认框：有安装来源授权时直接调起系统安装器，
+ * 缺授权先引导授权，授权返回自动继续安装（见 [rememberUpdateInstallLauncher]）。
  *
  * 更新源统一为本仓库 Releases：稳定版取 `releases/latest`，
  * 开启"接收预发布版本"后包含 CI 自动构建的 debug 预发布（`v<versionName>` 版本标签）；
@@ -81,6 +83,31 @@ fun UpdateDialog(
     var downloadJob by remember { mutableStateOf<Job?>(null) }
     var latestRelease by remember { mutableStateOf<GithubRelease?>(null) }
     var latestAsset by remember { mutableStateOf<GithubRelease.Asset?>(null) }
+
+    // 直通安装的异常路径提示（缺授权 / 调起失败）；正常路径下载完成即调起安装器
+    var permissionPrompt by rememberSaveable { mutableStateOf(false) }
+    var permissionDeniedBefore by rememberSaveable { mutableStateOf(false) }
+    var installError by rememberSaveable { mutableStateOf<String?>(null) }
+    val installLauncher =
+        rememberUpdateInstallLauncher(
+            onNeedPermission = { stillDenied ->
+                permissionDeniedBefore = stillDenied
+                permissionPrompt = true
+            },
+            onFailed = { message ->
+                permissionPrompt = false
+                permissionDeniedBefore = false
+                installError = message
+            },
+            onLaunched = {
+                // 已交给系统安装器：收起更新弹窗，安装结果由系统界面呈现
+                permissionPrompt = false
+                permissionDeniedBefore = false
+                installError = null
+                downloadedApkPath = null
+                onHideDialog()
+            },
+        )
 
     DisposableEffect(show) {
         if (!show) {
@@ -170,10 +197,44 @@ fun UpdateDialog(
         }
     }
 
-    if (show && downloadedApkPath != null) {
-        UpdateInstallDialog(
-            file = File(requireNotNull(downloadedApkPath)),
+    // 下载完成即调起安装器（缺授权时先转授权页）；路径置空/变化前只触发一次
+    LaunchedEffect(downloadedApkPath) {
+        val path = downloadedApkPath ?: return@LaunchedEffect
+        installLauncher(File(path))
+    }
+
+    if (show && installError != null) {
+        UpdateInstallPromptDialog(
+            title = "安装失败",
+            message = requireNotNull(installError),
+            confirmText = "重试安装",
+            onConfirm = {
+                installError = null
+                downloadedApkPath?.let { installLauncher(File(it)) }
+            },
             onDismiss = {
+                installError = null
+                permissionPrompt = false
+                permissionDeniedBefore = false
+                downloadedApkPath = null
+                onHideDialog()
+            },
+        )
+    } else if (show && permissionPrompt) {
+        UpdateInstallPromptDialog(
+            title = "需要安装权限",
+            message =
+                if (permissionDeniedBefore) {
+                    "仍未允许安装此来源的应用。请开启权限后重试安装。"
+                } else {
+                    "更新已下载，但尚未允许安装此来源的应用。请开启权限，返回后将继续安装。"
+                },
+            confirmText = "去授权",
+            onConfirm = { installLauncher.requestPermission() },
+            onDismiss = {
+                permissionPrompt = false
+                permissionDeniedBefore = false
+                installError = null
                 downloadedApkPath = null
                 onHideDialog()
             },
