@@ -175,6 +175,30 @@ class TabbedTwoSlotTest {
         assertEquals(1, creations["E"])
     }
 
+    /** 焦点防抖：停钟下连发方向键扫过多个 Tab，只有停稳的最后一个 Tab 提交（中间页零组合）。 */
+    @Test
+    fun rapidFocusSweep_debouncesToFinalTab() {
+        setUpShell()
+        compose.mainClock.autoAdvance = false
+        try {
+            // A→B→C→D 连发，中间不冲刷帧时钟：focusedTab 连写三次，
+            // 防抖 LaunchedEffect 只以最终值 D 启动，B/C 的延迟从未存在
+            repeat(3) { compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) } }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+
+        assertEquals(
+            "只有停稳的最后一个 Tab 提交；log=$tabSelectedLog",
+            listOf("D"),
+            tabSelectedLog,
+        )
+        assertEquals("扫过的中间页不得组合；creations=$creations", null, creations["C"])
+        assertTrue("终态页必须已装载；live=$liveTabs", "D" in liveTabs)
+    }
+
     /** 目标已在备用槽位（A→B→A）：零重建，remember 实例同址。 */
     @Test
     fun targetInBackupSlot_reusedNotRecreated() {
@@ -342,7 +366,7 @@ class TabbedTwoSlotTest {
         assertEquals(setOf("B", "C"), liveTabs)
     }
 
-    /** 热切换（预热命中的复用路径）零改动：选中当帧内容已在组合里存活，无壳帧、无重建。 */
+    /** 热切换（预热命中的复用路径）零改动：提交时内容已在组合里存活，无壳帧、无重建（选中经 200ms 防抖）。 */
     @Test
     fun warmSwitch_contentAlreadyLiveAtSelectionFrame() {
         setUpShell()
@@ -355,7 +379,8 @@ class TabbedTwoSlotTest {
         compose.mainClock.autoAdvance = false
         try {
             compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) } // A→B（复用）
-            compose.mainClock.advanceTimeBy(1)
+            // 冲刷防抖窗口：切换提交延迟 200ms，选中回调与页面放置在提交后可见
+            compose.mainClock.advanceTimeBy(1_000)
             assertEquals("选中应已发生", "B", tabSelectedLog.lastOrNull())
             assertTrue("复用选中帧内容必须已就绪（无壳帧）；live=$liveTabs", "B" in liveTabs)
             assertEquals("复用不得重建 B", bBefore, creations["B"])

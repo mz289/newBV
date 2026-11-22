@@ -102,7 +102,9 @@ class TabbedContentFocusTest {
         compose.runOnIdle { navFocus.requestFocus() }
 
         // 先切到 B 再切回 A：B 页此时已组合并保持，旧实现里它的卡片仍可聚焦。
+        // （Tab 切换有 200ms 焦点防抖：切键后先冲刷窗口让 B 提交，↓ 才会落进 B）
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.waitForIdle()
@@ -111,6 +113,7 @@ class TabbedContentFocusTest {
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         compose.waitForIdle()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()
 
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }

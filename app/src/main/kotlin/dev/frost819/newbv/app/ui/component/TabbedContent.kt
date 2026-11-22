@@ -30,11 +30,16 @@ import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 import androidx.compose.material3.Scaffold as Material3Scaffold
 
+/** 焦点防抖窗口：焦点停稳该时长后才提交内容切换（吸收长按扫键，同时单步切换延迟可感阈值内）。 */
+private const val TAB_FOCUS_DEBOUNCE_MS = 200L
+
 /**
  * 顶部 Tab 内容壳（[TopNav] + 内容区 + 菜单键刷新）。
  *
  * Tab 按首选项把 [initialTab] 旋转到首位；内容区获得焦点后 TopNav 收紧内边距；
  * 菜单键刷新当前 Tab 并把焦点交还 TopNav。
+ * Tab 行焦点移动只更新高亮，内容切换按 [TAB_FOCUS_DEBOUNCE_MS] 防抖：焦点停稳才提交；
+ * OK 键点击立即提交并刷新当前 Tab。
  *
  * 内容采用"双槽位页面缓冲"（参考 Telegram Dialogs 文件夹切换），切换为**即时替换、
  * 无过渡动画**（旧页立即退场，不存在新旧页并存的过渡期）：
@@ -55,7 +60,7 @@ import androidx.compose.material3.Scaffold as Material3Scaffold
  * @param displayName Tab 显示名称。
  * @param onRefresh 点击 Tab 或按菜单键时的刷新回调。
  * @param animated Tab 是否为多子页壳（true：双槽位缓冲；false：单内容直接组合）。
- * @param onTabSelected Tab 切换回调（如懒加载），同 Tab 重复聚焦不触发。
+ * @param onTabSelected Tab 切换回调（如懒加载），焦点停稳防抖后触发；同 Tab 重复聚焦不触发。
  * @param content Tab 内容。
  */
 @Composable
@@ -72,6 +77,9 @@ fun <T> TabbedContent(
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(initialTab) }
     var focusOnContent by remember { mutableStateOf(false) }
+    // 焦点所在 Tab（防抖输入源）：Tab 行高亮即时跟手（TopNav 内部状态），
+    // 内容切换经 [TAB_FOCUS_DEBOUNCE_MS] 停稳后统一提交
+    var focusedTab by remember { mutableStateOf(selectedTab) }
 
     val reorderedTabs =
         remember {
@@ -79,6 +87,19 @@ fun <T> TabbedContent(
             if (startIndex == -1) tabs else tabs.drop(startIndex) + tabs.take(startIndex)
         }
     val stateHolder = rememberSaveableStateHolder()
+
+    // 防抖提交：焦点在 Tab 行扫过时只记录位置，焦点停稳后才切换内容——
+    // 长按方向键扫过多个 Tab 不再逐个装载中间页（每次冷装载是 400ms 级组合 + 数据加载）。
+    // focusedTab 每次变化重启本 effect（取消上一个延迟），即 trailing-edge 防抖；
+    // 焦点回到当前已选 Tab（往返扫动）时零提交，连旧页装载都省掉。
+    LaunchedEffect(focusedTab) {
+        if (focusedTab == selectedTab) return@LaunchedEffect
+        delay(TAB_FOCUS_DEBOUNCE_MS)
+        // 延迟期内用户可能已按 OK 键点击确认（onClick 直提），避免二次触发 onTabSelected
+        if (focusedTab == selectedTab) return@LaunchedEffect
+        selectedTab = focusedTab
+        onTabSelected(focusedTab)
+    }
 
     Material3Scaffold(
         topBar = {
@@ -89,12 +110,17 @@ fun <T> TabbedContent(
                 selectedIndex = reorderedTabs.indexOf(selectedTab),
                 isLargePadding = !focusOnContent,
                 onSelectedChanged = { tab ->
+                    // 只记录焦点位置，提交交给上方防抖 effect
+                    focusedTab = tab
+                },
+                onClick = { tab ->
+                    // 点击即确认意图：立即提交防抖中的选择，再走刷新
                     if (tab != selectedTab) {
                         selectedTab = tab
                         onTabSelected(tab)
                     }
+                    onRefresh(tab)
                 },
-                onClick = onRefresh,
             )
         },
     ) { innerPadding ->
@@ -152,6 +178,9 @@ private fun <T> TwoSlotPageBuffer(
     // 焦点切换不等待页面加载（整页组合是单帧 400ms 级的重活，不能和选中反馈捆在同一帧）。
     val current = slots.firstOrNull { it.tab == selectedTab }
     if (current == null) {
+        // 非首次装载（槽里已有页面）= 用户切换：置守卫，预热不得再把刚离开的页挤出备用槽。
+        // （4f80a5e 引入守卫时漏掉了置位，长期为死代码——预热在进页 ~500ms 后无条件执行）
+        if (slots[0].tab != null) userSwitched = true
         val slot = slots.firstOrNull { !it.active } ?: slots.first()
         slot.tab = selectedTab
         slot.deferContent = true
@@ -162,10 +191,8 @@ private fun <T> TwoSlotPageBuffer(
     // 仅在用户尚未切换时执行，否则会把刚离开的上一页挤出备用槽（快速往返 A↔B 就得重建）。
     // 按帧计数而非 delay：随帧时钟推进，测试时钟下确定性快进。
     LaunchedEffect(reorderedTabs) {
-        println("PROBE prewarm effect enter")
         if (reorderedTabs.size <= 1) return@LaunchedEffect
         repeat(30) { withFrameNanos {} }
-        println("PROBE prewarm frames done userSwitched=$userSwitched")
         if (userSwitched) return@LaunchedEffect
         val next = reorderedTabs[1]
         if (slots.none { it.tab == next }) {
