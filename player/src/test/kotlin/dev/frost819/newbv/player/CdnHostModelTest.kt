@@ -156,33 +156,25 @@ class CdnHostModelTest {
         model.recordSpeed("a", "video-1", ttfbMs = 50.0, rateBytesPerSec = 8 * mib)
         model.recordOutcome("a", CdnOutcome.OK, videoKey = "video-1", now = 0)
 
-        // 新视频不沿用旧样本：重新需要探测，估计回到先验值
-        assertThat(model.needsProbe("a", "/v.m4s", "video-2")).isTrue()
+        // 新视频不沿用旧样本：估计回到先验值
         val estimate = model.estimate("a", "video-2", bytes = 0)
         assertThat(estimate.measured).isFalse()
         assertThat(estimate.ttfbMs).isEqualTo(350.0)
     }
 
     @Test
-    fun `needsProbe skips cooled down excluded and banned hosts`() {
-        // 先让字节流动过，否则失联保护会吞掉 a 的连接层失败
-        model.recordOutcome("peer", CdnOutcome.OK, videoKey = "video", now = 0)
-        model.recordOutcome("a", CdnOutcome.CONNECT_FAIL, videoKey = "video", now = 0)
-        assertThat(model.needsProbe("a", "/a.m4s", "video")).isFalse()
-
-        model.recordOutcome("b", CdnOutcome.MISSING, videoKey = "video", now = 0)
-        assertThat(model.needsProbe("b", "/b.m4s", "video")).isFalse()
-
-        model.recordOutcome("c", CdnOutcome.EXPIRED, addressKey = "/c.m4s", now = 0)
-        assertThat(model.needsProbe("c", "/c.m4s", "video")).isFalse()
-    }
-
-    @Test
     fun `speed samples evict least recently used videos beyond the cap`() {
         repeat(33) { v -> model.recordSpeed("host-$v", "video-$v", ttfbMs = 100.0, rateBytesPerSec = mib) }
-        // video-0 最久未用，已被淘汰，重新需要探测
-        assertThat(model.needsProbe("host-0", "/0.m4s", "video-0")).isTrue()
+        // 固定 lastUsedAt，避免冷连接惩罚干扰断言
+        model.recordOutcome("host-0", CdnOutcome.OK, videoKey = "video-0", now = 0)
+        model.recordOutcome("host-32", CdnOutcome.OK, videoKey = "video-32", now = 0)
+        // video-0 最久未用，已被淘汰：估计回到先验值
+        val evicted = model.estimate("host-0", "video-0", bytes = 0)
+        assertThat(evicted.measured).isFalse()
+        assertThat(evicted.ttfbMs).isEqualTo(350.0)
         // 最近写入的 video-32 样本仍在
-        assertThat(model.needsProbe("host-32", "/32.m4s", "video-32")).isFalse()
+        val kept = model.estimate("host-32", "video-32", bytes = 0)
+        assertThat(kept.measured).isTrue()
+        assertThat(kept.ttfbMs).isEqualTo(100.0)
     }
 }

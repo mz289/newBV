@@ -49,7 +49,6 @@ import dev.frost819.newbv.data.datastore.Resolution
 import dev.frost819.newbv.data.datastore.SkipPolicy
 import dev.frost819.newbv.data.datastore.VideoCodec
 import dev.frost819.newbv.player.CdnClassify
-import dev.frost819.newbv.player.CdnSelector
 import dev.frost819.newbv.player.VideoPlayerListener
 import dev.frost819.newbv.player.VideoPlayerOptions
 import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
@@ -120,7 +119,7 @@ private val AUDIO_FALLBACK_ORDER = listOf(Audio.A192K, Audio.A132K, Audio.A64K)
  * @param sponsorBlockApi SponsorBlock 片段查询 API（bsbsb.top 社区服务器）
  * @param exoPlayerFactory ExoPlayer 工厂
  * @param videoCapabilityProvider 设备视频解码能力查询器（选流时过滤超能力组合）
- * @param cdnSelector CDN 测速选择器（开启自动选源时用于排序候选地址）
+ * @param cdnRacingRegistry CDN 换宿注册表（主机池/熔断状态与播放侧成败回报）
  */
 @HiltViewModel
 class PlayerViewModel
@@ -133,7 +132,6 @@ class PlayerViewModel
         private val videoCapabilityProvider: VideoCapabilityProvider,
         private val favoriteRepository: FavoriteRepository,
         private val sponsorBlockApi: SponsorBlockApi,
-        private val cdnSelector: CdnSelector,
         private val cdnRacingRegistry: CdnRacingRegistry,
     ) : ViewModel() {
         private val logger = Loggers.get("PlayerViewModel")
@@ -170,17 +168,14 @@ class PlayerViewModel
         /** 本次播放已尝试过的音轨，用于音频解码回退去重与终止。 */
         private val attemptedAudioFallbacks = mutableSetOf<Audio>()
 
-        /** 当前视频轨道按推荐顺序排列的 CDN 候选（开启自动选源时按实测评估排序）。 */
+        /** 当前视频轨道的 CDN 候选（官方过滤后的顺序，原始 URL 为最终兜底）。 */
         private var videoCdnCandidates: List<String> = emptyList()
 
-        /** 当前音频轨道按推荐顺序排列的 CDN 候选。 */
+        /** 当前音频轨道的 CDN 候选。 */
         private var audioCdnCandidates: List<String> = emptyList()
 
         /** 运行时 CDN 回退已尝试到的候选下标。 */
         private var cdnFallbackIndex = 0
-
-        /** 当前视频的 CDN 评估 key（速度样本按视频隔离，不跨视频复用）。 */
-        private var cdnVideoKey: String? = null
 
         private val detachedWorkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -268,8 +263,8 @@ class PlayerViewModel
 
                 override fun onReady() {
                     logger.info { "onReady" }
-                    // 起播成功回报给选择器：重置当前主机的连续失败计数
-                    cdnSelector.noteSuccess(videoCdnCandidates.getOrNull(cdnFallbackIndex), cdnVideoKey)
+                    // 起播成功回报给竞速注册表：重置当前主机的连续失败计数
+                    videoCdnCandidates.getOrNull(cdnFallbackIndex)?.let(cdnRacingRegistry::notePlaybackSuccess)
                     _uiState.update { it.copy(playerState = PlayerState.Ready) }
                     updatePlaySpeed(forceUpdate = true)
                     startSeekerUpdater()
@@ -1647,12 +1642,9 @@ class PlayerViewModel
             val videoCandidates = officialCdnCandidates(videoUrls.filterNotNull())
             val audioCandidates = officialCdnCandidates(audioUrls)
 
-            // PR #31 thread-ripper 方案：不在起播路径上做前置探测排序——主机选择由
-            // RacingDataSource 在每个媒体请求上换宿竞速完成，测量发生在真实下载里。
-            // 候选保持官方过滤后的顺序（原始 URL 仍是原生回退的最终兜底）；
-            // cdnSelector 保留但不再在起播路径调用。视频/音频轨道沿用同一评估 key。
-            val cdnKey = "${state.aid}-${state.cid}-$targetQn"
-            cdnVideoKey = cdnKey
+            // PR #31 thread-ripper 方案：主机选择由 RacingDataSource 在每个媒体请求上
+            // 换宿竞速完成，测量发生在真实下载里。候选保持官方过滤后的顺序
+            // （原始 URL 仍是原生回退的最终兜底）；播放成败经注册表回报主机模型。
             videoCdnCandidates = videoCandidates
             audioCdnCandidates = audioCandidates
             cdnFallbackIndex = 0
@@ -1838,10 +1830,8 @@ class PlayerViewModel
          */
         private fun tryNextCdnFallback(): Boolean {
             val player = videoPlayer ?: return false
-            // 把失败回报给选择器：该主机按 STALL 冷却退避，连续失败会逐步拉长冷却时间
-            videoCdnCandidates.getOrNull(cdnFallbackIndex)?.let { failedUrl ->
-                cdnSelector.noteFailure(failedUrl, cdnVideoKey)
-            }
+            // 把失败回报给竞速注册表：该主机按 STALL 冷却退避，连续失败会逐步拉长冷却时间
+            videoCdnCandidates.getOrNull(cdnFallbackIndex)?.let(cdnRacingRegistry::notePlaybackFailure)
             val nextIndex = cdnFallbackIndex + 1
             val videoUrl = videoCdnCandidates.getOrNull(nextIndex) ?: return false
             cdnFallbackIndex = nextIndex

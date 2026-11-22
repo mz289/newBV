@@ -196,6 +196,31 @@ class CdnRacingRegistry(
         model.recordOutcome(host, outcome, videoKey, addressKey)
     }
 
+    /** 播放侧回报：当前候选地址起播/播放成功（重置该主机的连续失败计数）。 */
+    fun notePlaybackSuccess(url: String) {
+        recordPlaybackOutcome(url, CdnOutcome.OK)
+    }
+
+    /**
+     * 播放侧回报：当前候选地址播放失败，按 [outcome] 对其主机冷却退避。
+     * 播放器错误无法细分 HTTP 状态，调用方通常保持默认 [CdnOutcome.STALL] 即可，
+     * 连续失败会经由退避逐步拉长冷却时间。
+     */
+    fun notePlaybackFailure(
+        url: String,
+        outcome: CdnOutcome = CdnOutcome.STALL,
+    ) {
+        recordPlaybackOutcome(url, outcome)
+    }
+
+    private fun recordPlaybackOutcome(
+        url: String,
+        outcome: CdnOutcome,
+    ) {
+        val host = CdnClassify.hostOf(url) ?: return
+        model.recordOutcome(host, outcome, CdnClassify.videoKeyOf(url), addressKeyOf(url))
+    }
+
     private fun isBilibiliMediaHost(host: String): Boolean =
         host.endsWith(".bilivideo.com") ||
             host.endsWith(".bilivideo.cn") ||

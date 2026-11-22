@@ -33,7 +33,6 @@ import dev.frost819.newbv.data.datastore.Resolution
 import dev.frost819.newbv.data.datastore.VideoCodec
 import dev.frost819.newbv.player.CdnHostModel
 import dev.frost819.newbv.player.racing.CdnRacingRegistry
-import dev.frost819.newbv.player.CdnSelector
 import dev.frost819.newbv.player.VideoPlayerListener
 import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
@@ -86,7 +85,6 @@ class PlayerViewModelTest {
     private lateinit var videoCapabilityProvider: VideoCapabilityProvider
     private lateinit var favoriteRepository: FavoriteRepository
     private lateinit var sponsorBlockApi: SponsorBlockApi
-    private lateinit var cdnSelector: CdnSelector
     private lateinit var viewModel: PlayerViewModel
     private lateinit var mockPlayer: ExoMediaPlayer
 
@@ -102,7 +100,6 @@ class PlayerViewModelTest {
         every { videoCapabilityProvider.isDecodable(any()) } returns true
         favoriteRepository = mockk(relaxed = true)
         sponsorBlockApi = mockk(relaxed = true)
-        cdnSelector = mockk(relaxed = true)
 
         mockkObject(Prefs)
         every { Prefs.apiType } returns ApiType.Web
@@ -133,7 +130,6 @@ class PlayerViewModelTest {
                 videoCapabilityProvider = videoCapabilityProvider,
                 favoriteRepository = favoriteRepository,
                 sponsorBlockApi = sponsorBlockApi,
-                cdnSelector = cdnSelector,
                 cdnRacingRegistry = CdnRacingRegistry(CdnHostModel()),
             )
     }

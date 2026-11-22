@@ -42,10 +42,9 @@ enum class CdnOutcome {
 }
 
 /**
- * CDN 主机状态模型（参考 SukkaW/Make-Bilibili-Great-Than-Ever-Before PR #31 的 `host-model.ts`，
- * 按本项目的"起播前一次性探测 + 播放失败逐个回退"模式精简）。
+ * CDN 主机状态模型（参考 SukkaW/Make-Bilibili-Great-Than-Ever-Before PR #31 的 `host-model.ts`）。
  *
- * - **速度：按「视频 + 主机」维度记录最近若干次探测的 TTFB 与吞吐样本。** CDN 边缘节点对
+ * - **速度：按「视频 + 主机」维度记录最近若干次的 TTFB 与吞吐样本。** CDN 边缘节点对
  *   当前视频是否命中缓存直接决定其速度，因此样本不跨视频复用，新视频一律重新评估。
  *   未测速的主机使用同视频已测主机的中位数（"typical"）估计，再退到先验值。
  * - **可靠性：按主机维度做冷却退避。** 按失败类别施加指数退避冷却，成功重置；当所有主机
@@ -131,25 +130,22 @@ class CdnHostModel(
         }
 
     /**
-     * 记录一次探测的速度样本。
+     * 记录一次速度样本。
      *
      * @param ttfbMs 首字节耗时（毫秒），`null` 表示未测得。
-     * @param rateBytesPerSec 首字节之后的吞吐（字节/秒），`null` 表示未测得。
-     * @param partial 传输是否被截断：截断的吞吐只在尚无任何样本时记录一次，
-     *   避免被截断的短读拉低整体估计（完整样本到达后即覆盖）。
+     * @param rateBytesPerSec 吞吐（字节/秒），`null` 或非正数表示未测得。
      */
     fun recordSpeed(
         hostname: String,
         videoKey: String,
         ttfbMs: Double?,
         rateBytesPerSec: Double?,
-        partial: Boolean = false,
     ) {
         synchronized(lock) {
             val byHost = speeds.getOrPut(videoKey) { HashMap() }
             val speed = byHost.getOrPut(hostname) { Speed() }
             push(speed.ttfb, ttfbMs)
-            if (rateBytesPerSec != null && rateBytesPerSec > 0 && (!partial || speed.rate.isEmpty())) {
+            if (rateBytesPerSec != null && rateBytesPerSec > 0) {
                 push(speed.rate, rateBytesPerSec)
             }
         }
@@ -197,21 +193,6 @@ class CdnHostModel(
         }
     }
 
-    /** 探测结果一站式记录：成功记速度样本，结果本身走 [recordOutcome]。 */
-    fun recordProbe(
-        hostname: String,
-        addressKey: String,
-        videoKey: String,
-        outcome: CdnOutcome,
-        ttfbMs: Double? = null,
-        rateBytesPerSec: Double? = null,
-        partial: Boolean = false,
-        now: Long = nowMs(),
-    ) {
-        if (outcome == CdnOutcome.OK) recordSpeed(hostname, videoKey, ttfbMs, rateBytesPerSec, partial)
-        recordOutcome(hostname, outcome, videoKey, addressKey, now)
-    }
-
     /**
      * 竞速层回报：该主机刚送来一批字节。
      *
@@ -243,23 +224,6 @@ class CdnHostModel(
 
     /** 该签名地址是否已被封禁（签名过期）。 */
     fun isAddressBanned(addressKey: String): Boolean = synchronized(lock) { bannedAddresses.containsKey(addressKey) }
-
-    /**
-     * 是否需要对该主机做本视频的测速探测：
-     * 本视频尚无样本，且主机未冷却、未被排除、地址未封禁。
-     */
-    fun needsProbe(
-        hostname: String,
-        addressKey: String,
-        videoKey: String,
-        now: Long = nowMs(),
-    ): Boolean =
-        synchronized(lock) {
-            if (bannedAddresses.containsKey(addressKey)) return@synchronized false
-            if ((exclusions[videoKey]?.get(hostname) ?: 0L) > now) return@synchronized false
-            if (hostLocked(hostname).cooldownUntil > now) return@synchronized false
-            speeds[videoKey]?.get(hostname) == null
-        }
 
     /** 同视频已测主机的中位速度；没有任何样本时为先验值。 */
     private fun typicalSpeedLocked(videoKey: String): Pair<Double, Double> {

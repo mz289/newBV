@@ -9,8 +9,6 @@ import dagger.hilt.components.SingletonComponent
 import dev.frost819.newbv.app.util.MediaCodecVideoCapabilityProvider
 import dev.frost819.newbv.app.util.VideoCapabilityProvider
 import dev.frost819.newbv.player.CdnHostModel
-import dev.frost819.newbv.player.CdnSelector
-import dev.frost819.newbv.player.OkHttpCdnSelector
 import dev.frost819.newbv.player.OkHttpUtil
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
 import dev.frost819.newbv.player.racing.CdnRacingRegistry
@@ -26,7 +24,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object PlayerModule {
-    /** 播放与 CDN 测速共用单例，避免每轮播放重建 SSL 配置和连接池。 */
+    /** 播放请求共用单例，避免每轮播放重建 SSL 配置和连接池。 */
     @Provides
     @Singleton
     fun providePlayerHttpClient(
@@ -47,7 +45,7 @@ object PlayerModule {
         cdnRacingRegistry: CdnRacingRegistry,
     ): ExoPlayerFactory = ExoPlayerFactory(playerHttpClient, cdnRacingRegistry)
 
-    /** CDN 主机状态模型（速度样本 + 可靠性），竞速层与测速选择器共用形态，进程级单例。 */
+    /** 提供 CDN 主机状态模型：竞速层与播放侧回报共用的进程级单例。 */
     @Provides
     @Singleton
     fun provideCdnHostModel(): CdnHostModel = CdnHostModel()
@@ -73,15 +71,4 @@ object PlayerModule {
     fun provideVideoCapabilityProvider(
         @ApplicationContext context: Context,
     ): VideoCapabilityProvider = MediaCodecVideoCapabilityProvider(context)
-
-    /**
-     * 提供 CDN 自动选择器。
-     *
-     * 基于带自定义 SSL 配置的 OkHttpClient 对候选播放地址按视频维度实测评估
-     * （TTFB + 吞吐 → ETA 排序，样本不跨视频复用；主机可靠性冷却退避），
-     * 供 [dev.frost819.newbv.app.viewmodel.player.PlayerViewModel] 选流使用。
-     */
-    @Provides
-    @Singleton
-    fun provideCdnSelector(playerHttpClient: OkHttpClient): CdnSelector = OkHttpCdnSelector(playerHttpClient)
 }
