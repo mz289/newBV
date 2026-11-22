@@ -17,6 +17,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import dev.frost819.newbv.core.focus.ControlFocusDefaults
+import dev.frost819.newbv.core.focus.outerFocusBorder
 import dev.frost819.newbv.core.focus.touchClickable
 
 /**
@@ -73,7 +74,12 @@ fun UpActionButton(
                     } else {
                         Border.None
                     },
+                // 未聚焦时不传 focusedBorder 会回退为上面的 border（普通态即 Border.None），
+                // 聚焦时什么也不画；与全应用控件一致显式给出 2dp 外描边。
+                focusedBorder = outerFocusBorder(),
             ),
+        // 与本屏其余控件一致：焦点反馈只靠外描边，不放大挤占相邻按钮的 8dp 间距。
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
