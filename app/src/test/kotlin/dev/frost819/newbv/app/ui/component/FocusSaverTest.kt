@@ -160,4 +160,38 @@ class FocusSaverTest {
         compose.mainClock.advanceTimeBy(1_000)
         assertEquals("恢复完成后的焦点移动须正常保存", alwaysKey, savedKey.value)
     }
+
+    /**
+     * 接管窗口让位：恢复窗口内用户真实移动焦点（接管窗口阶段 key 变化）→
+     * 立即放弃恢复且不触发兜底，用户导航不被恢复抢夺。
+     */
+    @Test
+    fun userTakeoverAbortsRestoreWithoutFallback() {
+        setupFocusedThenNavigateAway()
+        compose.runOnUiThread {
+            mounted = true
+            itemsReady = false // 目标始终未注册：窗口会持续等待
+        }
+        compose.mainClock.advanceTimeBy(400) // 越过静默窗口（12 帧 ≈192ms）进入接管窗口
+        // 用户接管：真实焦点移动写入新 key（白盒注入，等价 onFocusChanged）
+        compose.runOnUiThread { fsRef!!.saveFocusedKey(alwaysKey) }
+        compose.mainClock.advanceTimeBy(2_000) // 冲刷整个窗口（72 帧 ≈1.15s）
+        assertEquals("用户接管后恢复须让位且不触发兜底", 0, restoreFailedCount)
+        assertEquals("用户接管写入的 key 须保留", alwaysKey, savedKey.value)
+    }
+
+    /** 接管窗口内目标终于注册（列表重载完成场景）→ 恢复仍落到 gridKey。 */
+    @Test
+    fun restoreSucceedsInTakeoverWindow() {
+        setupFocusedThenNavigateAway()
+        compose.runOnUiThread {
+            mounted = true
+            itemsReady = false // 模拟返回时列表还在骨架/重载
+        }
+        compose.mainClock.advanceTimeBy(400) // 越过静默窗口（列表尚未就绪）
+        compose.runOnUiThread { itemsReady = true } // 列表重载完成，目标注册
+        compose.mainClock.advanceTimeBy(2_000)
+        compose.onNodeWithTag(gridKey).assertIsFocused()
+        assertEquals("接管窗口内的迟到注册仍须恢复", gridKey, savedKey.value)
+    }
 }

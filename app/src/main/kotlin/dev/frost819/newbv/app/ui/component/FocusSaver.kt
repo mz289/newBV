@@ -104,6 +104,14 @@ class FocusSaver(
      * 后续 key 变化（默认聚焦、用户移动）不再触发恢复——那是新交互，
      * 不是「回到原位」。恢复成功后回写捕获值，抹掉窗口前落下的污染。
      *
+     * 两段式窗口，覆盖「返回时目标列表还在骨架/重载中」的慢场景：
+     * - 静默窗口（[RESTORE_SUPPRESS_FRAMES] 帧）：框架默认聚焦落点在此期间，
+     *   写入被拦截，恢复目标不被污染；
+     * - 接管窗口（至 [RESTORE_TOTAL_FRAMES] 帧）：拦截关闭，期间 savedKey 若
+     *   被真实焦点移动改写（≠ capturedKey），说明用户已接管——立刻让位，
+     *   不再恢复也不触发兜底；目标注册后仍可完成恢复。
+     * 全窗口耗尽才走 [onRestoreFailed] 兜底。
+     *
      * @param onRestoreFailed 重试用尽（key 已失效、目标元素不存在）后的兜底，
      *   如 MainScreen 回退到聚焦顶部 Tab。
      */
@@ -111,40 +119,66 @@ class FocusSaver(
     fun RestoreFocus(onRestoreFailed: (() -> Unit)? = null) {
         val capturedKey = remember { savedKey.value }
         LaunchedEffect(capturedKey) {
-            if (!FOCUS_RESTORE_DEBUG) {
-                if (capturedKey.isEmpty()) return@LaunchedEffect
-            } else {
+            if (FOCUS_RESTORE_DEBUG) {
                 logger.info { "[RESTORE] start captured='$capturedKey' current='${savedKey.value}'" }
             }
             if (capturedKey.isEmpty()) return@LaunchedEffect
-            restoring = true
             try {
-                repeat(RESTORE_MAX_FRAMES) { attempt ->
-                    val requester = requesters[capturedKey]
-                    if (requester != null && requester.focusWhenReady(maxFrames = 2)) {
-                        // 回写捕获值：抹掉恢复窗口开启前框架默认聚焦写下的 key，
-                        // 保证下一次「离开→返回」仍恢复到本次目标
-                        if (FOCUS_RESTORE_DEBUG) {
-                            logger.info { "[RESTORE] ok key='$capturedKey' attempt=$attempt savedWas='${savedKey.value}'" }
-                        }
-                        savedKey.value = capturedKey
-                        return@LaunchedEffect
-                    }
+                // 静默窗口：拦截框架默认聚焦对 key 的覆写
+                restoring = true
+                var abandoned = false
+                repeat(RESTORE_SUPPRESS_FRAMES) { attempt ->
+                    if (restoreAttempt(capturedKey)) return@LaunchedEffect
                     withFrameNanos { }
                 }
-                if (FOCUS_RESTORE_DEBUG) {
-                    logger.info { "[RESTORE] exhausted key='$capturedKey' registered=${requesters.keys} failed=${onRestoreFailed != null}" }
+                // 接管窗口：放开拦截；用户真实移动焦点（key 变化）即让位
+                restoring = false
+                repeat(RESTORE_TOTAL_FRAMES - RESTORE_SUPPRESS_FRAMES) { attempt ->
+                    if (savedKey.value != capturedKey) {
+                        if (FOCUS_RESTORE_DEBUG) {
+                            logger.info { "[RESTORE] abandoned key='$capturedKey' userMovedTo='${savedKey.value}'" }
+                        }
+                        abandoned = true
+                        return@LaunchedEffect
+                    }
+                    if (restoreAttempt(capturedKey, RESTORE_SUPPRESS_FRAMES + attempt)) return@LaunchedEffect
+                    withFrameNanos { }
                 }
-                onRestoreFailed?.invoke()
+                if (!abandoned) {
+                    if (FOCUS_RESTORE_DEBUG) {
+                        logger.info { "[RESTORE] exhausted key='$capturedKey' registered=${requesters.keys}" }
+                    }
+                    onRestoreFailed?.invoke()
+                }
             } finally {
                 restoring = false
             }
         }
     }
+
+    /** 单轮恢复：目标已注册则请求焦点，成功后回写捕获 key。 */
+    private suspend fun restoreAttempt(key: String, attempt: Int = 0): Boolean {
+        val requester = requesters[key] ?: return false
+        if (!requester.focusWhenReady(maxFrames = 2)) return false
+        // 回写捕获值：抹掉恢复窗口开启前框架默认聚焦写下的 key，
+        // 保证下一次「离开→返回」仍恢复到本次目标
+        if (FOCUS_RESTORE_DEBUG) {
+            logger.info { "[RESTORE] ok key='$key' attempt=$attempt savedWas='${savedKey.value}'" }
+        }
+        savedKey.value = key
+        return true
+    }
 }
 
-/** 恢复窗口上限（帧）：覆盖「壳帧 + Lazy 项注册 + 焦点请求」的正常时序，过期即兜底。 */
-private const val RESTORE_MAX_FRAMES = 12
+/**
+ * 恢复窗口帧数预算：
+ * - [RESTORE_SUPPRESS_FRAMES] 静默拦截窗口：覆盖「壳帧 + 框架默认聚焦」时序；
+ * - [RESTORE_TOTAL_FRAMES] 总窗口：额外覆盖「返回时列表尚在骨架/重载」的慢场景
+ *   （推荐流被 refresh 清空后 ~1s 级重载，期间目标项不存在）。
+ * 帧预算按帧数计：重帧期间帧时钟停走，不随卡顿放大。
+ */
+private const val RESTORE_SUPPRESS_FRAMES = 12
+private const val RESTORE_TOTAL_FRAMES = 72
 
 /**
  * 创建 [FocusSaver]，使用 [rememberSaveable] 持久化焦点 key。
