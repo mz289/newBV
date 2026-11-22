@@ -11,6 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import dev.frost819.newbv.core.log.Loggers
+
+/** 焦点恢复链路诊断日志开关（排查「返回后焦点不回原位」用，定位后关闭）。 */
+private const val FOCUS_RESTORE_DEBUG = true
+private val logger = Loggers.get("FocusSaver")
 
 /**
  * 焦点恢复器。
@@ -56,7 +61,15 @@ class FocusSaver(
      * onFocusChanged 不能污染待恢复 key。
      */
     fun saveFocusedKey(key: String) {
-        if (restoring) return
+        if (restoring) {
+            if (FOCUS_RESTORE_DEBUG && key != savedKey.value) {
+                logger.info { "[SAVE] suppressed key='$key' (restoring, saved='${savedKey.value}')" }
+            }
+            return
+        }
+        if (FOCUS_RESTORE_DEBUG && key != savedKey.value) {
+            logger.info { "[SAVE] key='$key'" }
+        }
         savedKey.value = key
     }
 
@@ -98,18 +111,29 @@ class FocusSaver(
     fun RestoreFocus(onRestoreFailed: (() -> Unit)? = null) {
         val capturedKey = remember { savedKey.value }
         LaunchedEffect(capturedKey) {
+            if (!FOCUS_RESTORE_DEBUG) {
+                if (capturedKey.isEmpty()) return@LaunchedEffect
+            } else {
+                logger.info { "[RESTORE] start captured='$capturedKey' current='${savedKey.value}'" }
+            }
             if (capturedKey.isEmpty()) return@LaunchedEffect
             restoring = true
             try {
-                repeat(RESTORE_MAX_FRAMES) {
+                repeat(RESTORE_MAX_FRAMES) { attempt ->
                     val requester = requesters[capturedKey]
                     if (requester != null && requester.focusWhenReady(maxFrames = 2)) {
                         // 回写捕获值：抹掉恢复窗口开启前框架默认聚焦写下的 key，
                         // 保证下一次「离开→返回」仍恢复到本次目标
+                        if (FOCUS_RESTORE_DEBUG) {
+                            logger.info { "[RESTORE] ok key='$capturedKey' attempt=$attempt savedWas='${savedKey.value}'" }
+                        }
                         savedKey.value = capturedKey
                         return@LaunchedEffect
                     }
                     withFrameNanos { }
+                }
+                if (FOCUS_RESTORE_DEBUG) {
+                    logger.info { "[RESTORE] exhausted key='$capturedKey' registered=${requesters.keys} failed=${onRestoreFailed != null}" }
                 }
                 onRestoreFailed?.invoke()
             } finally {

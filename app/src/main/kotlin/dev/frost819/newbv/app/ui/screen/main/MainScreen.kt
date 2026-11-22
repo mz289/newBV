@@ -35,6 +35,7 @@ import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.rememberDrawerState
 import dev.frost819.newbv.app.ui.component.LocalGridLeftExit
+import dev.frost819.newbv.app.ui.component.TAB_SHELL_DEBUG
 import dev.frost819.newbv.app.ui.component.rememberDoublePressExit
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.user.UserPanel
@@ -81,7 +82,16 @@ fun MainScreen(
     // 仅"返回 MainScreen"时恢复焦点；首次进入不恢复，
     // 否则启动阶段系统自动聚焦左侧栏头像产生的 key 会把焦点抢回头像。
     if (focusInitialized) {
-        focusSaver.RestoreFocus(onRestoreFailed = { onFocusToContent() })
+        focusSaver.RestoreFocus(
+            onRestoreFailed = {
+                if (TAB_SHELL_DEBUG) {
+                    dev.frost819.newbv.core.log.Loggers.get("TabShell").info {
+                        "[MAIN] restore failed -> fallback focus TopNav (saved='${focusSaver.savedKeyValue()}')"
+                    }
+                }
+                onFocusToContent()
+            },
+        )
     }
 
     val handleBack =

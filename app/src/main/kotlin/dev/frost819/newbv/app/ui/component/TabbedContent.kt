@@ -28,7 +28,11 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
+import dev.frost819.newbv.core.log.Loggers
 import androidx.compose.material3.Scaffold as Material3Scaffold
+
+/** 焦点恢复/壳层装载诊断日志（排查「返回后焦点不回原位」用，定位后关闭）。 */
+internal const val TAB_SHELL_DEBUG = true
 
 /** 焦点防抖窗口：焦点停稳该时长后才提交内容切换（吸收长按扫键，同时单步切换延迟可感阈值内）。 */
 private const val TAB_FOCUS_DEBOUNCE_MS = 200L
@@ -184,6 +188,9 @@ private fun <T> TwoSlotPageBuffer(
         val slot = slots.firstOrNull { !it.active } ?: slots.first()
         slot.tab = selectedTab
         slot.deferContent = true
+        if (TAB_SHELL_DEBUG) {
+            Loggers.get("TabShell").info { "[SLOT] assign idx=${slot.index} defer=true selected=$selectedTab" }
+        }
     }
     slots.forEach { it.active = it.tab == selectedTab }
 
@@ -196,6 +203,9 @@ private fun <T> TwoSlotPageBuffer(
         if (userSwitched) return@LaunchedEffect
         val next = reorderedTabs[1]
         if (slots.none { it.tab == next }) {
+            if (TAB_SHELL_DEBUG) {
+                Loggers.get("TabShell").info { "[PREWARM] load next=$next" }
+            }
             slots.firstOrNull { !it.active }?.tab = next
         }
     }
@@ -256,8 +266,14 @@ private fun <T> KeptTabPage(
     // （一次 advance 会连排空多帧），壳态不可断言。
     LaunchedEffect(slot.tab) {
         if (slot.deferContent) {
+            if (TAB_SHELL_DEBUG) {
+                Loggers.get("TabShell").info { "[SLOT] shell frame idx=${slot.index}" }
+            }
             delay(16)
             slot.deferContent = false
+            if (TAB_SHELL_DEBUG) {
+                Loggers.get("TabShell").info { "[SLOT] content commit idx=${slot.index}" }
+            }
         }
     }
     CompositionLocalProvider(LocalPageActive provides slot.active) {
