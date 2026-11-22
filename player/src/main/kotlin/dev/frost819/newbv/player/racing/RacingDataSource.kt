@@ -65,6 +65,7 @@ class RacingDataSource(
         if (readLength == 0) return 0
         val j = job ?: throw IOException("Read before open")
         val n = j.read(buffer, offset, readLength)
+        if (n == RacingJob.EOS) return C.RESULT_END_OF_INPUT
         if (n > 0) bytesTransferred(n)
         return n
     }

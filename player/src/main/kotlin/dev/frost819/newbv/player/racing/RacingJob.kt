@@ -257,10 +257,10 @@ class RacingJob(
 
     private fun readNative(buffer: ByteArray, offset: Int, readLength: Int): Int {
         val response = nativeResponse ?: throw IOException("Read before open")
-        if (closed) return 0
+        if (closed) throw InterruptedIOException()
         return try {
             val n = response.read(buffer, offset, readLength)
-            if (n == -1) 0 else n
+            if (n > 0) n else EOS
         } catch (e: InterruptedIOException) {
             throw e
         } catch (e: IOException) {
@@ -278,7 +278,7 @@ class RacingJob(
                 val n = copyFrame(pendingFrame, buffer, offset, readLength)
                 if (n > 0) return n
             }
-            val piece = pieces.firstOrNull() ?: return 0
+            val piece = pieces.firstOrNull() ?: return EOS
             if (piece.attempts.isEmpty()) {
                 // 上一片完成后的新片：立即补尝试
                 ensureAttempts(piece, width = 1)
@@ -305,7 +305,9 @@ class RacingJob(
                 else -> onBytes(piece, frame, buffer, offset, readLength)?.let { return it }
             }
         }
-        return 0
+        // closed：调用方取消。DataReader 契约里 0 是非法返回值，取消必须以中断信号表达，
+        // 否则 extractor 会对 0 无限重读（播放到 EOF 后永远缓冲中的根因）
+        throw InterruptedIOException()
     }
 
     /** 字节帧：晋升 leader / 接管 / 丢弃失配帧；返回拷贝的字节数（>0 则结束本次 read）。 */
@@ -720,6 +722,13 @@ class RacingJob(
 
         /** 字节比对者缓存的字节数上限（PR `LAGGARD_BYTES`）。 */
         const val LAGGARD_BYTES = 64 * 1024
+
+        /**
+         * 流结束哨兵，值同 media3 `C.RESULT_END_OF_INPUT`。DataReader 契约禁止返回 0——
+         * extractor 对 0 的处理是原样再读一次，返回 0 会让播放到 EOF 后永远等不到 ENDED。
+         * RacingJob 刻意不依赖 media3，由 [RacingDataSource] 负责映射。
+         */
+        const val EOS = -1
 
         /** 轮询片队列的间隔。 */
         const val POLL_MS = 50L

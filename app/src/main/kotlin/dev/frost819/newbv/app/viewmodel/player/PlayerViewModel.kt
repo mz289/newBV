@@ -296,7 +296,9 @@ class PlayerViewModel
                     logger.info { "onEnd" }
                     stopSeekerUpdater()
                     stopDebugInfoUpdater()
-                    _uiState.update { it.copy(playerState = PlayerState.Ended) }
+                    // BUFFERING→ENDED 之间没有 READY，isBuffering 必须在此回收，
+                    // 否则播放结束后 PlayStateTips 永远显示转圈（它只看 isBuffering）
+                    _uiState.update { it.copy(playerState = PlayerState.Ended, isBuffering = false) }
                     viewModelScope.launch { _uiEffect.emit(PlayerUiEffect.PlayEnded) }
                 }
             }

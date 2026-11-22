@@ -80,7 +80,7 @@ class RacingDataSourceTest {
         val buf = ByteArray(4096)
         while (true) {
             val n = job.read(buf, 0, buf.size)
-            if (n == 0) break
+            if (n <= 0) break // EOS(-1) / 关闭
             out.addAll(buf.take(n).toList())
         }
         return out.toByteArray()
@@ -160,6 +160,9 @@ class RacingDataSourceTest {
         val data = readAll(job)
         assertThat(data).isEqualTo(content)
         assertThat(job.currentUri()).contains("upos-a.bilivideo.com")
+        // EOS 哨兵：流结束后必须是 -1（media3 DataReader 契约禁止 0——返回 0 会让
+        // extractor 无限重读，播放到 EOF 后永远缓冲中）
+        assertThat(job.read(ByteArray(16), 0, 16)).isEqualTo(RacingJob.EOS)
         job.close()
     }
 
@@ -293,7 +296,7 @@ class RacingDataSourceTest {
                 val buf = ByteArray(4096)
                 while (true) {
                     val n = job.read(buf, 0, buf.size)
-                    if (n == 0) break
+                    if (n <= 0) break
                     out.write(buf, 0, n)
                 }
             }
