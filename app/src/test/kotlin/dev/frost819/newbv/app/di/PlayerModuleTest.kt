@@ -1,6 +1,8 @@
 package dev.frost819.newbv.app.di
 
 import com.google.common.truth.Truth.assertThat
+import dev.frost819.newbv.player.CdnHostModel
+import dev.frost819.newbv.player.racing.CdnRacingRegistry
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
 import io.mockk.mockk
 import okhttp3.OkHttpClient
@@ -22,7 +24,7 @@ class PlayerModuleTest {
         val sharedClient = mockk<OkHttpClient>(relaxed = true)
 
         // When
-        val factory: ExoPlayerFactory = PlayerModule.provideExoPlayerFactory(sharedClient)
+        val factory: ExoPlayerFactory = PlayerModule.provideExoPlayerFactory(sharedClient, CdnRacingRegistry(CdnHostModel()))
 
         // Then：工厂必须复用同一 client（= 同一 ConnectionPool）
         assertThat(factory.client).isSameInstanceAs(sharedClient)
@@ -35,8 +37,8 @@ class PlayerModuleTest {
         val clientB = mockk<OkHttpClient>(relaxed = true)
 
         // When
-        val factoryA = PlayerModule.provideExoPlayerFactory(clientA)
-        val factoryB = PlayerModule.provideExoPlayerFactory(clientB)
+        val factoryA = PlayerModule.provideExoPlayerFactory(clientA, CdnRacingRegistry(CdnHostModel()))
+        val factoryB = PlayerModule.provideExoPlayerFactory(clientB, CdnRacingRegistry(CdnHostModel()))
 
         // Then：工厂本身不做缓存（单例由 Hilt 保证）
         assertThat(factoryA.client).isSameInstanceAs(clientA)

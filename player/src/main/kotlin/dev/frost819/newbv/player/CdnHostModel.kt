@@ -77,6 +77,9 @@ class CdnHostModel(
         /** 最近一次请求结束时间；空闲超过 [WARM_MS] 的连接视为已断开。 */
         var lastUsedAt = Long.MIN_VALUE / 2
 
+        /** 最近一次该主机送来字节的时间（[alive] 判定与 [noteDelivery] 维护）。 */
+        var lastDeliveryAt = Long.MIN_VALUE / 2
+
         /** 冷却截止时间，之前不再请求该主机。 */
         var cooldownUntil = 0L
 
@@ -168,11 +171,18 @@ class CdnHostModel(
         synchronized(lock) {
             val host = hostLocked(hostname)
             host.lastUsedAt = now
-            // 连接层失败且最近没有任何主机送来字节：多半是用户自己的网络，不惩罚主机
-            if (outcome in CONNECTION_FAILURES && now - lastBytesAt > NETWORK_DOWN_MS) return
+            // 连接层失败不惩罚主机的两种情形（PR #31 `alive` 语义）：
+            // ① 该主机 2s 内还在送字节（alive）——只是这一条连接坏了，主机仍可用于重试；
+            // ② 最近没有任何主机送来字节——多半是用户自身网络整体失联。
+            if (outcome in CONNECTION_FAILURES &&
+                (now - host.lastDeliveryAt < ALIVE_MS || now - lastBytesAt > NETWORK_DOWN_MS)
+            ) {
+                return
+            }
             when (outcome) {
                 CdnOutcome.OK -> {
                     lastBytesAt = now
+                    host.lastDeliveryAt = now
                     host.failureStreak = 0
                 }
                 CdnOutcome.TRUNCATED, CdnOutcome.RESET, CdnOutcome.STALL -> cooldownLocked(host, now, 500)
@@ -200,6 +210,19 @@ class CdnHostModel(
     ) {
         if (outcome == CdnOutcome.OK) recordSpeed(hostname, videoKey, ttfbMs, rateBytesPerSec, partial)
         recordOutcome(hostname, outcome, videoKey, addressKey, now)
+    }
+
+    /**
+     * 竞速层回报：该主机刚送来一批字节。
+     *
+     * 维护 [HostRecord.lastDeliveryAt] 与全局 `lastBytesAt`，供连接层失败的
+     * alive / 网络失联判定使用（PR #31 的 `lastDelivery` 语义）。
+     */
+    fun noteDelivery(hostname: String, now: Long = nowMs()) {
+        synchronized(lock) {
+            hostLocked(hostname).lastDeliveryAt = now
+            lastBytesAt = now
+        }
     }
 
     /** 该主机是否在冷却期内。 */
@@ -286,6 +309,9 @@ class CdnHostModel(
 
         /** 超过该时长没有任何主机送来字节：失败是用户自身网络，不惩罚主机。 */
         const val NETWORK_DOWN_MS = 3000L
+
+        /** 该主机这么近还送来过字节：连接级失败只是这一条连接坏，不退避。 */
+        const val ALIVE_MS = 2000L
 
         /** REFUSED 时对该主机按视频排除的时长。 */
         const val REFUSED_EXCLUDE_MS = 60 * 1000L

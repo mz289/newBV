@@ -43,6 +43,21 @@ object CdnClassify {
     /** 纯 IPv4 主机名（mcdn 直连 IP 形态）。 */
     private val IP_HOST_REGEX = Regex("^(?:\\d{1,3}\\.){3}\\d{1,3}$")
 
+    /** mcdn-tf 自有路径形态：纯 IP / *.mcdn.bilivideo.* 主机 + `/v1/resource`（PR #31 `mCdnTfRegex`）。 */
+    private val MCDN_TF_URL_REGEX =
+        Regex(
+            "^https?://(?:(?:\\d{1,3}\\.){3}\\d{1,3}|[^/]+\\.mcdn\\.bilivideo\\.(?:com|cn|net))(?::\\d{1,5})?/v\\d/resource/",
+        )
+
+    /**
+     * 镜像外壳的 PCDN：URL 参数 `os=mcdn`（PR #31 `classifyCdnUrl`）。
+     *
+     * 这类地址可能是官方 mirror 主机名，也可能是任意 PCDN 自有域名
+     * （如 `*.edge.mountaintoys.cn:4483` + `os=mcdn` + `mcdnid=…`），
+     * 主机名判断拦不住后者，只能靠该参数识别。
+     */
+    private val MCDN_OS_URL_REGEX = Regex("[?&]os=mcdn(?:&|$)")
+
     /** 已知 P2P / PCDN 域名特征。 */
     private val P2P_KEYWORDS =
         listOf(
@@ -60,6 +75,10 @@ object CdnClassify {
 
     /** 是否为 P2P / PCDN 节点。 */
     fun isP2pUrl(url: String): Boolean {
+        // URL 参数 os=mcdn：镜像外壳 / 任意自有域名的 PCDN，优先于一切主机名判断
+        if (MCDN_OS_URL_REGEX.containsMatchIn(url)) return true
+        // mcdn-tf 自有路径形态
+        if (MCDN_TF_URL_REGEX.containsMatchIn(url)) return true
         val host = hostOf(url) ?: return false
         if (IP_HOST_REGEX.matches(host)) return true
         if (P2P_KEYWORDS.any { url.contains(it, ignoreCase = true) }) return true
@@ -80,5 +99,35 @@ object CdnClassify {
             return CdnTier.OFFICIAL
         }
         return CdnTier.UNKNOWN
+    }
+
+    /**
+     * 签名地址 key（path?query，不含主机）。
+     *
+     * upgcxcode 地址的签名不含主机（upos 系主机接受任意同签名地址），
+     * 换主机后 key 不变，可作为换宿与字节比对的对齐依据。
+     */
+    fun mediaPathKey(url: String): String? =
+        runCatching {
+            val uri = URI(url)
+            val path = uri.rawPath ?: return@runCatching null
+            val query = uri.rawQuery
+            if (query != null) "$path?$query" else path
+        }.getOrNull()
+
+    /**
+     * 视频评估 key：upgcxcode 路径里的 cid 段（`/upgcxcode/xx/xx/{cid}/…`）。
+     *
+     * 速度样本按视频隔离（边缘节点对当前视频是否命中缓存决定速度），
+     * 同一视频的视频/音频/各画质轨道共用同一 key；非 upgcxcode 地址退回 path key。
+     */
+    fun videoKeyOf(url: String): String {
+        val path = runCatching { URI(url).rawPath }.getOrNull() ?: return url
+        val segments = path.split('/').filter { it.isNotBlank() }
+        val upgcxcodeIndex = segments.indexOf("upgcxcode")
+        if (upgcxcodeIndex >= 0 && upgcxcodeIndex + 3 < segments.size) {
+            return segments[upgcxcodeIndex + 3]
+        }
+        return path
     }
 }

@@ -8,10 +8,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.frost819.newbv.app.util.MediaCodecVideoCapabilityProvider
 import dev.frost819.newbv.app.util.VideoCapabilityProvider
+import dev.frost819.newbv.player.CdnHostModel
 import dev.frost819.newbv.player.CdnSelector
 import dev.frost819.newbv.player.OkHttpCdnSelector
 import dev.frost819.newbv.player.OkHttpUtil
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
+import dev.frost819.newbv.player.racing.CdnRacingRegistry
 import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
@@ -35,11 +37,30 @@ object PlayerModule {
      * 提供 [ExoPlayerFactory] 单例。
      *
      * 用于创建 Media3 ExoPlayer 实例。通过工厂模式抽象播放器创建，
-     * 便于未来扩展其他播放器实现。
+     * 便于未来扩展其他播放器实现。附带 CDN 竞速注册表（会话级单例，
+     * 主机池/熔断状态跨播放会话保留）。
      */
     @Provides
     @Singleton
-    fun provideExoPlayerFactory(playerHttpClient: OkHttpClient): ExoPlayerFactory = ExoPlayerFactory(playerHttpClient)
+    fun provideExoPlayerFactory(
+        playerHttpClient: OkHttpClient,
+        cdnRacingRegistry: CdnRacingRegistry,
+    ): ExoPlayerFactory = ExoPlayerFactory(playerHttpClient, cdnRacingRegistry)
+
+    /** CDN 主机状态模型（速度样本 + 可靠性），竞速层与测速选择器共用形态，进程级单例。 */
+    @Provides
+    @Singleton
+    fun provideCdnHostModel(): CdnHostModel = CdnHostModel()
+
+    /**
+     * 提供 CDN 竞速注册表：已知 upgcxcode 主机池、原生回退窗口、
+     * 连续失败熔断与完整性熔断（PR #31 thread-ripper 的 page 级状态）。
+     */
+    @Provides
+    @Singleton
+    fun provideCdnRacingRegistry(
+        cdnHostModel: CdnHostModel,
+    ): CdnRacingRegistry = CdnRacingRegistry(cdnHostModel)
 
     /**
      * 提供设备视频解码能力查询器。

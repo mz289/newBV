@@ -29,6 +29,8 @@ import dev.frost819.newbv.player.VideoPlayerOptions
 import dev.frost819.newbv.player.formatMinSec
 import dev.frost819.newbv.player.isAudioRenderError
 import dev.frost819.newbv.player.isVideoDecodeError
+import dev.frost819.newbv.player.racing.CdnRacingRegistry
+import dev.frost819.newbv.player.racing.RacingDataSource
 import okhttp3.OkHttpClient
 import java.io.ByteArrayInputStream
 import java.io.InputStream
@@ -50,6 +52,7 @@ class ExoMediaPlayer(
     private val context: Context,
     private val options: VideoPlayerOptions,
     internal val httpClient: OkHttpClient,
+    private val racingRegistry: CdnRacingRegistry? = null,
 ) : Player.Listener {
     companion object {
         private const val BEHIND_LIVE_WINDOW_RECOVER_WINDOW_MS = 15_000L
@@ -81,7 +84,26 @@ class ExoMediaPlayer(
             options.referer?.let { setDefaultRequestProperties(mapOf("referer" to it)) }
         }
 
-    private val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
+    /**
+     * 媒体数据源工厂：开启 CDN 竞速时以 [RacingDataSource.Factory] 包一层
+     * （对 upgcxcode 媒体做多主机换宿竞速，其余请求透明旁路）。
+     */
+    private val dataSourceFactory =
+        DefaultDataSource.Factory(
+            context,
+            if (options.cdnRacingEnabled && racingRegistry != null) {
+                RacingDataSource.Factory(
+                    client = httpClient,
+                    userAgent = options.userAgent,
+                    defaultHeaders = buildMap {
+                        options.referer?.let { put("Referer", it) }
+                    },
+                    registry = racingRegistry,
+                )
+            } else {
+                httpDataSourceFactory
+            },
+        )
 
     init {
         mPlayer = createPlayer()

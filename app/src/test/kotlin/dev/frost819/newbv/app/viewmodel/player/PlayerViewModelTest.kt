@@ -27,10 +27,12 @@ import dev.frost819.newbv.biliapi.repositories.FavoriteRepository
 import dev.frost819.newbv.biliapi.repositories.VideoPlayRepository
 import dev.frost819.newbv.data.datastore.ActionAfterPlay
 import dev.frost819.newbv.data.datastore.Audio
-import dev.frost819.newbv.data.datastore.PlaySpeed
 import dev.frost819.newbv.data.datastore.Prefs
+import dev.frost819.newbv.data.datastore.PlaySpeed
 import dev.frost819.newbv.data.datastore.Resolution
 import dev.frost819.newbv.data.datastore.VideoCodec
+import dev.frost819.newbv.player.CdnHostModel
+import dev.frost819.newbv.player.racing.CdnRacingRegistry
 import dev.frost819.newbv.player.CdnSelector
 import dev.frost819.newbv.player.VideoPlayerListener
 import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
@@ -132,6 +134,7 @@ class PlayerViewModelTest {
                 favoriteRepository = favoriteRepository,
                 sponsorBlockApi = sponsorBlockApi,
                 cdnSelector = cdnSelector,
+                cdnRacingRegistry = CdnRacingRegistry(CdnHostModel()),
             )
     }
 

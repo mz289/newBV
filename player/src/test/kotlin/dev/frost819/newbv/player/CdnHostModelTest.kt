@@ -123,6 +123,20 @@ class CdnHostModelTest {
     }
 
     @Test
+    fun `alive host is not cooled down by a single connection failure`() {
+        // PR #31 `alive` 语义：该主机 2s 内还在送字节，连接级失败只是这一条连接坏。
+        // 另一台主机在 2s 处送字节，保证全局网络不处于「失联」状态。
+        model.noteDelivery("a", now = 1_000)
+        model.noteDelivery("b", now = 2_000)
+        model.recordOutcome("a", CdnOutcome.CONNECT_FAIL, videoKey = "video", now = 2_500)
+        assertThat(model.isCoolingDown("a", now = 2_500)).isFalse()
+
+        // a 自己超过 ALIVE_MS（2s）没有字节（b 的字节让全局未失联）：失败重新计入冷却
+        model.recordOutcome("a", CdnOutcome.CONNECT_FAIL, videoKey = "video", now = 4_500)
+        assertThat(model.isCoolingDown("a", now = 4_500)).isTrue()
+    }
+
+    @Test
     fun `refused excludes the host for the video for a minute`() {
         model.recordOutcome("peer", CdnOutcome.OK, videoKey = "video", now = 0)
         model.recordOutcome("a", CdnOutcome.REFUSED, videoKey = "video", now = 0)

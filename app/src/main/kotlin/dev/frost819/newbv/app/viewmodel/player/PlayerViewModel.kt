@@ -48,12 +48,14 @@ import dev.frost819.newbv.data.datastore.Prefs
 import dev.frost819.newbv.data.datastore.Resolution
 import dev.frost819.newbv.data.datastore.SkipPolicy
 import dev.frost819.newbv.data.datastore.VideoCodec
+import dev.frost819.newbv.player.CdnClassify
 import dev.frost819.newbv.player.CdnSelector
 import dev.frost819.newbv.player.VideoPlayerListener
 import dev.frost819.newbv.player.VideoPlayerOptions
 import dev.frost819.newbv.player.impl.exo.ExoMediaPlayer
 import dev.frost819.newbv.player.impl.exo.ExoPlayerFactory
 import dev.frost819.newbv.player.isNetworkError
+import dev.frost819.newbv.player.racing.CdnRacingRegistry
 import dev.frost819.newbv.player.toPlaybackErrorMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -132,6 +134,7 @@ class PlayerViewModel
         private val favoriteRepository: FavoriteRepository,
         private val sponsorBlockApi: SponsorBlockApi,
         private val cdnSelector: CdnSelector,
+        private val cdnRacingRegistry: CdnRacingRegistry,
     ) : ViewModel() {
         private val logger = Loggers.get("PlayerViewModel")
 
@@ -740,6 +743,7 @@ class PlayerViewModel
                     userAgent = userAgent,
                     referer = referer,
                     enableSoftwareVideoDecoder = Prefs.enableSoftwareVideoDecoder,
+                    cdnRacingEnabled = Prefs.autoSelectCdn,
                 )
 
             val newPlayer = exoPlayerFactory.create(context.applicationContext, options)
@@ -1458,6 +1462,27 @@ class PlayerViewModel
                 )
             this.playData = playData
 
+            // 竞速层播种：playinfo 提到的所有 upgcxcode 主机进入换宿池
+            // （PR #31：「Every host a playinfo names becomes a candidate」）
+            if (Prefs.autoSelectCdn) {
+                playData.dashVideos.forEach { video ->
+                    cdnRacingRegistry.learnMediaUrl(video.baseUrl)
+                    video.backUrl.forEach(cdnRacingRegistry::learnMediaUrl)
+                }
+                playData.dashAudios.forEach { audio ->
+                    cdnRacingRegistry.learnMediaUrl(audio.baseUrl)
+                    audio.backUrl.forEach(cdnRacingRegistry::learnMediaUrl)
+                }
+                playData.dolby?.let { dolby ->
+                    cdnRacingRegistry.learnMediaUrl(dolby.baseUrl)
+                    dolby.backUrl.forEach(cdnRacingRegistry::learnMediaUrl)
+                }
+                playData.flac?.let { flac ->
+                    cdnRacingRegistry.learnMediaUrl(flac.baseUrl)
+                    flac.backUrl.forEach(cdnRacingRegistry::learnMediaUrl)
+                }
+            }
+
             val resolutionMap =
                 playData.dashVideos.associate { video ->
                     video.quality to Resolution.fromCode(video.quality).name
@@ -1622,18 +1647,14 @@ class PlayerViewModel
             val videoCandidates = officialCdnCandidates(videoUrls.filterNotNull())
             val audioCandidates = officialCdnCandidates(audioUrls)
 
-            // 开启自动选源时按视频维度实测评估候选（TTFB + 吞吐 → ETA 排序，样本不跨视频复用），
-            // 否则沿用原有顺序。视频/音频轨道共用同一个评估 key。
+            // PR #31 thread-ripper 方案：不在起播路径上做前置探测排序——主机选择由
+            // RacingDataSource 在每个媒体请求上换宿竞速完成，测量发生在真实下载里。
+            // 候选保持官方过滤后的顺序（原始 URL 仍是原生回退的最终兜底）；
+            // cdnSelector 保留但不再在起播路径调用。视频/音频轨道沿用同一评估 key。
             val cdnKey = "${state.aid}-${state.cid}-$targetQn"
             cdnVideoKey = cdnKey
-            videoCdnCandidates =
-                if (Prefs.autoSelectCdn) cdnSelector.rank(videoCandidates, cdnKey) else videoCandidates
-            audioCdnCandidates =
-                if (Prefs.autoSelectCdn && audioCandidates.isNotEmpty()) {
-                    cdnSelector.rank(audioCandidates, cdnKey)
-                } else {
-                    audioCandidates
-                }
+            videoCdnCandidates = videoCandidates
+            audioCdnCandidates = audioCandidates
             cdnFallbackIndex = 0
 
             val videoUrl = videoCdnCandidates.firstOrNull() ?: return null
@@ -1801,18 +1822,11 @@ class PlayerViewModel
         /**
          * 过滤出官方 CDN 候选地址。
          *
-         * 过滤掉 mcdn/szbdyd/IP 地址的 URL，优先使用官方 CDN；若全部被过滤则回退原列表。
+         * 按 [CdnClassify.isP2pUrl] 过滤 P2P / PCDN（mcdn/szbdyd/纯 IP/`os=mcdn` 镜像外壳/
+         * 302 系/七牛等），优先使用官方 CDN；若全部被过滤则回退原列表。
          */
         private fun officialCdnCandidates(urls: List<String>): List<String> {
-            val filtered =
-                urls
-                    .filter { !it.contains(".mcdn.bilivideo.") }
-                    .filter { !it.contains(".szbdyd.com") }
-                    .filter {
-                        !Regex(
-                            "^(https?://)?(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}(:\\d{1,5})?)(/.*)?(\\?.*)?$",
-                        ).matches(it)
-                    }
+            val filtered = urls.filterNot { CdnClassify.isP2pUrl(it) }
             return filtered.ifEmpty { urls }
         }
 
