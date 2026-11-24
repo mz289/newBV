@@ -18,8 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -39,8 +39,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,6 +82,8 @@ import dev.frost819.newbv.app.ui.component.comment.CommentDialogMode
 import dev.frost819.newbv.app.ui.component.comment.CommentsDialog
 import dev.frost819.newbv.app.ui.component.dialog.EpisodeListButton
 import dev.frost819.newbv.app.ui.component.dialog.EpisodeListDialog
+import dev.frost819.newbv.app.ui.component.dialog.EpisodeOrder
+import dev.frost819.newbv.app.ui.component.dialog.EpisodeOrderToggle
 import dev.frost819.newbv.app.ui.component.focusSaverItem
 import dev.frost819.newbv.app.ui.component.rememberFocusSaver
 import dev.frost819.newbv.app.ui.component.videocard.BadgeChip
@@ -264,6 +268,9 @@ private fun VideoDetailContent(
     var seasonDialogEpisodes by remember { mutableStateOf<List<Episode>>(emptyList()) }
     var seasonDialogTitle by remember { mutableStateOf("") }
     var showCommentsDialog by remember { mutableStateOf(false) }
+    // 选集排序：分 P 与每个合集分区各自记忆，行内列表与弹窗共用同一状态
+    var partDescending by rememberSaveable { mutableStateOf(false) }
+    val seasonDescending = remember { mutableStateMapOf<Int, Boolean>() }
 
     Column(
         modifier =
@@ -324,6 +331,7 @@ private fun VideoDetailContent(
 
         EpisodeRow(
             title = "分P",
+            countUnit = "P",
             cells =
                 detail.pages.map { page ->
                     EpisodeCell(
@@ -335,6 +343,9 @@ private fun VideoDetailContent(
                 },
             rowKey = "parts",
             itemKeyPrefix = "part_",
+            order = if (partDescending) EpisodeOrder.Descending else EpisodeOrder.Ascending,
+            onOrderChange = { partDescending = it == EpisodeOrder.Descending },
+            ordinalLabelOf = { "P$it" },
             lastPlayedCid = lastPlayedCid,
             lastPlayedTime = lastPlayedTime,
             onClick = { cell ->
@@ -356,16 +367,26 @@ private fun VideoDetailContent(
             season.sections.forEachIndexed { sectionIndex, section ->
                 EpisodeRow(
                     title = if (season.sections.size == 1) season.title else section.title,
+                    countUnit = "集",
                     cells =
                         section.episodes.map { episode ->
                             EpisodeCell(
                                 cid = episode.cid,
                                 title = episode.title,
                                 duration = episode.duration,
+                                isCurrent = episode.cid == detail.cid,
                             )
                         },
-                    rowKey = "seasons",
-                    itemKeyPrefix = "episode_",
+                    rowKey = "season_$sectionIndex",
+                    itemKeyPrefix = "episode_${sectionIndex}_",
+                    order =
+                        if (seasonDescending[sectionIndex] == true) {
+                            EpisodeOrder.Descending
+                        } else {
+                            EpisodeOrder.Ascending
+                        },
+                    onOrderChange = { seasonDescending[sectionIndex] = it == EpisodeOrder.Descending },
+                    ordinalLabelOf = { it.toString() },
                     lastPlayedCid = lastPlayedCid,
                     lastPlayedTime = lastPlayedTime,
                     onClick = { cell ->
@@ -407,6 +428,8 @@ private fun VideoDetailContent(
             currentCid = detail.cid,
             lastPlayedCid = lastPlayedCid,
             lastPlayedTime = lastPlayedTime,
+            order = if (partDescending) EpisodeOrder.Descending else EpisodeOrder.Ascending,
+            onOrderChange = { partDescending = it == EpisodeOrder.Descending },
             onDismiss = { showPartListDialog = false },
             onSelect = { page ->
                 showPartListDialog = false
@@ -427,8 +450,16 @@ private fun VideoDetailContent(
         VideoEpisodeListDialog(
             title = seasonDialogTitle,
             episodes = seasonDialogEpisodes,
+            currentCid = detail.cid,
             lastPlayedCid = lastPlayedCid,
             lastPlayedTime = lastPlayedTime,
+            order =
+                if (seasonDescending[seasonDialogSectionIndex] == true) {
+                    EpisodeOrder.Descending
+                } else {
+                    EpisodeOrder.Ascending
+                },
+            onOrderChange = { seasonDescending[seasonDialogSectionIndex] = it == EpisodeOrder.Descending },
             onDismiss = { showSeasonListDialog = false },
             onSelect = { episode ->
                 showSeasonListDialog = false
@@ -874,31 +905,49 @@ private data class EpisodeCell(
 /**
  * 选集列表行（分 P 与 UGC 合集共用）。
  *
- * 标题行（含网格按钮与续播按钮）+ 横向滚动选集按钮列表。
- * 超过 [PART_LIST_DIALOG_THRESHOLD] 个分集时显示网格按钮，点击弹出分页弹窗。
- * 有历史记录且分集数 > 1 时显示"上次看到：{分集标题}"续播按钮。
+ * 标题行：标题 + 排序切换（正序/倒序）+「全部 N 集」入口；下方横向列表按当前排序
+ * 展示，当前播放项高亮。超过 [PART_LIST_DIALOG_THRESHOLD] 个分集时才显示排序与
+ * 「全部」入口，弹窗与行内列表共用同一排序状态，两处顺序始终一致。
  *
  * @param title 行标题。
- * @param cells 分集列表。
+ * @param countUnit 条目计量单位（「集」「P」），用于「全部 N 集」入口文案。
+ * @param cells 分集列表，按接口自然顺序。
  * @param rowKey 行级焦点保存 key（如 "parts"）。
  * @param itemKeyPrefix 分集焦点 key 前缀（如 "part_"，拼 cid）。
+ * @param order 当前排序。
+ * @param onOrderChange 切换排序回调。
+ * @param ordinalLabelOf 由原始序号生成序号标签（如 `P12`、`12`）。
  * @param lastPlayedCid 上次播放的 CID。
  * @param lastPlayedTime 上次播放进度（秒）。
  * @param onClick 点击分集回调。
- * @param onShowListDialog 点击网格按钮回调。
+ * @param onShowListDialog 点击「全部」入口回调。
  */
 @Composable
 private fun EpisodeRow(
     title: String,
+    countUnit: String,
     cells: List<EpisodeCell>,
     rowKey: String,
     itemKeyPrefix: String,
+    order: EpisodeOrder,
+    onOrderChange: (EpisodeOrder) -> Unit,
+    ordinalLabelOf: (Int) -> String,
     lastPlayedCid: Long,
     lastPlayedTime: Int,
     onClick: (EpisodeCell) -> Unit,
     onShowListDialog: () -> Unit,
     focusSaver: FocusSaver,
 ) {
+    val showListEntry = cells.size > PART_LIST_DIALOG_THRESHOLD
+    // 展示顺序（原始下标）：倒序只改遍历方向，条目身份与序号不变
+    val displayOrder =
+        remember(cells, order) {
+            if (order == EpisodeOrder.Descending) cells.indices.reversed().toList() else cells.indices.toList()
+        }
+    val rowState = rememberLazyListState()
+    // 切换排序后回到列表起点，避免停在旧位置看到无关条目
+    LaunchedEffect(order) { if (rowState.firstVisibleItemIndex > 0) rowState.scrollToItem(0) }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -909,39 +958,33 @@ private fun EpisodeRow(
                     .fillMaxWidth()
                     .padding(horizontal = 50.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-            if (cells.size > PART_LIST_DIALOG_THRESHOLD) {
-                Surface(
+            if (showListEntry) {
+                EpisodeOrderToggle(
+                    selected = order,
+                    onSelect = onOrderChange,
+                    focusSaver = focusSaver,
+                    focusKeyPrefix = "${itemKeyPrefix}order",
+                )
+                EpisodeAllEntry(
+                    label = "全部 ${cells.size} $countUnit",
                     onClick = onShowListDialog,
-                    modifier = Modifier.touchClickable(onClick = onShowListDialog),
-                    shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
-                    colors =
-                        ControlFocusDefaults.surfaceColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                    border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(4.dp)),
-                    scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Apps,
-                        contentDescription = "网格列表",
-                        modifier =
-                            Modifier
-                                .padding(4.dp)
-                                .size(20.dp),
-                    )
-                }
+                    modifier = Modifier.focusSaverItem(focusSaver, itemKeyPrefix + "all"),
+                )
             }
         }
         val focusRequester = focusSaver.focusRequesterFor(rowKey)
         LazyRow(
+            state = rowState,
             modifier =
                 Modifier
                     .onFocusChanged { if (it.hasFocus) focusSaver.saveFocusedKey(rowKey) }
@@ -951,26 +994,62 @@ private fun EpisodeRow(
                 androidx.compose.foundation.layout
                     .PaddingValues(horizontal = 50.dp),
         ) {
-            itemsIndexed(cells) { index, cell ->
+            items(count = displayOrder.size, key = { cells[displayOrder[it]].cid }) { index ->
+                val ordinal = displayOrder[index] + 1
+                val cell = cells[displayOrder[index]]
                 val played = if (cell.cid == lastPlayedCid) lastPlayedTime else 0
                 EpisodeListButton(
                     title = cell.title,
+                    ordinalLabel = ordinalLabelOf(ordinal),
                     duration = cell.duration,
                     played = played,
                     isCurrent = cell.isCurrent,
                     onClick = { onClick(cell) },
                     modifier =
-                        if (index == 0) {
-                            Modifier.focusRequester(focusRequester).focusSaverItem(focusSaver, itemKeyPrefix + cell.cid)
-                        } else {
-                            Modifier.focusSaverItem(focusSaver, itemKeyPrefix + cell.cid)
-                        },
+                        Modifier
+                            .width(200.dp)
+                            .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier)
+                            .focusSaverItem(focusSaver, itemKeyPrefix + cell.cid),
                 )
             }
         }
     }
 }
 
+/** 选集行尾的「全部 N 集」入口：图标 + 数量，比纯图标入口更易发现。 */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun EpisodeAllEntry(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.touchClickable(onClick = onClick),
+        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
+        colors =
+            ControlFocusDefaults.surfaceColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        border = ClickableSurfaceDefaults.border(focusedBorder = outerFocusBorder(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Apps,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(text = label, style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
 
 @Composable
 private fun RelatedVideoRow(
@@ -1043,11 +1122,14 @@ private fun RelatedVideoRow(
  *
  * 当分 P 数量超过 [PART_LIST_DIALOG_THRESHOLD] 时显示。
  * 委托给通用 [EpisodeListDialog]，每页 [PART_LIST_DIALOG_PAGE_SIZE] 个。
+ * 打开时定位到正在播放的分 P；排序与行内列表共用同一状态。
  *
  * @param pages 全部分 P 列表。
  * @param currentCid 当前 CID。
  * @param lastPlayedCid 上次播放 CID。
  * @param lastPlayedTime 上次播放进度（秒）。
+ * @param order 当前排序。
+ * @param onOrderChange 切换排序回调。
  * @param onDismiss 关闭弹窗回调。
  * @param onSelect 选择分 P 回调。
  */
@@ -1057,19 +1139,33 @@ private fun VideoPartListDialog(
     currentCid: Long,
     lastPlayedCid: Long,
     lastPlayedTime: Int,
+    order: EpisodeOrder,
+    onOrderChange: (EpisodeOrder) -> Unit,
     onDismiss: () -> Unit,
     onSelect: (VideoPage) -> Unit,
 ) {
+    val currentOrdinal = pages.indexOfFirst { it.cid == currentCid }.takeIf { it >= 0 }?.plus(1)
+    val locateOrdinal =
+        currentOrdinal
+            ?: pages
+                .indexOfFirst { lastPlayedCid != 0L && it.cid == lastPlayedCid }
+                .takeIf { it >= 0 }
+                ?.plus(1)
     EpisodeListDialog(
-        title = null,
+        title = "分 P",
+        countUnit = "P",
         entries = pages,
         pageSize = PART_LIST_DIALOG_PAGE_SIZE,
+        order = order,
+        onOrderChange = onOrderChange,
+        currentOrdinal = currentOrdinal,
+        locateOrdinal = locateOrdinal,
         keyOf = { it.cid },
         titleOf = { it.title },
+        ordinalLabelOf = { "P$it" },
         durationOf = { it.duration },
         playedOf = { if (it.cid == lastPlayedCid) lastPlayedTime else 0 },
         isCurrentOf = { it.cid == currentCid },
-        tabLabelOf = { start, end -> "P$start-$end" },
         onDismiss = onDismiss,
         onSelect = onSelect,
     )
@@ -1080,11 +1176,15 @@ private fun VideoPartListDialog(
  *
  * 当分集数量超过 [PART_LIST_DIALOG_THRESHOLD] 时显示。
  * 委托给通用 [EpisodeListDialog]，每页 [PART_LIST_DIALOG_PAGE_SIZE] 个。
+ * 打开时定位到当前/上次播放的分集；排序与行内列表共用同一状态。
  *
  * @param title 弹窗标题。
  * @param episodes 全部分集列表。
+ * @param currentCid 当前播放的分集 CID。
  * @param lastPlayedCid 上次播放 CID。
  * @param lastPlayedTime 上次播放进度（秒）。
+ * @param order 当前排序。
+ * @param onOrderChange 切换排序回调。
  * @param onDismiss 关闭弹窗回调。
  * @param onSelect 选择分集回调。
  */
@@ -1092,21 +1192,37 @@ private fun VideoPartListDialog(
 private fun VideoEpisodeListDialog(
     title: String,
     episodes: List<Episode>,
+    currentCid: Long,
     lastPlayedCid: Long,
     lastPlayedTime: Int,
+    order: EpisodeOrder,
+    onOrderChange: (EpisodeOrder) -> Unit,
     onDismiss: () -> Unit,
     onSelect: (Episode) -> Unit,
 ) {
+    val currentOrdinal = episodes.indexOfFirst { it.cid == currentCid }.takeIf { it >= 0 }?.plus(1)
+    val locateOrdinal =
+        currentOrdinal
+            ?: episodes
+                .indexOfFirst { lastPlayedCid != 0L && it.cid == lastPlayedCid }
+                .takeIf { it >= 0 }
+                ?.plus(1)
     EpisodeListDialog(
         title = title,
+        badge = "合集",
+        countUnit = "集",
         entries = episodes,
         pageSize = PART_LIST_DIALOG_PAGE_SIZE,
+        order = order,
+        onOrderChange = onOrderChange,
+        currentOrdinal = currentOrdinal,
+        locateOrdinal = locateOrdinal,
         keyOf = { it.cid },
         titleOf = { it.title },
+        ordinalLabelOf = { it.toString() },
         durationOf = { it.duration },
         playedOf = { if (it.cid == lastPlayedCid) lastPlayedTime else 0 },
-        isCurrentOf = { false },
-        tabLabelOf = { start, end -> "$start-$end" },
+        isCurrentOf = { it.cid == currentCid },
         onDismiss = onDismiss,
         onSelect = onSelect,
     )
