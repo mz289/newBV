@@ -141,6 +141,12 @@ class ExoMediaPlayer(
             .setRenderersFactory(renderersFactory)
             // 限制缓冲时长与字节数：默认 50 秒窗在 4K 高码率流上会占满低内存电视的堆
             .setLoadControl(PlayerLoadControl.create())
+            // 不向视频 Surface 投帧率票：默认策略(ONLY_IF_SEAMLESS)会按内容帧率(如 30fps)
+            // 调 Surface.setFrameRate，系统随之把整个 app 的 vsync 分频锁定到该帧率，
+            // 弹幕与全部 UI 的 Choreographer 一并掉到 30Hz——滚动弹幕呈"一跳一跳"。
+            // OFF 短路 VideoFrameReleaseHelper 的全部 setFrameRate 调用（含清除），
+            // 显示保持默认刷新率；视频帧依旧由解码释放时钟对齐显示节奏，不受影响。
+            .setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF)
             .build()
             .also { it.addListener(this) }
     }
