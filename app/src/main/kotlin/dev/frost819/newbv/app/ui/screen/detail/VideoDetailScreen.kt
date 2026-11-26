@@ -345,7 +345,6 @@ private fun VideoDetailContent(
             itemKeyPrefix = "part_",
             order = if (partDescending) EpisodeOrder.Descending else EpisodeOrder.Ascending,
             onOrderChange = { partDescending = it == EpisodeOrder.Descending },
-            ordinalLabelOf = { "P$it" },
             lastPlayedCid = lastPlayedCid,
             lastPlayedTime = lastPlayedTime,
             onClick = { cell ->
@@ -386,7 +385,6 @@ private fun VideoDetailContent(
                             EpisodeOrder.Ascending
                         },
                     onOrderChange = { seasonDescending[sectionIndex] = it == EpisodeOrder.Descending },
-                    ordinalLabelOf = { it.toString() },
                     lastPlayedCid = lastPlayedCid,
                     lastPlayedTime = lastPlayedTime,
                     onClick = { cell ->
@@ -916,7 +914,6 @@ private data class EpisodeCell(
  * @param itemKeyPrefix 分集焦点 key 前缀（如 "part_"，拼 cid）。
  * @param order 当前排序。
  * @param onOrderChange 切换排序回调。
- * @param ordinalLabelOf 由原始序号生成序号标签（如 `P12`、`12`）。
  * @param lastPlayedCid 上次播放的 CID。
  * @param lastPlayedTime 上次播放进度（秒）。
  * @param onClick 点击分集回调。
@@ -931,7 +928,6 @@ private fun EpisodeRow(
     itemKeyPrefix: String,
     order: EpisodeOrder,
     onOrderChange: (EpisodeOrder) -> Unit,
-    ordinalLabelOf: (Int) -> String,
     lastPlayedCid: Long,
     lastPlayedTime: Int,
     onClick: (EpisodeCell) -> Unit,
@@ -995,12 +991,10 @@ private fun EpisodeRow(
                     .PaddingValues(horizontal = 50.dp),
         ) {
             items(count = displayOrder.size, key = { cells[displayOrder[it]].cid }) { index ->
-                val ordinal = displayOrder[index] + 1
                 val cell = cells[displayOrder[index]]
                 val played = if (cell.cid == lastPlayedCid) lastPlayedTime else 0
                 EpisodeListButton(
                     title = cell.title,
-                    ordinalLabel = ordinalLabelOf(ordinal),
                     duration = cell.duration,
                     played = played,
                     isCurrent = cell.isCurrent,

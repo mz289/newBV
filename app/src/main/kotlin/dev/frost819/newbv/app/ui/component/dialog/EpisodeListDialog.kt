@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
@@ -179,11 +178,10 @@ fun EpisodeOrderToggle(
 /**
  * 分 P / 分集通用卡片。
  *
- * 左侧序号标签 + 两行标题 + 时长/播放中标记，底部叠加播放进度条。
+ * 两行标题 + 时长/播放中标记，底部叠加播放进度条。
  * 当前播放项用主色底 + 主色描边标记，与普通项一眼可分。
  *
  * @param title 条目标题。
- * @param ordinalLabel 序号标签（如 `P12`、`175`）。
  * @param duration 总时长（秒），<= 0 时不显示。
  * @param played 已播放时长（秒），0 表示无进度；传负数表示已看完（进度条拉满）。
  * @param isCurrent 是否为当前播放项。
@@ -194,7 +192,6 @@ fun EpisodeOrderToggle(
 @Composable
 fun EpisodeListButton(
     title: String,
-    ordinalLabel: String,
     duration: Int,
     played: Int,
     isCurrent: Boolean,
@@ -234,41 +231,35 @@ fun EpisodeListButton(
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1f),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Row(
+            Column(
                 modifier =
                     Modifier
                         .fillMaxSize()
                         // 底部留出进度条空间，标题不压进度条
                         .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                EpisodeOrdinalBadge(label = ordinalLabel, highlighted = isCurrent)
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = contentColor,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (duration > 0) {
-                            Text(
-                                text = formatEpisodeDuration(duration),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (isCurrent) {
-                            Text(
-                                text = "播放中",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = primary,
-                            )
-                        }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = contentColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (duration > 0) {
+                        Text(
+                            text = formatEpisodeDuration(duration),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (isCurrent) {
+                        Text(
+                            text = "播放中",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = primary,
+                        )
                     }
                 }
             }
@@ -295,44 +286,6 @@ fun EpisodeListButton(
     }
 }
 
-/** 序号小标签：当前项用主色底，其余用低对比底。 */
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun EpisodeOrdinalBadge(
-    label: String,
-    highlighted: Boolean,
-) {
-    val background =
-        if (highlighted) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
-        }
-    val color =
-        if (highlighted) {
-            MaterialTheme.colorScheme.onPrimary
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        }
-    Box(
-        modifier =
-            Modifier
-                .heightIn(min = 22.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(background)
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = color,
-            maxLines = 1,
-        )
-    }
-}
-
 /**
  * 分 P / 分集分页弹窗。
  *
@@ -351,7 +304,7 @@ private fun EpisodeOrdinalBadge(
  * @param locateOrdinal 自动定位的原始序号，缺省退回 [currentOrdinal]。
  * @param keyOf 提取条目的稳定 key，用于网格项 key。
  * @param titleOf 提取条目显示标题。
- * @param ordinalLabelOf 由原始序号生成序号标签（如 `P12`、`12`）。
+ * @param ordinalLabelOf 由原始序号生成标题区「当前」文案的标签（如 `P12`）。
  * @param durationOf 提取条目总时长（秒）。
  * @param playedOf 提取条目已播放时长（秒），0 表示无进度。
  * @param isCurrentOf 判断条目是否为当前播放项。
@@ -604,10 +557,9 @@ fun <T> EpisodeListDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(count = slice.size, key = { index -> keyOf(slice[index].second) }) { index ->
-                            val (ordinal, entry) = slice[index]
+                            val entry = slice[index].second
                             EpisodeListButton(
                                 title = titleOf(entry),
-                                ordinalLabel = ordinalLabelOf(ordinal),
                                 duration = durationOf(entry),
                                 played = playedOf(entry),
                                 isCurrent = isCurrentOf(entry),
