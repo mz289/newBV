@@ -178,7 +178,7 @@ fun EpisodeOrderToggle(
 /**
  * 分 P / 分集通用卡片。
  *
- * 两行标题 + 时长/播放中标记，底部叠加播放进度条。
+ * 两行标题 + 时长标记，底部叠加播放进度条。
  * 当前播放项用主色底 + 主色描边标记，与普通项一眼可分。
  *
  * @param title 条目标题。
@@ -246,21 +246,12 @@ fun EpisodeListButton(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (duration > 0) {
-                        Text(
-                            text = formatEpisodeDuration(duration),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (isCurrent) {
-                        Text(
-                            text = "播放中",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = primary,
-                        )
-                    }
+                if (duration > 0) {
+                    Text(
+                        text = formatEpisodeDuration(duration),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             if (played != 0 && duration > 0) {
