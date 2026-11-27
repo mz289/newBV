@@ -903,8 +903,9 @@ private data class EpisodeCell(
 /**
  * 选集列表行（分 P 与 UGC 合集共用）。
  *
- * 标题行：标题 + 排序切换（正序/倒序）+「全部 N 集」入口；下方横向列表按当前排序
- * 展示，当前播放项高亮。超过 [PART_LIST_DIALOG_THRESHOLD] 个分集时才显示排序与
+ * 标题行：排序切换（正序/倒序）与「全部 N 集」入口靠左（与下方卡片同侧，TV 焦点可达），
+ * 标题占余下宽度；下方横向列表按当前排序展示，当前播放项高亮。超过
+ * [PART_LIST_DIALOG_THRESHOLD] 个分集时才显示排序与
  * 「全部」入口，弹窗与行内列表共用同一排序状态，两处顺序始终一致。
  *
  * @param title 行标题。
@@ -956,14 +957,6 @@ private fun EpisodeRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
             if (showListEntry) {
                 EpisodeOrderToggle(
                     selected = order,
@@ -977,6 +970,14 @@ private fun EpisodeRow(
                     modifier = Modifier.focusSaverItem(focusSaver, itemKeyPrefix + "all"),
                 )
             }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
         }
         val focusRequester = focusSaver.focusRequesterFor(rowKey)
         LazyRow(
